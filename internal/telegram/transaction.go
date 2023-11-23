@@ -58,7 +58,7 @@ func NewTransaction(bot *TipBot, from *lnbits.User, to *lnbits.User, amount int6
 		FromId:   from.Telegram.ID,
 		ToId:     to.Telegram.ID,
 		Amount:   amount,
-		Memo:     "Powered by @LightningTipBot",
+		Memo:     "Powered by @BitcoinDeepaBot",
 		Time:     time.Now(),
 		Success:  false,
 	}
