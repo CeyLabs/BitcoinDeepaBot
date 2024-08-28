@@ -45,7 +45,7 @@ func init() {
 	mainMenu.Reply(
 		mainMenu.Row(btnBalanceMainMenu),
 		// mainMenu.Row(btnInvoiceMainMenu, btnWebAppMainMenu, btnSendMainMenu, btnHelpMainMenu), // TODO: fix btnSendMainMenu
-		mainMenu.Row(btnInvoiceMainMenu, btnWebAppMainMenu, btnHelpMainMenu),
+		mainMenu.Row(btnInvoiceMainMenu, btnHelpMainMenu),
 	)
 }
 
@@ -82,7 +82,7 @@ func (bot *TipBot) appendWebAppLinkToButton(btn *tb.Btn, user *lnbits.User) {
 		// prevent adding a link if not https is used, otherwise
 		// Telegram returns an error and does not show the keyboard
 		url = "https://t.me/c/1869805823"
-		btn.WebApp = &tb.WebAppInfo{Url: url}
+		btn.URL = "https://t.me/c/1869805823"
 	}
 }
 
@@ -109,7 +109,7 @@ func (bot *TipBot) mainMenuBalanceButtonUpdate(to int64) {
 		mainMenu.Reply(
 			mainMenu.Row(btnBalanceMainMenu),
 			// mainMenu.Row(btnInvoiceMainMenu, btnWebAppMainMenu, btnSendMainMenu, btnHelpMainMenu), // TODO: fix btnSendMainMenu
-			mainMenu.Row(btnInvoiceMainMenu, btnWebAppMainMenu, btnHelpMainMenu),
+			mainMenu.Row(btnInvoiceMainMenu, btnHelpMainMenu),
 		)
 	}
 }
