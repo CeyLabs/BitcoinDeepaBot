@@ -137,10 +137,10 @@ func (bot *TipBot) invoiceHandler(ctx intercept.Context) (intercept.Context, err
 	}
 
 	// check for memo in command
-	memo := "Powered by @LightningTipBot"
+	memo := "Powered by @BitcoinDeepaBot"
 	if len(strings.Split(m.Text, " ")) > 2 {
 		memo = GetMemoFromCommand(m.Text, 2)
-		tag := " (@LightningTipBot)"
+		tag := " (@BitcoinDeepaBot)"
 		memoMaxLen := 159 - len(tag)
 		if len(memo) > memoMaxLen {
 			memo = memo[:memoMaxLen-len(tag)]
