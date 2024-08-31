@@ -77,7 +77,7 @@ _This bot is a Bitcoin Lightning wallet that can sends tips on Telegram. To tip,
 */advanced* 🤖 Advanced features.
 */help* 📖 Read this help.
 
-*Community* 🤝 [@bitcoindeepa](https://t.me/c/1869805823)"""
+*Community* 🤝 [@bitcoindeepa](https://t.me/bitcoindeepa)"""
 
 infoHelpMessage = """ℹ️ *Info*"""
 infoYourLightningAddress = """Your Lightning address is `%s`"""
