@@ -74,6 +74,12 @@ _This bot is a Bitcoin Lightning wallet that can sends tips on Telegram. To tip,
 */send* 💸 Send funds to a user: `/send <amount> @user or user@ln.tips [<memo>]`
 */invoice* ⚡️ Receive with Lightning: `/invoice <amount> [<memo>]`
 */pay* ⚡️ Pay with Lightning: `/pay <invoice>`
+*/transactions* 📊 List transactions
+*/link* 🔗 Link your wallet to [BlueWallet](https://bluewallet.io/) or [Zeus](https://zeusln.app/)
+*/lnurl* ⚡️ Lnurl receive or pay: `/lnurl` or `/lnurl <lnurl> [memo]`
+*/nostr* 💜 Connect to Nostr: `/nostr`
+*/faucet* 🚰 Create a faucet: `/faucet <capacity> <per_user>`
+*/tipjar* 🍯 Create a tipjar: `/tipjar <capacity> <per_user>`
 */help* 📖 Read this help.
 
 *Community* 🤝 [@bitcoindeepa](https://t.me/bitcoindeepa)"""
