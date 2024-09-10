@@ -1,8 +1,6 @@
-<p align="center">
-  	<img alt="logo" width="150" src="https://i.imgur.com/VB3zep8.png" >
-</p>
+![image](https://github.com/user-attachments/assets/11535aed-3285-4546-9389-b78924092199)
 
-# @BitcoinDeepaBot 🏅
+# [@BitcoinDeepaBot](https://t.me/BitcoinDeepaBot) 🏅
 
 A Telegram Lightning ⚡️ Bitcoin wallet and tip bot for group chats.
 
