@@ -148,7 +148,7 @@ startNoUsernameMessage    = """☝️ Vypadá to, že na Telegramu nemáš ješt
 
 # BALANCE
 
-balanceMessage      = """👑 *Tvůj zůstatek:* %d sat"""
+balanceMessage      = """👑 *Tvůj zůstatek:* %d sat(s). (%.2f USD / %.2f LKR)"""
 balanceErrorMessage = """🚫 Nepodařilo se získat info o zůstatku. Zkus to později znovu."""
 
 # TIP

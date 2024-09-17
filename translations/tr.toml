@@ -142,7 +142,7 @@ startNoUsernameMessage = """☝️ Henüz bir Telegram kullanıcı @adın yok gi
 
 # BALANCE
 
-balanceMessage      = """👑 *Kredin:* %d sat"""
+balanceMessage      = """👑 *Kredin:* %d sat(s). (%.2f USD / %.2f LKR)"""
 balanceErrorMessage = """🚫 Şu an kredini okuyamıyorum. Lütfen daha sonra tekrar dene."""
 
 # TIP

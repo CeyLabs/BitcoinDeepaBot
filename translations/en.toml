@@ -148,7 +148,7 @@ startNoUsernameMessage    = """☝️ It looks like you don't have a Telegram @u
 
 # BALANCE
 
-balanceMessage      = """👑 *Your balance:* %d sat"""
+balanceMessage      = """👑 *Your balance:* %d sat(s). (%.2f USD / %.2f LKR)"""
 balanceErrorMessage = """🚫 Could not fetch your balance. Please try again later."""
 
 # TIP

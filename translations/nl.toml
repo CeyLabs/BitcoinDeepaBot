@@ -143,7 +143,7 @@ startNoUsernameMessage    = """☝️ Het lijkt erop dat je nog geen Telegram @ 
 
 # BALANCE
 
-balanceMessage      = """👑 *Uw saldo:* %d sat"""
+balanceMessage      = """👑 *Uw saldo:* %d sat(s). (%.2f USD / %.2f LKR)"""
 balanceErrorMessage = """🚫 Kon uw saldo niet ophalen. Probeer het later nog eens."""
 
 # TIP
