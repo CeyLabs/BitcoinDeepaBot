@@ -57,7 +57,7 @@ func GetSatPrice() (float64, float64, error) {
 	LKRPerSat := priceResponse.Bitcoin.LKR / SATS_IN_A_BITCOIN
 	USDPerSat := priceResponse.Bitcoin.USD / SATS_IN_A_BITCOIN
 
-	cache.Set(key, fmt.Sprintf("%.2f-%.2f", LKRPerSat, USDPerSat))
+	cache.Set(key, fmt.Sprintf("%f-%f", LKRPerSat, USDPerSat))
 
 	return LKRPerSat, USDPerSat, nil
 }
