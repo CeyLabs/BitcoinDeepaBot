@@ -1,4 +1,4 @@
-package thridparty
+package thirdparty
 
 import (
 	"encoding/json"
@@ -18,7 +18,7 @@ type PriceResponse struct {
 	} `json:"bitcoin"`
 }
 
-const SATS_IN_A_BITCOIN = 100_000_000
+const SATS_PER_BITCOIN = 100_000_000
 
 // Caching price for 10 mins
 var cache = utils.NewCache(10 * time.Minute)
@@ -54,8 +54,8 @@ func GetSatPrice() (float64, float64, error) {
 	}
 
 	// Calculate price per sat
-	LKRPerSat := priceResponse.Bitcoin.LKR / SATS_IN_A_BITCOIN
-	USDPerSat := priceResponse.Bitcoin.USD / SATS_IN_A_BITCOIN
+	LKRPerSat := priceResponse.Bitcoin.LKR / SATS_PER_BITCOIN
+	USDPerSat := priceResponse.Bitcoin.USD / SATS_PER_BITCOIN
 
 	cache.Set(key, fmt.Sprintf("%f-%f", LKRPerSat, USDPerSat))
 

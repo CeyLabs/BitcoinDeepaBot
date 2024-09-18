@@ -5,7 +5,7 @@ import (
 
 	"github.com/LightningTipBot/LightningTipBot/internal/errors"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
-	thridparty "github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
+	thirdparty "github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 
 	log "github.com/sirupsen/logrus"
 
@@ -44,7 +44,7 @@ func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, err
 
 	log.Infof("[/balance] %s's balance: %d sat\n", usrStr, balance)
 
-	LKRPerSat, USDPerSat, err := thridparty.GetSatPrice()
+	LKRPerSat, USDPerSat, err := thirdparty.GetSatPrice()
 	if err != nil {
 		log.Infof("[/balance] error fetching price from coingecko\n")
 	}
