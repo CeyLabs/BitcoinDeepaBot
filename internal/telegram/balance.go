@@ -5,6 +5,7 @@ import (
 
 	"github.com/LightningTipBot/LightningTipBot/internal/errors"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
+	thirdparty "github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 
 	log "github.com/sirupsen/logrus"
 
@@ -42,6 +43,15 @@ func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, err
 	}
 
 	log.Infof("[/balance] %s's balance: %d sat\n", usrStr, balance)
-	bot.trySendMessage(ctx.Sender(), fmt.Sprintf(Translate(ctx, "balanceMessage"), balance))
+
+	LKRPerSat, USDPerSat, err := thirdparty.GetSatPrice()
+	if err != nil {
+		log.Infof("[/balance] error fetching price from coingecko\n")
+	}
+
+	USDValue := USDPerSat * float64(balance)
+	LKRValue := LKRPerSat * float64(balance)
+
+	bot.trySendMessage(ctx.Sender(), fmt.Sprintf(Translate(ctx, "balanceMessage"), balance, USDValue, LKRValue))
 	return ctx, nil
 }

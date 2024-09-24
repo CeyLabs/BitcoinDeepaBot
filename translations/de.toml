@@ -145,7 +145,7 @@ startNoUsernameMessage = """☝️ Es sieht so aus, als hättest du noch keinen 
 
 # BALANCE
 
-balanceMessage      = """👑 *Dein Guthaben:* %d sat"""
+balanceMessage      = """👑 *Dein Guthaben:* %d sat(s). (%.2f USD / %.2f LKR)"""
 balanceErrorMessage = """🚫 Konnte dein Guthaben nicht abfragen. Bitte versuche es später noch einmal."""
 
 # TIP

@@ -143,7 +143,7 @@ startNoUsernameMessage    = """☝️ Kelihatannya kamu belum memiliki sebuah @u
 
 # BALANCE
 
-balanceMessage      = """👑 *Saldo mu:* %d sat"""
+balanceMessage      = """👑 *Saldo mu:* %d sat(s). (%.2f USD / %.2f LKR)"""
 balanceErrorMessage = """🚫 Tidak dapat memeriksa saldo mu. Tolong coba lagi nanti."""
 
 # TIP

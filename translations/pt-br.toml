@@ -143,7 +143,7 @@ startNoUsernameMessage    = """☝️ Parece que você ainda não tem um @nomede
 
 # BALANCE
 
-balanceMessage      = """👑 *Seu saldo:* %d sat"""
+balanceMessage      = """👑 *Seu saldo:* %d sat(s). (%.2f USD / %.2f LKR)"""
 balanceErrorMessage = """🚫 Seu saldo não pôde ser recuperado. Por favor, tente novamente mais tarde."""
 
 # TIP
