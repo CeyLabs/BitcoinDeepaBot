@@ -307,7 +307,7 @@ func (bot *TipBot) groupConfirmPayButtonHandler(ctx intercept.Context) (intercep
 			bot.tryEditMessage(c, fmt.Sprintf(i18n.Translate(ticketEvent.LanguageCode, "invoicePaymentFailedMessage"), err.Error()), &tb.ReplyMarkup{})
 		}
 		if bot.ErrorLogger != nil {
-			bot.ErrorLogger.LogPaymentError(err, ticketEvent.Invoice.PaymentHash, user.Telegram)
+			bot.ErrorLogger.LogPaymentError(err, "Join Ticket Payment", ticketEvent.Invoice.PaymentHash, user.Telegram)
 		}
 		log.Errorln(errmsg)
 		return ctx, err
@@ -384,7 +384,7 @@ func (bot *TipBot) groupGetInviteLinkHandler(event Event) {
 				Out:     false,
 				Amount:  commissionSat,
 				Memo:    "🎟 Ticket commission for group " + ticketEvent.Group.Title,
-				Webhook: internal.Configuration.Lnbits.WebhookServer},
+				Webhook: internal.GetWebhookURL()},
 			bot.Client)
 		if err != nil {
 			errmsg := fmt.Sprintf("[/invoice] Could not create an invoice: %s", err.Error())
@@ -588,7 +588,7 @@ func (bot *TipBot) createGroupTicketInvoice(ctx context.Context, payer *lnbits.U
 			Out:     false,
 			Amount:  group.Ticket.Price,
 			Memo:    memo,
-			Webhook: internal.Configuration.Lnbits.WebhookServer},
+			Webhook: internal.GetWebhookURL()},
 		bot.Client)
 	if err != nil {
 		errmsg := fmt.Sprintf("[/invoice] Could not create an invoice: %s", err.Error())
