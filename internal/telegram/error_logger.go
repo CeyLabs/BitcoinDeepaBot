@@ -90,11 +90,11 @@ func (el *ErrorLogger) LogCriticalError(err error, context string, userInfo ...i
 func (el *ErrorLogger) formatErrorMessage(err error, context string, userInfo ...interface{}) string {
 	timestamp := time.Now().Format("2006-01-02 15:04:05 UTC")
 
-	msg := fmt.Sprintf("*INCIDENT DETECTED*\n\n"+
+	msg := fmt.Sprintf(
 		"*Time:* `%s`\n"+
-		"*Context:* `%s`\n"+
-		"*Error Details:*\n"+
-		"> %s\n",
+			"*Context:* `%s`\n"+
+			"*Error Details:*\n"+
+			"> %s\n",
 		el.escapeMarkdownV2(timestamp),
 		el.escapeMarkdownV2(context),
 		el.escapeMarkdownV2(err.Error()))
