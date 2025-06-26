@@ -213,6 +213,13 @@ func (bot *TipBot) confirmPayHandler(ctx intercept.Context) (intercept.Context, 
 	invoice, err := user.Wallet.Pay(lnbits.PaymentParams{Out: true, Bolt11: payData.Invoice}, bot.Client)
 	if err != nil {
 		errmsg := fmt.Sprintf("[/pay] Could not pay invoice of %s: %s", userStr, err)
+		
+		// Enhanced error logging with detailed payment information
+		if bot.ErrorLogger != nil {
+			paymentDetails := fmt.Sprintf("Amount: %d sat, Memo: %s", payData.Amount, payData.Memo)
+			bot.ErrorLogger.LogPaymentError(err, paymentDetails, payData.Invoice, user.Telegram)
+		}
+		
 		err = fmt.Errorf(i18n.Translate(payData.LanguageCode, "invoiceUndefinedErrorMessage"))
 		bot.tryEditMessage(ctx.Message(), fmt.Sprintf(i18n.Translate(payData.LanguageCode, "invoicePaymentFailedMessage"), err.Error()), &tb.ReplyMarkup{})
 		// verbose error message, turned off for now

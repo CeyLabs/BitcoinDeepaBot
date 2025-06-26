@@ -49,6 +49,8 @@ type BotConfiguration struct {
 type TelegramConfiguration struct {
 	MessageDisposeDuration int64  `yaml:"message_dispose_duration"`
 	ApiKey                 string `yaml:"api_key"`
+	LogGroupId             int64  `yaml:"log_group_id"`
+	ErrorThreadId          int64  `yaml:"error_thread_id"`
 }
 type DatabaseConfiguration struct {
 	DbPath           string `yaml:"db_path"`

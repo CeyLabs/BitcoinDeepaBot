@@ -310,6 +310,9 @@ func (bot *TipBot) confirmSendHandler(ctx intercept.Context) (intercept.Context,
 	to, err := GetLnbitsUser(&tb.User{ID: toId, Username: toUserStrWithoutAt}, *bot)
 	if err != nil {
 		log.Errorln(err.Error())
+		if bot.ErrorLogger != nil {
+			bot.ErrorLogger.LogError(err, "Failed to get recipient user for send", from.Telegram)
+		}
 		bot.tryDeleteMessage(ctx.Callback().Message)
 		return ctx, err
 	}
@@ -324,9 +327,13 @@ func (bot *TipBot) confirmSendHandler(ctx intercept.Context) (intercept.Context,
 
 	success, err := t.Send()
 	if !success || err != nil {
-		// bot.trySendMessage(c.Sender, sendErrorMessage)
+		// Enhanced error logging for send transaction failures
 		errmsg := fmt.Sprintf("[/send] Error: Transaction failed. %s", err.Error())
 		log.Errorln(errmsg)
+		if bot.ErrorLogger != nil {
+			// Log detailed send transaction error with sender/receiver info
+			bot.ErrorLogger.LogTransactionError(err, "send", amount, from.Telegram, to.Telegram)
+		}
 		bot.tryEditMessage(ctx.Callback().Message, i18n.Translate(sendData.LanguageCode, "sendErrorMessage"), &tb.ReplyMarkup{})
 		return ctx, errors.Create(errors.UnknownError)
 	}

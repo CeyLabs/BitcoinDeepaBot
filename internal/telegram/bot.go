@@ -23,12 +23,13 @@ import (
 )
 
 type TipBot struct {
-	DB       *Databases
-	Bunt     *storage.DB
-	ShopBunt *storage.DB
-	Telegram *tb.Bot
-	Client   *lnbits.Client
-	limiter  map[string]limiter.Limiter
+	DB          *Databases
+	Bunt        *storage.DB
+	ShopBunt    *storage.DB
+	Telegram    *tb.Bot
+	Client      *lnbits.Client
+	limiter     map[string]limiter.Limiter
+	ErrorLogger *ErrorLogger
 	Cache
 }
 type Cache struct {
@@ -47,7 +48,8 @@ func NewBot() TipBot {
 	// create sqlite databases
 	dbs := AutoMigration()
 	limiter.Start()
-	return TipBot{
+	
+	bot := TipBot{
 		DB:       dbs,
 		Client:   lnbits.NewClient(internal.Configuration.Lnbits.AdminKey, internal.Configuration.Lnbits.Url),
 		Bunt:     createBunt(internal.Configuration.Database.BuntDbPath),
@@ -55,6 +57,11 @@ func NewBot() TipBot {
 		Telegram: newTelegramBot(),
 		Cache:    Cache{GoCacheStore: gocacheStore},
 	}
+	
+	// Initialize error logger after bot is created
+	bot.ErrorLogger = NewErrorLogger(&bot)
+	
+	return bot
 }
 
 // newTelegramBot will create a new Telegram bot.
@@ -138,8 +145,8 @@ func (bot *TipBot) Start() {
 	go bot.restartPersistedTickets()
 	// gracefully shutdown
 	exit := make(chan os.Signal, 1) // we need to reserve to buffer size 1, so the notifier are not blocked
-	// we need to catch SIGTERM and SIGSTOP
-	signal.Notify(exit, os.Interrupt, syscall.SIGTERM, syscall.SIGSTOP)
+	// we need to catch SIGTERM and SIGINT
+	signal.Notify(exit, os.Interrupt, syscall.SIGTERM)
 	<-exit
 	// gracefully shutdown
 	bot.GracefulShutdown()

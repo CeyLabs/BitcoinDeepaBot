@@ -13,6 +13,8 @@ bot:
 telegram:
   message_dispose_duration: 10
   api_key: "1234"
+  log_group_id: -1001234567890  # Telegram group chat ID where errors will be logged
+  error_thread_id: 0            # Optional: specific thread ID for error messages (0 for main chat)
 lnbits:
   url: "http://127.0.0.1:5000"
   admin_key: "1234"

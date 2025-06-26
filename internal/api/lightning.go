@@ -81,6 +81,9 @@ func (s Service) PayInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 	invoice, err := user.Wallet.Pay(lnbits.PaymentParams{Out: true, Bolt11: payInvoiceRequest.PayRequest}, s.Bot.Client)
 	if err != nil {
+		if s.Bot.ErrorLogger != nil {
+			s.Bot.ErrorLogger.LogAPIError(err, "PayInvoice API", user.Telegram)
+		}
 		RespondError(w, "could not pay invoice: "+err.Error())
 		return
 	}

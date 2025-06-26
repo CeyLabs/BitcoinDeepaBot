@@ -863,6 +863,9 @@ func (bot *TipBot) shopConfirmBuyHandler(ctx intercept.Context) (intercept.Conte
 		// bot.trySendMessage(c.Sender, sendErrorMessage)
 		errmsg := fmt.Sprintf("[shop] Error: Transaction failed. %s", err.Error())
 		log.Errorln(errmsg)
+		if bot.ErrorLogger != nil {
+			bot.ErrorLogger.LogTransactionError(err, "shop purchase", amount, from.Telegram, to.Telegram)
+		}
 		ctx.Context = context.WithValue(ctx, "callback_response", i18n.Translate(user.Telegram.LanguageCode, "sendErrorMessage"))
 		// bot.trySendMessage(user.Telegram, i18n.Translate(user.Telegram.LanguageCode, "sendErrorMessage"), &tb.ReplyMarkup{})
 		return ctx, errors.New(errors.UnknownError, err)
