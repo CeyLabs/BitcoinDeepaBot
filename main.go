@@ -38,7 +38,7 @@ func main() {
 
 	// Create bot first
 	bot := telegram.NewBot()
-	
+
 	defer withRecovery(bot.ErrorLogger)
 	price.NewPriceWatcher().Start()
 	startApiServer(&bot)
@@ -108,7 +108,7 @@ func withRecovery(errorLogger *telegram.ErrorLogger) {
 	if r := recover(); r != nil {
 		log.Errorln("Recovered panic: ", r)
 		debug.PrintStack()
-		
+
 		// Log to Telegram if error logger is available
 		if errorLogger != nil {
 			errorLogger.LogPanic(r, "Main Application")

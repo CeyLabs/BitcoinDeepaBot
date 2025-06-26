@@ -13,27 +13,27 @@ import (
 
 // ErrorLogger handles logging errors to Telegram group
 type ErrorLogger struct {
-	bot         *TipBot
-	logGroupId  int64
-	threadId    int64
-	enabled     bool
+	bot        *TipBot
+	logGroupId int64
+	threadId   int64
+	enabled    bool
 }
 
 // NewErrorLogger creates a new error logger instance
 func NewErrorLogger(bot *TipBot) *ErrorLogger {
 	logger := &ErrorLogger{
-		bot:         bot,
-		logGroupId:  internal.Configuration.Telegram.LogGroupId,
-		threadId:    internal.Configuration.Telegram.ErrorThreadId,
-		enabled:     internal.Configuration.Telegram.LogGroupId != 0,
+		bot:        bot,
+		logGroupId: internal.Configuration.Telegram.LogGroupId,
+		threadId:   internal.Configuration.Telegram.ErrorThreadId,
+		enabled:    internal.Configuration.Telegram.LogGroupId != 0,
 	}
-	
+
 	if logger.enabled {
 		log.Infof("[ErrorLogger] Error logging enabled for group: %d", logger.logGroupId)
 	} else {
 		log.Warnf("[ErrorLogger] Error logging disabled - no log_group_id configured")
 	}
-	
+
 	return logger
 }
 
@@ -45,7 +45,7 @@ func (el *ErrorLogger) LogError(err error, context string, userInfo ...interface
 
 	// Format error message
 	errorMsg := el.formatErrorMessage(err, context, userInfo...)
-	
+
 	// Send to Telegram group
 	go el.sendToTelegram(errorMsg)
 }
@@ -61,10 +61,10 @@ func (el *ErrorLogger) LogPanic(panicData interface{}, context string) {
 	n := runtime.Stack(buf, false)
 	stackTrace := string(buf[:n])
 
-	errorMsg := fmt.Sprintf("🚨 *PANIC DETECTED*\n\n" +
-		"**Context:** %s\n" +
-		"**Panic:** `%v`\n\n" +
-		"**Stack Trace:**\n```\n%s\n```\n\n" +
+	errorMsg := fmt.Sprintf("🚨 *PANIC DETECTED*\n\n"+
+		"**Context:** %s\n"+
+		"**Panic:** `%v`\n\n"+
+		"**Stack Trace:**\n```\n%s\n```\n\n"+
 		"**Time:** %s",
 		el.escapeMarkdown(context),
 		panicData,
@@ -81,7 +81,7 @@ func (el *ErrorLogger) LogCriticalError(err error, context string, userInfo ...i
 	}
 
 	errorMsg := "🔥 *CRITICAL ERROR* 🔥\n\n" + el.formatErrorMessage(err, context, userInfo...)
-	
+
 	// Send to Telegram group immediately (not in goroutine for critical errors)
 	el.sendToTelegram(errorMsg)
 }
@@ -89,11 +89,12 @@ func (el *ErrorLogger) LogCriticalError(err error, context string, userInfo ...i
 // formatErrorMessage creates a formatted error message
 func (el *ErrorLogger) formatErrorMessage(err error, context string, userInfo ...interface{}) string {
 	timestamp := time.Now().Format("2006-01-02 15:04:05 UTC")
-	
-	msg := fmt.Sprintf("❌ **ERROR LOG**\n\n" +
-		"**Time:** %s\n" +
-		"**Context:** %s\n" +
-		"**Error:** `%s`\n",
+
+	msg := fmt.Sprintf("❌ **ERROR LOG**\n\n"+
+		"**Time:** %s\n"+
+		"**Context:** %s\n"+
+		"**Error Details:**\n"+
+		"> %s\n",
 		timestamp,
 		el.escapeMarkdown(context),
 		el.escapeMarkdown(err.Error()))
@@ -114,14 +115,14 @@ func (el *ErrorLogger) formatErrorMessage(err error, context string, userInfo ..
 			}
 		}
 		if len(userDetails) > 0 {
-			msg += fmt.Sprintf("**Details:** %s\n", strings.Join(userDetails, ", "))
+			msg += fmt.Sprintf("> **Details:** %s\n", strings.Join(userDetails, ", "))
 		}
 	}
 
 	// Add stack trace for debugging (limited to 3 most recent calls)
 	if pc, file, line, ok := runtime.Caller(2); ok {
 		funcName := runtime.FuncForPC(pc).Name()
-		msg += fmt.Sprintf("**Location:** `%s:%d` in `%s`\n", file, line, funcName)
+		msg += fmt.Sprintf(">**Location:** `%s:%d` in `%s`\n", file, line, funcName)
 	}
 
 	return msg
@@ -136,30 +137,32 @@ func (el *ErrorLogger) sendToTelegram(message string) {
 
 	// Create recipient
 	recipient := &tb.Chat{ID: el.logGroupId}
-	
+
 	// Prepare send options
-	options := []interface{}{
-		&tb.SendOptions{
-			ParseMode:             tb.ModeMarkdown,
-			DisableWebPagePreview: true,
-		},
+	sendOptions := &tb.SendOptions{
+		ParseMode:             tb.ModeMarkdown,
+		DisableWebPagePreview: true,
 	}
 
-	// Add thread ID if specified
+	// Add thread ID if specified (for Telegram topics/threads)
 	if el.threadId > 0 {
-		options = append(options, &tb.SendOptions{
-			ReplyTo: &tb.Message{ID: int(el.threadId)},
-		})
+		sendOptions.ReplyTo = &tb.Message{ID: int(el.threadId)}
 	}
 
 	// Send message
-	_, err := el.bot.Telegram.Send(recipient, message, options...)
+	_, err := el.bot.Telegram.Send(recipient, message, sendOptions)
 	if err != nil {
 		log.Errorf("[ErrorLogger] Failed to send error log to Telegram: %v", err)
 		// Try sending without markdown if parsing fails
 		if strings.Contains(err.Error(), "parse") {
 			plainMessage := el.stripMarkdown(message)
-			_, fallbackErr := el.bot.Telegram.Send(recipient, plainMessage)
+			plainOptions := &tb.SendOptions{
+				DisableWebPagePreview: true,
+			}
+			if el.threadId > 0 {
+				plainOptions.ReplyTo = &tb.Message{ID: int(el.threadId)}
+			}
+			_, fallbackErr := el.bot.Telegram.Send(recipient, plainMessage, plainOptions)
 			if fallbackErr != nil {
 				log.Errorf("[ErrorLogger] Failed to send plain error log: %v", fallbackErr)
 			}
@@ -228,31 +231,31 @@ func (el *ErrorLogger) getUserStr(user *tb.User) string {
 // LogPaymentError logs payment-related errors with detailed information
 func (el *ErrorLogger) LogPaymentError(err error, paymentDetails, invoice string, user *tb.User) {
 	context := fmt.Sprintf("Payment Failure - %s", paymentDetails)
-	
-	userInfo := fmt.Sprintf("User Details:\n- User: %s\n- ID: %d", el.getUserStr(user), user.ID)
+
+	userInfo := fmt.Sprintf("> **User:** %s (ID: %d)", el.getUserStr(user), user.ID)
 	if len(invoice) > 50 {
 		invoice = invoice[:50] + "..."
 	}
-	paymentInfo := fmt.Sprintf("Payment Info:\n- Invoice: %s\n- Error: %s", invoice, err.Error())
-	
+	paymentInfo := fmt.Sprintf("> **Invoice:** %s\n> **Error:** %s", invoice, err.Error())
+
 	el.LogError(err, context, user, userInfo, paymentInfo)
 }
 
 // LogTransactionError logs transaction-related errors with sender/receiver info
 func (el *ErrorLogger) LogTransactionError(err error, transactionType string, amount int64, fromUser, toUser *tb.User) {
 	context := fmt.Sprintf("Transaction Error - Type: %s, Amount: %d sat", transactionType, amount)
-	
+
 	var userDetails []string
 	if fromUser != nil {
-		userDetails = append(userDetails, fmt.Sprintf("From: %s (ID: %d)", el.getUserStr(fromUser), fromUser.ID))
+		userDetails = append(userDetails, fmt.Sprintf("> **From:** %s (ID: %d)", el.getUserStr(fromUser), fromUser.ID))
 	}
 	if toUser != nil {
-		userDetails = append(userDetails, fmt.Sprintf("To: %s (ID: %d)", el.getUserStr(toUser), toUser.ID))
+		userDetails = append(userDetails, fmt.Sprintf("> **To:** %s (ID: %d)", el.getUserStr(toUser), toUser.ID))
 	}
-	
-	transactionDetails := fmt.Sprintf("Transaction Details:\n%s\n- Amount: %d sat\n- Error: %s", 
+
+	transactionDetails := fmt.Sprintf("> **Transaction Details:**\n%s\n> **Amount:** %d sat\n> **Error:** %s",
 		strings.Join(userDetails, "\n"), amount, err.Error())
-	
+
 	var logUsers []interface{}
 	if fromUser != nil {
 		logUsers = append(logUsers, fromUser)
@@ -261,7 +264,7 @@ func (el *ErrorLogger) LogTransactionError(err error, transactionType string, am
 		logUsers = append(logUsers, toUser)
 	}
 	logUsers = append(logUsers, transactionDetails)
-	
+
 	el.LogError(err, context, logUsers...)
 }
 
@@ -275,4 +278,18 @@ func (el *ErrorLogger) LogDatabaseError(err error, operation string, user *tb.Us
 func (el *ErrorLogger) LogAPIError(err error, endpoint string, user *tb.User) {
 	context := fmt.Sprintf("API Error - Endpoint: %s", endpoint)
 	el.LogError(err, context, user)
+}
+
+// LogLNURLError logs LNURL-related errors with request details
+func (el *ErrorLogger) LogLNURLError(err error, operation string, username string, requestDetails map[string]interface{}) {
+	context := fmt.Sprintf("LNURL Error - Operation: %s, User: %s", operation, username)
+
+	var details []string
+	for key, value := range requestDetails {
+		details = append(details, fmt.Sprintf("> **%s:** %v", key, value))
+	}
+
+	requestInfo := fmt.Sprintf("> **Request Details:**\n%s", strings.Join(details, "\n"))
+
+	el.LogError(err, context, requestInfo)
 }

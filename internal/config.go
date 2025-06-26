@@ -61,13 +61,13 @@ type DatabaseConfiguration struct {
 }
 
 type LnbitsConfiguration struct {
-	AdminId          string   `yaml:"admin_id"`
-	AdminKey         string   `yaml:"admin_key"`
-	Url              string   `yaml:"url"`
-	LnbitsPublicUrl  string   `yaml:"lnbits_public_url"`
-	WebhookServer    string   `yaml:"webhook_server"`
-	WebhookServerUrl *url.URL `yaml:"-"`
-	WebhookPublicUrl string   `yaml:"webhook_public_url"`
+	AdminId                string   `yaml:"admin_id"`
+	AdminKey               string   `yaml:"admin_key"`
+	Url                    string   `yaml:"url"`
+	LnbitsPublicUrl        string   `yaml:"lnbits_public_url"`
+	WebhookServer          string   `yaml:"webhook_server"`
+	WebhookServerUrl       *url.URL `yaml:"-"`
+	WebhookPublicUrl       string   `yaml:"webhook_public_url"`
 	WebhookPublicUrlParsed *url.URL `yaml:"-"`
 }
 

@@ -112,7 +112,14 @@ func (w Lnurl) Handle(writer http.ResponseWriter, request *http.Request) {
 		if len(payerdata) > 0 {
 			err = json.Unmarshal([]byte(payerdata), &payerData)
 			if err != nil {
-				// api.NotFoundHandler(writer, fmt.Errorf("[handleLnUrl] Couldn't parse payerdata: %v", err))
+				// Log to Telegram error channel
+				if w.bot.ErrorLogger != nil {
+					requestDetails := map[string]interface{}{
+						"Username":  username,
+						"PayerData": payerdata,
+					}
+					w.bot.ErrorLogger.LogLNURLError(err, "PayerData Parse", username, requestDetails)
+				}
 				log.Errorf("[handleLnUrl] Couldn't parse payerdata: %v", err)
 				// log.Errorf("[handleLnUrl] payerdata: %v", payerdata)
 			}
@@ -129,15 +136,38 @@ func (w Lnurl) Handle(writer http.ResponseWriter, request *http.Request) {
 		if len(zapEventQuery) > 0 {
 			err = json.Unmarshal([]byte(zapEventQuery), &zapEvent)
 			if err != nil {
+				if w.bot.ErrorLogger != nil {
+					requestDetails := map[string]interface{}{
+						"Username": username,
+						"ZapEvent": zapEventQuery,
+					}
+					w.bot.ErrorLogger.LogLNURLError(err, "Nostr Event Parse", username, requestDetails)
+				}
 				log.Errorf("[handleLnUrl] Couldn't parse nostr event: %v", err)
 			} else {
 				valid, err := zapEvent.CheckSignature()
 				if !valid || err != nil {
+					if w.bot.ErrorLogger != nil {
+						requestDetails := map[string]interface{}{
+							"Username":  username,
+							"ZapEvent":  zapEvent.ID,
+							"PublicKey": zapEvent.PubKey,
+						}
+						w.bot.ErrorLogger.LogLNURLError(fmt.Errorf("signature validation failed: %v", err), "Nostr Zap Signature", username, requestDetails)
+					}
 					log.Errorf("[handleLnUrl] Nostr NIP-57 zap event signature invalid: %v", err)
 					return
 				}
 				if len(zapEvent.Tags) == 0 || zapEvent.Tags.GetFirst([]string{"p"}) == nil {
 					// zapEvent.Tags.GetFirst([]string{"e"}) == nil {
+					if w.bot.ErrorLogger != nil {
+						requestDetails := map[string]interface{}{
+							"Username": username,
+							"ZapEvent": zapEvent.ID,
+							"Tags":     fmt.Sprintf("%v", zapEvent.Tags),
+						}
+						w.bot.ErrorLogger.LogLNURLError(fmt.Errorf("missing required tags"), "Nostr Zap Validation", username, requestDetails)
+					}
 					log.Errorf("[handleLnUrl] Nostr NIP-57 zap event validation error")
 					return
 				}
@@ -149,6 +179,21 @@ func (w Lnurl) Handle(writer http.ResponseWriter, request *http.Request) {
 	}
 	// check if error was returned from first or second handlers
 	if err != nil {
+		// log the error to Telegram if ErrorLogger is available
+		if w.bot.ErrorLogger != nil {
+			requestDetails := map[string]interface{}{
+				"Username":   username,
+				"Query":      request.URL.RawQuery,
+				"Method":     request.Method,
+				"User-Agent": request.Header.Get("User-Agent"),
+			}
+			if request.URL.RawQuery != "" {
+				requestDetails["Amount"] = request.FormValue("amount")
+				requestDetails["Comment"] = request.FormValue("comment")
+			}
+			w.bot.ErrorLogger.LogLNURLError(err, "LNURL Request Handler", username, requestDetails)
+		}
+
 		// log the error
 		log.Errorf("[LNURL] %v", err.Error())
 		if response != nil {
@@ -273,6 +318,15 @@ func (w Lnurl) serveLNURLpSecond(username string, amount_msat int64, comment str
 	}
 	user, tx := db.FindUser(w.database, username)
 	if tx.Error != nil {
+		// Log to Telegram error channel
+		if w.bot.ErrorLogger != nil {
+			requestDetails := map[string]interface{}{
+				"Username":      username,
+				"DatabaseError": tx.Error.Error(),
+			}
+			w.bot.ErrorLogger.LogLNURLError(tx.Error, "User Lookup", username, requestDetails)
+		}
+
 		return &lnurl.LNURLPayValues{
 			LNURLResponse: lnurl.LNURLResponse{
 				Status: api.StatusError,
@@ -280,6 +334,15 @@ func (w Lnurl) serveLNURLpSecond(username string, amount_msat int64, comment str
 		}, fmt.Errorf("[GetUser] Couldn't fetch user info from database: %v", tx.Error)
 	}
 	if user.Wallet == nil {
+		// Log to Telegram error channel
+		if w.bot.ErrorLogger != nil {
+			requestDetails := map[string]interface{}{
+				"Username": username,
+				"UserID":   user.ID,
+			}
+			w.bot.ErrorLogger.LogLNURLError(fmt.Errorf("user has no wallet"), "Wallet Check", username, requestDetails)
+		}
+
 		return &lnurl.LNURLPayValues{
 			LNURLResponse: lnurl.LNURLResponse{
 				Status: api.StatusError,
@@ -312,6 +375,15 @@ func (w Lnurl) serveLNURLpSecond(username string, amount_msat int64, comment str
 		zapEventSerialized, err := json.Marshal(zapEvent)
 		zapEventSerializedStr = fmt.Sprintf("%s", zapEventSerialized)
 		if err != nil {
+			// Log to Telegram error channel
+			if w.bot.ErrorLogger != nil {
+				requestDetails := map[string]interface{}{
+					"Username":   username,
+					"ZapEventID": zapEvent.ID,
+					"PubKey":     zapEvent.PubKey,
+				}
+				w.bot.ErrorLogger.LogLNURLError(err, "Zap Event Serialization", username, requestDetails)
+			}
 			log.Println(err)
 			return &lnurl.LNURLPayValues{
 				LNURLResponse: lnurl.LNURLResponse{
@@ -365,6 +437,17 @@ func (w Lnurl) serveLNURLpSecond(username string, amount_msat int64, comment str
 			Webhook:         w.WebhookServer},
 		w.c)
 	if err != nil {
+		// Log to Telegram error channel
+		if w.bot.ErrorLogger != nil {
+			requestDetails := map[string]interface{}{
+				"Username":        username,
+				"Amount":          amount_msat / 1000,
+				"DescriptionHash": descriptionHash,
+				"WalletID":        user.Wallet.ID,
+			}
+			w.bot.ErrorLogger.LogLNURLError(err, "Invoice Creation", username, requestDetails)
+		}
+
 		err = fmt.Errorf("[serveLNURLpSecond] Couldn't create invoice: %v", err.Error())
 		resp = &lnurl.LNURLPayValues{
 			LNURLResponse: lnurl.LNURLResponse{
