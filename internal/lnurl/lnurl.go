@@ -64,7 +64,7 @@ func New(bot *telegram.TipBot) Lnurl {
 		c:                bot.Client,
 		database:         bot.DB.Users,
 		callbackHostname: internal.Configuration.Bot.LNURLHostUrl,
-		WebhookServer:    internal.Configuration.Lnbits.WebhookServer,
+		WebhookServer:    internal.GetWebhookURL(),
 		buntdb:           bot.Bunt,
 		telegram:         bot.Telegram,
 		cache:            bot.Cache,

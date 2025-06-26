@@ -61,7 +61,7 @@ func NewServer(bot *telegram.TipBot) *Server {
 	}
 	apiServer.httpServer.Handler = apiServer.newRouter()
 	go apiServer.httpServer.ListenAndServe()
-	log.Infof("[Webhook] Server started at %s", internal.Configuration.Lnbits.WebhookServerUrl)
+	log.Infof("[Webhook] Server started at %s (public URL: %s)", internal.Configuration.Lnbits.WebhookServerUrl, internal.GetWebhookURL())
 	return apiServer
 }
 

@@ -59,7 +59,7 @@ func (s Service) CreateInvoice(w http.ResponseWriter, r *http.Request) {
 			DescriptionHash:     createInvoiceRequest.DescriptionHash,
 			UnhashedDescription: createInvoiceRequest.UnhashedDescription,
 			Memo:                createInvoiceRequest.Memo,
-			Webhook:             internal.Configuration.Lnbits.WebhookServer},
+			Webhook:             internal.GetWebhookURL()},
 		s.Bot.Client)
 	if err != nil {
 		RespondError(w, "could not create invoice")

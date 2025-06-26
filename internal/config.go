@@ -67,6 +67,8 @@ type LnbitsConfiguration struct {
 	LnbitsPublicUrl  string   `yaml:"lnbits_public_url"`
 	WebhookServer    string   `yaml:"webhook_server"`
 	WebhookServerUrl *url.URL `yaml:"-"`
+	WebhookPublicUrl string   `yaml:"webhook_public_url"`
+	WebhookPublicUrlParsed *url.URL `yaml:"-"`
 }
 
 func init() {
@@ -79,6 +81,17 @@ func init() {
 		panic(err)
 	}
 	Configuration.Lnbits.WebhookServerUrl = webhookUrl
+
+	// Parse webhook public URL if provided, otherwise use webhook server URL
+	if Configuration.Lnbits.WebhookPublicUrl != "" {
+		webhookPublicUrl, err := url.Parse(Configuration.Lnbits.WebhookPublicUrl)
+		if err != nil {
+			panic(fmt.Errorf("failed to parse webhook_public_url: %v", err))
+		}
+		Configuration.Lnbits.WebhookPublicUrlParsed = webhookPublicUrl
+	} else {
+		Configuration.Lnbits.WebhookPublicUrlParsed = webhookUrl
+	}
 
 	lnUrl, err := url.Parse(Configuration.Bot.LNURLServer)
 	if err != nil {
@@ -93,6 +106,22 @@ func init() {
 	checkLnbitsConfiguration()
 }
 
+// GetWebhookURL returns the appropriate webhook URL
+// If webhook_public_url is configured, it returns that (for reverse proxy scenarios)
+// Otherwise, it returns the webhook_server URL (for direct access)
+func GetWebhookURL() string {
+	if Configuration.Lnbits.WebhookPublicUrl != "" {
+		return Configuration.Lnbits.WebhookPublicUrl
+	}
+	return Configuration.Lnbits.WebhookServer
+}
+
+// GetWebhookURLParsed returns the parsed webhook URL
+func GetWebhookURLParsed() *url.URL {
+	return Configuration.Lnbits.WebhookPublicUrlParsed
+}
+
+// checkLnbitsConfiguration validates the lnbits configuration
 func checkLnbitsConfiguration() {
 	if Configuration.Lnbits.Url == "" {
 		panic(fmt.Errorf("please configure a lnbits url"))
