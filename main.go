@@ -12,6 +12,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/lnurl"
 	"github.com/LightningTipBot/LightningTipBot/internal/nostr"
 	"github.com/LightningTipBot/LightningTipBot/internal/runtime/mutex"
+	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
 
 	_ "net/http/pprof"
 
@@ -19,7 +20,6 @@ import (
 
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits/webhook"
 	"github.com/LightningTipBot/LightningTipBot/internal/price"
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -36,16 +36,28 @@ func main() {
 	// set logger
 	setLogger()
 
-	defer withRecovery()
-	price.NewPriceWatcher().Start()
+	// Create bot first
 	bot := telegram.NewBot()
+	
+	defer withRecovery(bot.ErrorLogger)
+	price.NewPriceWatcher().Start()
 	startApiServer(&bot)
 	bot.Start()
 }
 func startApiServer(bot *telegram.TipBot) {
 	// log errors from interceptors
 	bot.Telegram.OnError = func(err error, ctx tb.Context) {
-		// we already log in the interceptors
+		// Log errors to Telegram group
+		if bot.ErrorLogger != nil {
+			userInfo := []interface{}{}
+			if ctx.Sender() != nil {
+				userInfo = append(userInfo, ctx.Sender())
+			}
+			if ctx.Chat() != nil {
+				userInfo = append(userInfo, ctx.Chat())
+			}
+			bot.ErrorLogger.LogError(err, "Telegram Bot Error", userInfo...)
+		}
 	}
 	// start internal webhook server
 	webhook.NewServer(bot)
@@ -92,9 +104,14 @@ func startApiServer(bot *telegram.TipBot) {
 
 }
 
-func withRecovery() {
+func withRecovery(errorLogger *telegram.ErrorLogger) {
 	if r := recover(); r != nil {
 		log.Errorln("Recovered panic: ", r)
 		debug.PrintStack()
+		
+		// Log to Telegram if error logger is available
+		if errorLogger != nil {
+			errorLogger.LogPanic(r, "Main Application")
+		}
 	}
 }

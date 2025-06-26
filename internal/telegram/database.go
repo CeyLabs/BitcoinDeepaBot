@@ -180,6 +180,9 @@ func GetLnbitsUser(u *tb.User, bot TipBot) (*lnbits.User, error) {
 	if tx.Error != nil {
 		errmsg := fmt.Sprintf("[GetUser] Couldn't fetch %s from Database: %s", GetUserStr(u), tx.Error.Error())
 		log.Warnln(errmsg)
+		if bot.ErrorLogger != nil {
+			bot.ErrorLogger.LogDatabaseError(tx.Error, "GetLnbitsUser", u)
+		}
 		user.Telegram = u
 		return user, tx.Error
 	}
@@ -193,6 +196,9 @@ func GetLnbitsUserWithSettings(u *tb.User, bot TipBot) (*lnbits.User, error) {
 	if tx.Error != nil {
 		errmsg := fmt.Sprintf("[GetLnbitsUserWithSettings] Couldn't fetch %s from Database: %s", GetUserStr(u), tx.Error.Error())
 		log.Warnln(errmsg)
+		if bot.ErrorLogger != nil {
+			bot.ErrorLogger.LogDatabaseError(tx.Error, "GetLnbitsUserWithSettings", u)
+		}
 		user.Telegram = u
 		return user, tx.Error
 	}
@@ -287,6 +293,9 @@ func UpdateUserRecord(user *lnbits.User, bot TipBot) error {
 	if tx.Error != nil {
 		errmsg := fmt.Sprintf("[UpdateUserRecord] Error: Couldn't update %s's info in Database.", GetUserStr(user.Telegram))
 		log.Errorln(errmsg)
+		if bot.ErrorLogger != nil {
+			bot.ErrorLogger.LogDatabaseError(tx.Error, "UpdateUserRecord", user.Telegram)
+		}
 		return tx.Error
 	}
 	log.Tracef("[UpdateUserRecord] Records of user %s updated.", GetUserStr(user.Telegram))

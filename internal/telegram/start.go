@@ -33,6 +33,9 @@ func (bot TipBot) startHandler(ctx intercept.Context) (intercept.Context, error)
 	user, err := bot.initWallet(ctx.Sender())
 	if err != nil {
 		log.Errorln(fmt.Sprintf("[startHandler] Error with initWallet: %s", err.Error()))
+		if bot.ErrorLogger != nil {
+			bot.ErrorLogger.LogCriticalError(err, "Wallet initialization failed", ctx.Sender())
+		}
 		bot.tryEditMessage(walletCreationMsg, Translate(ctx, "startWalletErrorMessage"))
 		return ctx, err
 	}
