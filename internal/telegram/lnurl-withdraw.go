@@ -263,7 +263,7 @@ func (bot *TipBot) confirmWithdrawHandler(ctx intercept.Context) (intercept.Cont
 			Out:     false,
 			Amount:  int64(lnurlWithdrawState.Amount) / 1000,
 			Memo:    "Withdraw",
-			Webhook: internal.Configuration.Lnbits.WebhookServer},
+			Webhook: internal.GetWebhookURL()},
 		bot.Client)
 	if err != nil {
 		errmsg := fmt.Sprintf("[lnurlWithdrawHandlerWithdraw] Could not create an invoice: %s", err.Error())
