@@ -62,14 +62,14 @@ func (el *ErrorLogger) LogPanic(panicData interface{}, context string) {
 	stackTrace := string(buf[:n])
 
 	errorMsg := fmt.Sprintf("🚨 *PANIC DETECTED*\n\n"+
-		"**Context:** %s\n"+
-		"**Panic:** `%v`\n\n"+
-		"**Stack Trace:**\n```\n%s\n```\n\n"+
-		"**Time:** %s",
-		el.escapeMarkdown(context),
+		"*Context:* `%s`\n"+
+		"*Panic:* `%v`\n\n"+
+		"*Stack Trace:*\n```\n%s\n```\n\n"+
+		"*Time:* `%s`",
+		el.escapeMarkdownV2(context),
 		panicData,
 		el.truncateStackTrace(stackTrace),
-		time.Now().Format("2006-01-02 15:04:05 UTC"))
+		el.escapeMarkdownV2(time.Now().Format("2006-01-02 15:04:05 UTC")))
 
 	go el.sendToTelegram(errorMsg)
 }
@@ -90,14 +90,14 @@ func (el *ErrorLogger) LogCriticalError(err error, context string, userInfo ...i
 func (el *ErrorLogger) formatErrorMessage(err error, context string, userInfo ...interface{}) string {
 	timestamp := time.Now().Format("2006-01-02 15:04:05 UTC")
 
-	msg := fmt.Sprintf("❌ **ERROR LOG**\n\n"+
-		"**Time:** `%s`\n"+
-		"**Context:** `%s`\n"+
-		"**Error Details:**\n"+
-		"> `%s`\n",
-		timestamp,
-		el.escapeMarkdown(context),
-		el.escapeMarkdown(err.Error()))
+	msg := fmt.Sprintf("*INCIDENT DETECTED*\n\n"+
+		"*Time:* `%s`\n"+
+		"*Context:* `%s`\n"+
+		"*Error Details:*\n"+
+		"> %s\n",
+		el.escapeMarkdownV2(timestamp),
+		el.escapeMarkdownV2(context),
+		el.escapeMarkdownV2(err.Error()))
 
 	// Add user information if provided
 	if len(userInfo) > 0 {
@@ -105,9 +105,9 @@ func (el *ErrorLogger) formatErrorMessage(err error, context string, userInfo ..
 		for _, info := range userInfo {
 			switch v := info.(type) {
 			case *tb.User:
-				userDetails = append(userDetails, fmt.Sprintf("**User:** %s (ID: %d)", el.getUserStr(v), v.ID))
+				userDetails = append(userDetails, fmt.Sprintf("*User:* %s \\(ID: %d\\)", el.getUserStrV2(v), v.ID))
 			case *tb.Chat:
-				userDetails = append(userDetails, fmt.Sprintf("**Chat:** %s (ID: %d)", v.Title, v.ID))
+				userDetails = append(userDetails, fmt.Sprintf("*Chat:* %s \\(ID: %d\\)", el.escapeMarkdownV2(v.Title), v.ID))
 			case string:
 				userDetails = append(userDetails, v)
 			default:
@@ -115,14 +115,14 @@ func (el *ErrorLogger) formatErrorMessage(err error, context string, userInfo ..
 			}
 		}
 		if len(userDetails) > 0 {
-			msg += fmt.Sprintf("\n**Additional Details:**\n%s\n", strings.Join(userDetails, "\n"))
+			msg += fmt.Sprintf("\n*Additional Details:*\n%s\n", strings.Join(userDetails, "\n"))
 		}
 	}
 
 	// Add stack trace for debugging (limited to 3 most recent calls)
 	if pc, file, line, ok := runtime.Caller(2); ok {
 		funcName := runtime.FuncForPC(pc).Name()
-		msg += fmt.Sprintf("\n**Location:** `%s:%d` in `%s`", file, line, funcName)
+		msg += fmt.Sprintf("\n*Location:* `%s:%d` in `%s`", el.escapeMarkdownV2(file), line, el.escapeMarkdownV2(funcName))
 	}
 
 	return msg
@@ -140,7 +140,7 @@ func (el *ErrorLogger) sendToTelegram(message string) {
 
 	// Prepare send options
 	sendOptions := &tb.SendOptions{
-		ParseMode:             tb.ModeMarkdown,
+		ParseMode:             tb.ModeMarkdownV2,
 		DisableWebPagePreview: true,
 	}
 
@@ -174,12 +174,38 @@ func (el *ErrorLogger) sendToTelegram(message string) {
 func (el *ErrorLogger) escapeMarkdown(text string) string {
 	replacer := strings.NewReplacer(
 		"_", "\\_",
+		"*", "\\*",
 		"`", "\\`",
 		"[", "\\[",
 		"]", "\\]",
 		"(", "\\(",
 		")", "\\)",
 		"~", "\\~",
+		">", "\\>",
+		"#", "\\#",
+		"+", "\\+",
+		"-", "\\-",
+		"=", "\\=",
+		"|", "\\|",
+		"{", "\\{",
+		"}", "\\}",
+		".", "\\.",
+		"!", "\\!",
+	)
+	return replacer.Replace(text)
+}
+
+// escapeMarkdownV2 escapes special MarkdownV2 characters
+func (el *ErrorLogger) escapeMarkdownV2(text string) string {
+	replacer := strings.NewReplacer(
+		"_", "\\_",
+		"*", "\\*",
+		"[", "\\[",
+		"]", "\\]",
+		"(", "\\(",
+		")", "\\)",
+		"~", "\\~",
+		"`", "\\`",
 		">", "\\>",
 		"#", "\\#",
 		"+", "\\+",
@@ -227,15 +253,26 @@ func (el *ErrorLogger) getUserStr(user *tb.User) string {
 	return fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 }
 
+// getUserStrV2 returns a MarkdownV2 escaped string representation of a Telegram user
+func (el *ErrorLogger) getUserStrV2(user *tb.User) string {
+	if user == nil {
+		return "Unknown"
+	}
+	if user.Username != "" {
+		return "@" + el.escapeMarkdownV2(user.Username)
+	}
+	return fmt.Sprintf("%s %s", el.escapeMarkdownV2(user.FirstName), el.escapeMarkdownV2(user.LastName))
+}
+
 // LogPaymentError logs payment-related errors with detailed information
 func (el *ErrorLogger) LogPaymentError(err error, paymentDetails, invoice string, user *tb.User) {
 	context := fmt.Sprintf("Payment Failure - %s", paymentDetails)
 
-	userInfo := fmt.Sprintf("**User:** %s (ID: %d)", el.getUserStr(user), user.ID)
+	userInfo := fmt.Sprintf("> *User:* %s \\(ID: %d\\)", el.getUserStrV2(user), user.ID)
 	if len(invoice) > 50 {
 		invoice = invoice[:50] + "..."
 	}
-	paymentInfo := fmt.Sprintf("**Invoice:** `%s`\n**Payment Error:** `%s`", invoice, err.Error())
+	paymentInfo := fmt.Sprintf("> *Invoice:* `%s`\n> *Payment Error:* `%s`", el.escapeMarkdownV2(invoice), el.escapeMarkdownV2(err.Error()))
 
 	el.LogError(err, context, user, userInfo, paymentInfo)
 }
@@ -246,14 +283,14 @@ func (el *ErrorLogger) LogTransactionError(err error, transactionType string, am
 
 	var userDetails []string
 	if fromUser != nil {
-		userDetails = append(userDetails, fmt.Sprintf("**From:** %s (ID: %d)", el.getUserStr(fromUser), fromUser.ID))
+		userDetails = append(userDetails, fmt.Sprintf("> *From:* %s \\(ID: %d\\)", el.getUserStrV2(fromUser), fromUser.ID))
 	}
 	if toUser != nil {
-		userDetails = append(userDetails, fmt.Sprintf("**To:** %s (ID: %d)", el.getUserStr(toUser), toUser.ID))
+		userDetails = append(userDetails, fmt.Sprintf("> *To:* %s \\(ID: %d\\)", el.getUserStrV2(toUser), toUser.ID))
 	}
 
-	transactionDetails := fmt.Sprintf("**Transaction Details:**\n%s\n**Amount:** `%d sat`\n**Transaction Error:** `%s`",
-		strings.Join(userDetails, "\n"), amount, err.Error())
+	transactionDetails := fmt.Sprintf("*Transaction Details:*\n%s\n> *Amount:* `%d sat`\n> *Transaction Error:* `%s`",
+		strings.Join(userDetails, "\n"), amount, el.escapeMarkdownV2(err.Error()))
 
 	var logUsers []interface{}
 	if fromUser != nil {
@@ -285,10 +322,10 @@ func (el *ErrorLogger) LogLNURLError(err error, operation string, username strin
 
 	var details []string
 	for key, value := range requestDetails {
-		details = append(details, fmt.Sprintf("**%s:** `%v`", key, value))
+		details = append(details, fmt.Sprintf("> *%s:* `%v`", el.escapeMarkdownV2(key), el.escapeMarkdownV2(fmt.Sprintf("%v", value))))
 	}
 
-	requestInfo := fmt.Sprintf("**Request Details:**\n%s", strings.Join(details, "\n"))
+	requestInfo := fmt.Sprintf("*Request Details:*\n%s", strings.Join(details, "\n"))
 
 	el.LogError(err, context, requestInfo)
 }
