@@ -91,10 +91,10 @@ func (el *ErrorLogger) formatErrorMessage(err error, context string, userInfo ..
 	timestamp := time.Now().Format("2006-01-02 15:04:05 UTC")
 
 	msg := fmt.Sprintf("❌ **ERROR LOG**\n\n"+
-		"**Time:** %s\n"+
-		"**Context:** %s\n"+
+		"**Time:** `%s`\n"+
+		"**Context:** `%s`\n"+
 		"**Error Details:**\n"+
-		"> %s\n",
+		"> `%s`\n",
 		timestamp,
 		el.escapeMarkdown(context),
 		el.escapeMarkdown(err.Error()))
@@ -105,9 +105,9 @@ func (el *ErrorLogger) formatErrorMessage(err error, context string, userInfo ..
 		for _, info := range userInfo {
 			switch v := info.(type) {
 			case *tb.User:
-				userDetails = append(userDetails, fmt.Sprintf("User: %s (ID: %d)", el.getUserStr(v), v.ID))
+				userDetails = append(userDetails, fmt.Sprintf("**User:** %s (ID: %d)", el.getUserStr(v), v.ID))
 			case *tb.Chat:
-				userDetails = append(userDetails, fmt.Sprintf("Chat: %s (ID: %d)", v.Title, v.ID))
+				userDetails = append(userDetails, fmt.Sprintf("**Chat:** %s (ID: %d)", v.Title, v.ID))
 			case string:
 				userDetails = append(userDetails, v)
 			default:
@@ -115,14 +115,14 @@ func (el *ErrorLogger) formatErrorMessage(err error, context string, userInfo ..
 			}
 		}
 		if len(userDetails) > 0 {
-			msg += fmt.Sprintf("> **Details:** %s\n", strings.Join(userDetails, ", "))
+			msg += fmt.Sprintf("\n**Additional Details:**\n%s\n", strings.Join(userDetails, "\n"))
 		}
 	}
 
 	// Add stack trace for debugging (limited to 3 most recent calls)
 	if pc, file, line, ok := runtime.Caller(2); ok {
 		funcName := runtime.FuncForPC(pc).Name()
-		msg += fmt.Sprintf(">**Location:** `%s:%d` in `%s`\n", file, line, funcName)
+		msg += fmt.Sprintf("\n**Location:** `%s:%d` in `%s`", file, line, funcName)
 	}
 
 	return msg
@@ -174,7 +174,6 @@ func (el *ErrorLogger) sendToTelegram(message string) {
 func (el *ErrorLogger) escapeMarkdown(text string) string {
 	replacer := strings.NewReplacer(
 		"_", "\\_",
-		"*", "\\*",
 		"`", "\\`",
 		"[", "\\[",
 		"]", "\\]",
@@ -232,11 +231,11 @@ func (el *ErrorLogger) getUserStr(user *tb.User) string {
 func (el *ErrorLogger) LogPaymentError(err error, paymentDetails, invoice string, user *tb.User) {
 	context := fmt.Sprintf("Payment Failure - %s", paymentDetails)
 
-	userInfo := fmt.Sprintf("> **User:** %s (ID: %d)", el.getUserStr(user), user.ID)
+	userInfo := fmt.Sprintf("**User:** %s (ID: %d)", el.getUserStr(user), user.ID)
 	if len(invoice) > 50 {
 		invoice = invoice[:50] + "..."
 	}
-	paymentInfo := fmt.Sprintf("> **Invoice:** %s\n> **Error:** %s", invoice, err.Error())
+	paymentInfo := fmt.Sprintf("**Invoice:** `%s`\n**Payment Error:** `%s`", invoice, err.Error())
 
 	el.LogError(err, context, user, userInfo, paymentInfo)
 }
@@ -247,13 +246,13 @@ func (el *ErrorLogger) LogTransactionError(err error, transactionType string, am
 
 	var userDetails []string
 	if fromUser != nil {
-		userDetails = append(userDetails, fmt.Sprintf("> **From:** %s (ID: %d)", el.getUserStr(fromUser), fromUser.ID))
+		userDetails = append(userDetails, fmt.Sprintf("**From:** %s (ID: %d)", el.getUserStr(fromUser), fromUser.ID))
 	}
 	if toUser != nil {
-		userDetails = append(userDetails, fmt.Sprintf("> **To:** %s (ID: %d)", el.getUserStr(toUser), toUser.ID))
+		userDetails = append(userDetails, fmt.Sprintf("**To:** %s (ID: %d)", el.getUserStr(toUser), toUser.ID))
 	}
 
-	transactionDetails := fmt.Sprintf("> **Transaction Details:**\n%s\n> **Amount:** %d sat\n> **Error:** %s",
+	transactionDetails := fmt.Sprintf("**Transaction Details:**\n%s\n**Amount:** `%d sat`\n**Transaction Error:** `%s`",
 		strings.Join(userDetails, "\n"), amount, err.Error())
 
 	var logUsers []interface{}
@@ -286,10 +285,10 @@ func (el *ErrorLogger) LogLNURLError(err error, operation string, username strin
 
 	var details []string
 	for key, value := range requestDetails {
-		details = append(details, fmt.Sprintf("> **%s:** %v", key, value))
+		details = append(details, fmt.Sprintf("**%s:** `%v`", key, value))
 	}
 
-	requestInfo := fmt.Sprintf("> **Request Details:**\n%s", strings.Join(details, "\n"))
+	requestInfo := fmt.Sprintf("**Request Details:**\n%s", strings.Join(details, "\n"))
 
 	el.LogError(err, context, requestInfo)
 }
