@@ -48,7 +48,7 @@ func NewBot() TipBot {
 	// create sqlite databases
 	dbs := AutoMigration()
 	limiter.Start()
-	
+
 	bot := TipBot{
 		DB:       dbs,
 		Client:   lnbits.NewClient(internal.Configuration.Lnbits.AdminKey, internal.Configuration.Lnbits.Url),
@@ -57,10 +57,10 @@ func NewBot() TipBot {
 		Telegram: newTelegramBot(),
 		Cache:    Cache{GoCacheStore: gocacheStore},
 	}
-	
+
 	// Initialize error logger after bot is created
 	bot.ErrorLogger = NewErrorLogger(&bot)
-	
+
 	return bot
 }
 

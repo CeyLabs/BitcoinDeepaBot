@@ -116,12 +116,12 @@ func (bot *TipBot) tipHandler(ctx intercept.Context) (intercept.Context, error) 
 		bot.trySendMessage(m.Sender, fmt.Sprintf("%s: %s", Translate(ctx, "tipErrorMessage"), Translate(ctx, "tipUndefinedErrorMsg")))
 		errMsg := fmt.Sprintf("[/tip] Transaction failed: %s", err.Error())
 		log.Warnln(errMsg)
-		
+
 		// Enhanced error logging for tip transaction failures
 		if bot.ErrorLogger != nil {
 			bot.ErrorLogger.LogTransactionError(err, "tip", amount, from.Telegram, to.Telegram)
 		}
-		
+
 		return ctx, err
 	}
 
