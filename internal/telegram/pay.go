@@ -216,8 +216,7 @@ func (bot *TipBot) confirmPayHandler(ctx intercept.Context) (intercept.Context, 
 
 		// Enhanced error logging with detailed payment information
 		if bot.ErrorLogger != nil {
-			paymentDetails := fmt.Sprintf("Amount: %d sat, Memo: %s", payData.Amount, payData.Memo)
-			bot.ErrorLogger.LogPaymentError(err, paymentDetails, payData.Invoice, user.Telegram)
+			bot.ErrorLogger.LogPaymentError(err, payData.Amount, payData.Memo, payData.Invoice, user.Telegram)
 		}
 
 		err = fmt.Errorf(i18n.Translate(payData.LanguageCode, "invoiceUndefinedErrorMessage"))
