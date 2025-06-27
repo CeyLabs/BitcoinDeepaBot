@@ -47,9 +47,15 @@ func InternalNetworkMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// Check if IP is in the internal network range defined in config
-		_, internalNet, _ := net.ParseCIDR(GetInternalNetworkCIDR())
+		_, internalNet, err := net.ParseCIDR(GetInternalNetworkCIDR())
+		if err != nil {
+			log.Errorf("[api/send] Invalid internal network CIDR configuration: %s, error: %v", GetInternalNetworkCIDR(), err)
+			http.Error(w, "Internal server configuration error", http.StatusInternalServerError)
+			return
+		}
+		
 		if !internalNet.Contains(ip) {
-			log.Warnf("[api/send] Access denied for IP: %s (not in internal network)", clientIP)
+			log.Warnf("[api/send] Access denied for IP: %s (not in internal network %s)", clientIP, GetInternalNetworkCIDR())
 			http.Error(w, "Access denied: Internal network only", http.StatusForbidden)
 			return
 		}
