@@ -307,7 +307,7 @@ func (bot *TipBot) groupConfirmPayButtonHandler(ctx intercept.Context) (intercep
 			bot.tryEditMessage(c, fmt.Sprintf(i18n.Translate(ticketEvent.LanguageCode, "invoicePaymentFailedMessage"), err.Error()), &tb.ReplyMarkup{})
 		}
 		if bot.ErrorLogger != nil {
-			bot.ErrorLogger.LogPaymentError(err, "Join Ticket Payment", ticketEvent.Invoice.PaymentHash, user.Telegram)
+			bot.ErrorLogger.LogPaymentError(err, ticketEvent.Group.Ticket.Price, "Join Ticket Payment", ticketEvent.Invoice.PaymentRequest, user.Telegram)
 		}
 		log.Errorln(errmsg)
 		return ctx, err
