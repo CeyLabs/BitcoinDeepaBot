@@ -36,22 +36,16 @@ generate:
 nostr:
   private_key: "hex private key here"
 
-# API Send Configuration (Future Enhancement)
-# Currently configured in internal/api/send_config.go
-# api:
-#   send:
-#     enabled: true
-#     internal_network: "10.0.0.0/24"
-#     max_amount: 1000000
-#     min_amount: 1
-#     max_memo_length: 280
-#     rate_limit: 60
-#     whitelisted_senders:
-#       - "BiccoindeepaDSA"
-#       - "CeycubeBank"
-#     notifications:
-#       enabled: true
-#       include_memo: true
-#     logging:
-#       enabled: true
-#       level: "info"
+# API Send Configuration
+api:
+  send:
+    enabled: true
+    internal_network: "10.0.0.0/24"
+    max_amount: 1000000
+    min_amount: 1
+    admin_approval_threshold: 100000
+    max_memo_length: 280
+    rate_limit: 60
+    whitelisted_senders:
+      - "BiccoindeepaDSA"
+      - "CeycubeBank"

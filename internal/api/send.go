@@ -280,6 +280,18 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		log.Warnf("[api/send] Could not send notification to recipient: %v", err)
 	}
 
+	// Send confirmation to sender (from user) - same format as /send command
+	toUserStrMd := telegram.GetUserStrMd(toUser.Telegram)
+	senderConfirmationMsg := fmt.Sprintf("✅ Payment sent successfully!\n\n💸 Amount: %d sat\n👤 To: %s", req.Amount, toUserStrMd)
+	if req.Memo != "" {
+		senderConfirmationMsg += fmt.Sprintf("\n✉️ Memo: %s", str.MarkdownEscape(req.Memo))
+	}
+
+	_, err = s.Bot.Telegram.Send(fromUser.Telegram, senderConfirmationMsg)
+	if err != nil {
+		log.Warnf("[api/send] Could not send confirmation to sender: %v", err)
+	}
+
 	response := SendResponse{
 		Success:  true,
 		Message:  "Payment sent successfully",
