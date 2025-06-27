@@ -37,6 +37,14 @@ func NewErrorLogger(bot *TipBot) *ErrorLogger {
 	return logger
 }
 
+// GetLogGroupId returns the log group ID for external packages
+func GetLogGroupId(el *ErrorLogger) int64 {
+	if el == nil {
+		return 0
+	}
+	return el.logGroupId
+}
+
 // LogError logs an error to the configured Telegram group
 func (el *ErrorLogger) LogError(err error, context string, userInfo ...interface{}) {
 	if !el.enabled || err == nil {
