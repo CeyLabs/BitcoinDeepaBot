@@ -146,7 +146,7 @@ startNoUsernameMessage    = """☝️ Похоже, что у вас еще не
 
 # BALANCE
 
-balanceMessage      = """👑 *Ваш баланс:* %d sat(s). (%.2f USD / %.2f LKR)"""
+balanceMessage      = """👑 *Ваш баланс:* %d sat(s). (%s USD / %s LKR)"""
 balanceErrorMessage = """🚫 Не удалось получить ваш баланс. Пожалуйста, повторите попытку позже."""
 
 # TIP
@@ -187,7 +187,7 @@ sendHelpText               = """📖 Упс, это не сработало. %s
 # INVOICE
 
 invoiceReceivedMessage    = """⚡️ Вы получили %d sat."""
-invoiceReceivedCurrencyMessage    = """⚡️ Вы получили %d sat (%.2f %s)."""
+invoiceReceivedCurrencyMessage    = """⚡️ Вы получили %d sat (%s %s)."""
 invoiceEnterAmountMessage = """Ввели ли вы сумму?"""
 invoiceValidAmountMessage = """Ввели ли вы правильную сумму?"""
 invoiceHelpText           = """📖 Упс, это не сработало. %s

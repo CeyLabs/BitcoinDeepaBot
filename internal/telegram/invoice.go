@@ -10,8 +10,8 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
 	"github.com/nbd-wtf/go-nostr"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/errors"
-	"github.com/LightningTipBot/LightningTipBot/internal/storage"
+       "github.com/LightningTipBot/LightningTipBot/internal/errors"
+       "github.com/LightningTipBot/LightningTipBot/internal/storage"
 
 	"github.com/LightningTipBot/LightningTipBot/internal"
 
@@ -20,9 +20,10 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/runtime"
-	"github.com/LightningTipBot/LightningTipBot/internal/str"
-	"github.com/skip2/go-qrcode"
-	tb "gopkg.in/lightningtipbot/telebot.v3"
+       "github.com/LightningTipBot/LightningTipBot/internal/str"
+       "github.com/skip2/go-qrcode"
+       "github.com/LightningTipBot/LightningTipBot/internal/utils"
+       tb "gopkg.in/lightningtipbot/telebot.v3"
 )
 
 type InvoiceEventCallback map[int]EventHandler
@@ -223,15 +224,15 @@ func (bot *TipBot) notifyInvoiceReceivedEvent(event Event) {
 	if invoiceEvent.UserCurrency == "" || strings.ToLower(invoiceEvent.UserCurrency) == "btc" {
 		bot.trySendMessage(invoiceEvent.User.Telegram, fmt.Sprintf(i18n.Translate(invoiceEvent.User.Telegram.LanguageCode, "invoiceReceivedMessage"), invoiceEvent.Amount))
 	} else {
-		fiatAmount, err := SatoshisToFiat(invoiceEvent.Amount, strings.ToUpper(invoiceEvent.UserCurrency))
-		if err != nil {
-			log.Errorln(err)
-			// fallback to satoshis
-			bot.trySendMessage(invoiceEvent.User.Telegram, fmt.Sprintf(i18n.Translate(invoiceEvent.User.Telegram.LanguageCode, "invoiceReceivedMessage"), invoiceEvent.Amount))
-			return
-		}
-		bot.trySendMessage(invoiceEvent.User.Telegram, fmt.Sprintf(i18n.Translate(invoiceEvent.User.Telegram.LanguageCode, "invoiceReceivedCurrencyMessage"), invoiceEvent.Amount, fiatAmount, strings.ToUpper(invoiceEvent.UserCurrency)))
-	}
+               fiatAmount, err := SatoshisToFiat(invoiceEvent.Amount, strings.ToUpper(invoiceEvent.UserCurrency))
+               if err != nil {
+                        log.Errorln(err)
+                        // fallback to satoshis
+                        bot.trySendMessage(invoiceEvent.User.Telegram, fmt.Sprintf(i18n.Translate(invoiceEvent.User.Telegram.LanguageCode, "invoiceReceivedMessage"), invoiceEvent.Amount))
+                        return
+               }
+               bot.trySendMessage(invoiceEvent.User.Telegram, fmt.Sprintf(i18n.Translate(invoiceEvent.User.Telegram.LanguageCode, "invoiceReceivedCurrencyMessage"), invoiceEvent.Amount, utils.FormatFloatWithCommas(fiatAmount), strings.ToUpper(invoiceEvent.UserCurrency)))
+       }
 }
 
 type LNURLInvoice struct {
