@@ -222,15 +222,15 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Notify admins
-		err = pendingTx.NotifyAdmins(s.Bot)
+		// Send approval request using Telegram callback buttons (same as /send command)
+		err = telegram.CreateAPIApprovalRequest(s.Bot, fromUser, toIdentifier, req.Amount, req.Memo, pendingTx.ID, clientIP)
 		if err != nil {
-			log.Warnf("[api/send] Failed to notify admins: %v", err)
+			log.Warnf("[api/send] Failed to send approval request: %v", err)
 		}
 
 		response := SendResponse{
 			Success: false,
-			Message: fmt.Sprintf("Transaction requires admin approval (amount: %d sat > threshold: %d sat). Transaction ID: %s",
+			Message: fmt.Sprintf("Transaction requires admin approval (amount: %d sat > threshold: %d sat). Approval request sent to you via Telegram. Transaction ID: %s",
 				req.Amount, GetAdminApprovalThreshold(), pendingTx.ID),
 			FromUser: fromUsername,
 			ToUser:   toIdentifier,
