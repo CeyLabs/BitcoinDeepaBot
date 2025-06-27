@@ -119,7 +119,11 @@ func (bot *TipBot) approveAPITransactionHandler(ctx intercept.Context) (intercep
 	// Update approval message to show success
 	if ctx.Callback().Message.Private() {
 		bot.tryDeleteMessage(ctx.Callback().Message)
-		bot.trySendMessage(ctx.Callback().Sender, fmt.Sprintf("✅ Payment approved and sent successfully!\n\n💸 Amount: %d sat\n👤 To: @%s", approvalData.Amount, approvalData.ToUsername))
+		successMsg := fmt.Sprintf("✅ Payment approved and sent successfully!\n\n💸 Amount: %d sat\n👤 To: @%s", approvalData.Amount, approvalData.ToUsername)
+		if approvalData.Memo != "" {
+			successMsg += fmt.Sprintf("\n✉️ Memo: %s", str.MarkdownEscape(approvalData.Memo))
+		}
+		bot.trySendMessage(ctx.Callback().Sender, successMsg)
 	} else {
 		toUserStrMd := GetUserStrMd(toUser.Telegram)
 		bot.tryEditMessage(ctx.Callback().Message, fmt.Sprintf("✅ API payment approved and sent!\n\n💸 %d sat → %s", approvalData.Amount, toUserStrMd), &tb.ReplyMarkup{})
@@ -172,8 +176,8 @@ func CreateAPIApprovalRequest(bot *TipBot, fromUser *lnbits.User, toUsername str
 	confirmText += "\n\n🔔 *Admin Approval Required*\n"
 	confirmText += fmt.Sprintf("This transaction requires approval because the amount (%d sat) exceeds the threshold.", amount)
 
-	// Create unique ID for this approval request
-	id := fmt.Sprintf("api_approval-%s", transactionID)
+	// Create unique ID for this approval request (same pattern as send command)
+	id := fmt.Sprintf("api-%d-%d-%s", fromUser.Telegram.ID, amount, RandStringRunes(5))
 
 	// Create approval data object (similar to SendData)
 	approvalData := &APIApprovalData{
@@ -195,7 +199,7 @@ func CreateAPIApprovalRequest(bot *TipBot, fromUser *lnbits.User, toUsername str
 		return err
 	}
 
-	// Create buttons (same as send confirmation)
+	// Create buttons (same pattern as send confirmation)
 	approveButton := apiApprovalConfirmationMenu.Data("✅ Approve & Send", "approve_api_tx")
 	cancelButton := apiApprovalConfirmationMenu.Data("🚫 Cancel", "cancel_api_tx")
 	approveButton.Data = id
