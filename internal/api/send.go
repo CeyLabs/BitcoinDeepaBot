@@ -33,11 +33,11 @@ type SendResponse struct {
 	Memo            string `json:"memo,omitempty"`
 }
 
-	// InternalNetworkMiddleware restricts access to internal network IPs (configurable)
+// InternalNetworkMiddleware restricts access to internal network IPs (configurable)
 func InternalNetworkMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		clientIP := getClientIP(r)
-		
+
 		// Parse the client IP
 		ip := net.ParseIP(clientIP)
 		if ip == nil {
@@ -47,9 +47,15 @@ func InternalNetworkMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// Check if IP is in the internal network range defined in config
-		_, internalNet, _ := net.ParseCIDR(GetInternalNetworkCIDR())
+		_, internalNet, err := net.ParseCIDR(GetInternalNetworkCIDR())
+		if err != nil {
+			log.Errorf("[api/send] Invalid internal network CIDR configuration: %s, error: %v", GetInternalNetworkCIDR(), err)
+			http.Error(w, "Internal server configuration error", http.StatusInternalServerError)
+			return
+		}
+
 		if !internalNet.Contains(ip) {
-			log.Warnf("[api/send] Access denied for IP: %s (not in internal network)", clientIP)
+			log.Warnf("[api/send] Access denied for IP: %s (not in internal network %s)", clientIP, GetInternalNetworkCIDR())
 			http.Error(w, "Access denied: Internal network only", http.StatusForbidden)
 			return
 		}
@@ -68,12 +74,12 @@ func getClientIP(r *http.Request) string {
 			return strings.TrimSpace(ips[0])
 		}
 	}
-	
+
 	// Check X-Real-IP header
 	if xri := r.Header.Get("X-Real-IP"); xri != "" {
 		return xri
 	}
-	
+
 	// Fall back to RemoteAddr
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -120,7 +126,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		RespondError(w, fmt.Sprintf("Amount cannot exceed %d satoshis", GetMaxAPITransactionAmount()))
 		return
 	}
-	
+
 	// Check if amount requires admin approval
 	requiresApproval := req.Amount > GetAdminApprovalThreshold()
 	if len(req.Memo) > GetMaxMemoLength() {
@@ -203,11 +209,11 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 	// Check if amount requires admin approval
 	if requiresApproval {
 		log.Infof("[api/send] Large transaction requires admin approval: %s -> %s (%d sat)", fromUsername, toIdentifier, req.Amount)
-		
+
 		// Create pending transaction
 		clientIP := getClientIP(r)
 		pendingTx := NewPendingTransaction(&req, fromUser, toUser, clientIP)
-		
+
 		// Save to database
 		err = pendingTx.SaveToDB(s.Bot)
 		if err != nil {
@@ -215,16 +221,16 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 			RespondError(w, "Failed to create pending transaction")
 			return
 		}
-		
-		// Notify admins
-		err = pendingTx.NotifyAdmins(s.Bot)
+
+		// Send approval request using Telegram callback buttons (same as /send command)
+		err = telegram.CreateAPIApprovalRequest(s.Bot, fromUser, toIdentifier, req.Amount, req.Memo, pendingTx.ID, clientIP)
 		if err != nil {
-			log.Warnf("[api/send] Failed to notify admins: %v", err)
+			log.Warnf("[api/send] Failed to send approval request: %v", err)
 		}
-		
+
 		response := SendResponse{
 			Success: false,
-			Message: fmt.Sprintf("Transaction requires admin approval (amount: %d sat > threshold: %d sat). Transaction ID: %s", 
+			Message: fmt.Sprintf("Transaction requires admin approval (amount: %d sat > threshold: %d sat). Approval request sent to you via Telegram. Transaction ID: %s",
 				req.Amount, GetAdminApprovalThreshold(), pendingTx.ID),
 			FromUser: fromUsername,
 			ToUser:   toIdentifier,
@@ -262,19 +268,16 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 
 	log.Infof("[api/send] ✅ API Send successful: %s -> %s (%d sat)", fromUserStr, toUserStr, req.Amount)
 
-	// Send notification to recipient (optional, can be disabled for API usage)
+	// Send notification to recipient with memo included in same message
 	fromUserStrMd := telegram.GetUserStrMd(fromUser.Telegram)
-	_, err = s.Bot.Telegram.Send(toUser.Telegram, fmt.Sprintf("💰 You received %d sat from %s via API", req.Amount, fromUserStrMd))
+	notificationMsg := fmt.Sprintf("💰 You received %d sat from %s via Automated API", req.Amount, fromUserStrMd)
+	if req.Memo != "" {
+		notificationMsg += fmt.Sprintf("\n✉️ Memo: %s", str.MarkdownEscape(req.Memo))
+	}
+
+	_, err = s.Bot.Telegram.Send(toUser.Telegram, notificationMsg)
 	if err != nil {
 		log.Warnf("[api/send] Could not send notification to recipient: %v", err)
-	}
-	
-	// Send memo if provided
-	if req.Memo != "" {
-		_, err = s.Bot.Telegram.Send(toUser.Telegram, fmt.Sprintf("✉️ %s", str.MarkdownEscape(req.Memo)))
-		if err != nil {
-			log.Warnf("[api/send] Could not send memo to recipient: %v", err)
-		}
 	}
 
 	response := SendResponse{
