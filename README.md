@@ -48,16 +48,49 @@ You can either use your own LNbits instance (recommended) or create an account a
   	<img alt="How to set up a lnbits wallet and the User Manager extension." src="resources/lnbits_setup.png" >
 </p>
 
-#### More configuration
+## API Send Endpoint 🚀
 
-- `db_path`: User database file path.
-- `transactions_path`: Transaction database file path.
-- `buntdb_path`: Object storage database file path.
-- `lnbits_webhook_server`: URL that lnbits can reach the bot with. This is used for creating webhooks from LNbits to receive notifications about payments (optional).
-- `message_dispose_duration`: Duration in seconds after which `/tip` are deleted from a channel (only if the bot is channel admin).
-- `http_proxy` uses a proxy for all LNURL-related outbound requests (optional).
-- `lnurl_public_host_name` is the public URL of your lnbits/LndHub (for BlueWallet/Zeus support, optional).
-- `lnurl_server` is the public URL for inbound LNURL payments and your lightning address host (optional).
+The bot now includes a new HTTP API endpoint `/api/send` for programmatic Bitcoin Lightning payments. This feature allows authorized applications to send payments on behalf of whitelisted accounts.
+
+### Features
+
+- **Secure**: Only whitelisted sender accounts can use the API
+- **Network Restricted**: Limited to internal network access (10.0.0.0/24)
+- **Flexible Recipients**: Send to any Telegram username or wallet ID
+- **Transaction Logging**: All API payments are logged for audit purposes
+
+### Quick Start
+
+```bash
+curl -X POST http://10.0.0.5:8080/api/send \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from": "BiccoindeepaDSA",
+    "to": "recipient_user",
+    "amount": 1000,
+    "memo": "API payment"
+  }'
+```
+
+### Configuration
+
+By default, only these accounts are whitelisted to send payments:
+- `@BiccoindeepaDSA` 
+- `@CeycubeBank`
+
+To modify the whitelist, edit `WhitelistedFromAccounts` in `internal/api/send_config.go`.
+
+### Documentation
+
+For complete API documentation and examples, see [API_SEND_DOCUMENTATION.md](API_SEND_DOCUMENTATION.md).
+
+### Testing
+
+Use the included test script to verify the API functionality:
+
+```bash
+python test_api_send.py --test-suite
+```
 
 ## Features
 

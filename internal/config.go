@@ -16,6 +16,7 @@ var Configuration = struct {
 	Lnbits   LnbitsConfiguration   `yaml:"lnbits"`
 	Generate GenerateConfiguration `yaml:"generate"`
 	Nostr    NostrConfiguration    `yaml:"nostr"`
+	API      APIConfiguration      `yaml:"api"`
 }{}
 
 type NostrConfiguration struct {
@@ -71,6 +72,21 @@ type LnbitsConfiguration struct {
 	WebhookPublicUrlParsed *url.URL `yaml:"-"`
 }
 
+type APIConfiguration struct {
+	Send APISendConfiguration `yaml:"send"`
+}
+
+type APISendConfiguration struct {
+	Enabled                bool     `yaml:"enabled"`
+	InternalNetwork        string   `yaml:"internal_network"`
+	MaxAmount              int64    `yaml:"max_amount"`
+	MinAmount              int64    `yaml:"min_amount"`
+	AdminApprovalThreshold int64    `yaml:"admin_approval_threshold"`
+	MaxMemoLength          int      `yaml:"max_memo_length"`
+	RateLimit              int      `yaml:"rate_limit"`
+	WhitelistedSenders     []string `yaml:"whitelisted_senders"`
+}
+
 func init() {
 	err := configor.Load(&Configuration, "config.yaml")
 	if err != nil {
@@ -104,6 +120,7 @@ func init() {
 	}
 	Configuration.Bot.LNURLHostUrl = hostname
 	checkLnbitsConfiguration()
+	setAPISendDefaults()
 }
 
 // GetWebhookURL returns the appropriate webhook URL
@@ -133,4 +150,45 @@ func checkLnbitsConfiguration() {
 			Configuration.Lnbits.LnbitsPublicUrl = Configuration.Lnbits.LnbitsPublicUrl + "/"
 		}
 	}
+}
+
+// setAPISendDefaults sets default values for API Send configuration
+func setAPISendDefaults() {
+	// Set defaults only if not configured
+	if Configuration.API.Send.InternalNetwork == "" {
+		Configuration.API.Send.InternalNetwork = "10.0.0.0/24"
+	}
+	if Configuration.API.Send.MaxAmount == 0 {
+		Configuration.API.Send.MaxAmount = 1000000 // 1M sats
+	}
+	if Configuration.API.Send.MinAmount == 0 {
+		Configuration.API.Send.MinAmount = 1
+	}
+	if Configuration.API.Send.AdminApprovalThreshold == 0 {
+		Configuration.API.Send.AdminApprovalThreshold = 100000 // 100k sats
+	}
+	if Configuration.API.Send.MaxMemoLength == 0 {
+		Configuration.API.Send.MaxMemoLength = 280
+	}
+	if Configuration.API.Send.RateLimit == 0 {
+		Configuration.API.Send.RateLimit = 60
+	}
+	if len(Configuration.API.Send.WhitelistedSenders) == 0 {
+		Configuration.API.Send.WhitelistedSenders = []string{
+			"BiccoindeepaDSA",
+			"CeycubeBank",
+		}
+	}
+	
+	// Log API Send configuration status
+	if Configuration.API.Send.Enabled {
+		log.Infof("API Send module enabled with %d whitelisted senders", len(Configuration.API.Send.WhitelistedSenders))
+	} else {
+		log.Infof("API Send module disabled in configuration")
+	}
+}
+
+// IsAPISendEnabled returns whether the API Send module is enabled
+func IsAPISendEnabled() bool {
+	return Configuration.API.Send.Enabled
 }
