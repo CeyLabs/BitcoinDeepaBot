@@ -42,7 +42,7 @@ func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, err
 		return ctx, err
 	}
 
-	log.Infof("[/balance] %s's balance: %d sat\n", usrStr, balance)
+	log.Infof("[/balance] %s's balance: %d sat(s)\n", usrStr, balance)
 
 	LKRPerSat, USDPerSat, err := thirdparty.GetSatPrice()
 	if err != nil {

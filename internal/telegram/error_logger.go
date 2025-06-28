@@ -287,7 +287,7 @@ func (el *ErrorLogger) LogPaymentError(err error, paymentDetails, invoice string
 
 // LogTransactionError logs transaction-related errors with sender/receiver info
 func (el *ErrorLogger) LogTransactionError(err error, transactionType string, amount int64, fromUser, toUser *tb.User) {
-	context := fmt.Sprintf("Transaction Error - Type: %s, Amount: %d sat", transactionType, amount)
+	context := fmt.Sprintf("Transaction Error - Type: %s, Amount: %d sat(s)", transactionType, amount)
 
 	var userDetails []string
 	if fromUser != nil {
@@ -297,7 +297,7 @@ func (el *ErrorLogger) LogTransactionError(err error, transactionType string, am
 		userDetails = append(userDetails, fmt.Sprintf("> *To:* %s \\(ID: %d\\)", el.getUserStrV2(toUser), toUser.ID))
 	}
 
-	transactionDetails := fmt.Sprintf("*Transaction Details:*\n%s\n> *Amount:* `%d sat`\n> *Transaction Error:* `%s`",
+	transactionDetails := fmt.Sprintf("*Transaction Details:*\n%s\n> *Amount:* `%d sat(s)`\n> *Transaction Error:* `%s`",
 		strings.Join(userDetails, "\n"), amount, el.escapeMarkdownV2(err.Error()))
 
 	var logUsers []interface{}

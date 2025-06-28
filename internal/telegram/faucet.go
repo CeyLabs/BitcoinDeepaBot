@@ -192,7 +192,7 @@ func (bot TipBot) faucetHandler(ctx intercept.Context) (intercept.Context, error
 	}
 	fromUserStr := GetUserStr(ctx.Message().Sender)
 	mFaucet := bot.trySendMessage(ctx.Message().Chat, inlineFaucet.Message, bot.makeFaucetKeyboard(ctx, inlineFaucet.ID))
-	log.Infof("[faucet] %s created faucet %s: %d sat (%d per user)", fromUserStr, inlineFaucet.ID, inlineFaucet.Amount, inlineFaucet.PerUserAmount)
+	log.Infof("[faucet] %s created faucet %s: %d sat(s) (%d per user)", fromUserStr, inlineFaucet.ID, inlineFaucet.Amount, inlineFaucet.PerUserAmount)
 
 	// log faucet link if possible
 	if mFaucet != nil && mFaucet.Chat != nil {
@@ -226,7 +226,7 @@ func (bot TipBot) handleInlineFaucetQuery(ctx intercept.Context) (intercept.Cont
 		results[i].SetResultID(inlineFaucet.ID)
 
 		bot.Cache.Set(inlineFaucet.ID, inlineFaucet, &store.Options{Expiration: 5 * time.Minute})
-		log.Infof("[faucet] %s:%d created inline faucet %s: %d sat (%d per user)", GetUserStr(inlineFaucet.From.Telegram), inlineFaucet.From.Telegram.ID, inlineFaucet.ID, inlineFaucet.Amount, inlineFaucet.PerUserAmount)
+		log.Infof("[faucet] %s:%d created inline faucet %s: %d sat(s) (%d per user)", GetUserStr(inlineFaucet.From.Telegram), inlineFaucet.From.Telegram.ID, inlineFaucet.ID, inlineFaucet.Amount, inlineFaucet.PerUserAmount)
 	}
 
 	err = bot.Telegram.Answer(ctx.Query(), &tb.QueryResponse{
@@ -257,7 +257,7 @@ func (bot *TipBot) acceptInlineFaucetHandler(ctx intercept.Context) (intercept.C
 	from := inlineFaucet.From
 	// failsafe for queued users
 	if !inlineFaucet.Active {
-		log.Tracef(fmt.Sprintf("[faucet] faucet %s inactive. Remaining: %d sat", inlineFaucet.ID, inlineFaucet.RemainingAmount))
+		log.Tracef(fmt.Sprintf("[faucet] faucet %s inactive. Remaining: %d sat(s)", inlineFaucet.ID, inlineFaucet.RemainingAmount))
 		bot.finishFaucet(ctx, c, inlineFaucet)
 		return ctx, errors.Create(errors.NotActiveError)
 	}

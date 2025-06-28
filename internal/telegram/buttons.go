@@ -100,8 +100,8 @@ func (bot *TipBot) mainMenuBalanceButtonUpdate(to int64) {
 	if user.Wallet != nil {
 		amount, err := bot.GetUserBalanceCached(user)
 		if err == nil {
-			log.Tracef("[appendMainMenu] user %s balance %d sat", GetUserStr(user.Telegram), amount)
-			MainMenuCommandBalance := fmt.Sprintf("%s %d sat", MainMenuCommandBalance, amount)
+			log.Tracef("[appendMainMenu] user %s balance %d sat(s)", GetUserStr(user.Telegram), amount)
+			MainMenuCommandBalance := fmt.Sprintf("%s %d sat(s)", MainMenuCommandBalance, amount)
 			btnBalanceMainMenu = mainMenu.Text(MainMenuCommandBalance)
 		}
 
