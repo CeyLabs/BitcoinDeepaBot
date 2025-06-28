@@ -403,3 +403,8 @@ Pro připojení ke skupině si promluv s %s a v soukromé zprávě napiš `/join
 generateDalleHelpMessage        = """Vytvořit obrázky pomocí OpenAI DALLE 2.\nPoužití: `/generate <prompt>`\nCena: 1000 sat"""
 generateDallePayInvoiceMessage  = """Zaplať tuto invoice pro vytvoření 4 obrázků 👇"""
 generateDalleGeneratingMessage  = """Tvé obrázky se generují. Chvilku strpení..."""
+# CONVERT LKR TO SAT
+convertEnterAmountMessage = """Did you enter an amount?"""
+convertInvalidAmountMessage = """Did you enter a valid amount?"""
+convertPriceErrorMessage = """🚫 Couldn't fetch price."""
+convertResultMessage = """%.2f LKR is about %d sat."""

@@ -410,3 +410,8 @@ For users (in private chat): `/join <group_name>`\nExample: `/join TheBestBitcoi
 generateDalleHelpMessage        = """Generate images using OpenAI DALLE 2.\nUsage: `/generate <prompt>`\nPrice: 1000 sat"""
 generateDallePayInvoiceMessage  = """Pay this invoice to generate four images 👇"""
 generateDalleGeneratingMessage  = """Your images are being generated. Please wait..."""
+# CONVERT LKR TO SAT
+convertEnterAmountMessage = """Did you enter an amount?"""
+convertInvalidAmountMessage = """Did you enter a valid amount?"""
+convertPriceErrorMessage = """🚫 Couldn't fetch price."""
+convertResultMessage = """%.2f LKR is about %d sat."""

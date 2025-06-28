@@ -347,3 +347,8 @@ inlineTipjarHelpText                    = """📖 Opa, isso não funcionou. %s
 
 *Uso:* `/tipjar <capacidade> <por_usuário>`
 *Exemplo:* `/tipjar 210 21`"""
+# CONVERT LKR TO SAT
+convertEnterAmountMessage = """Did you enter an amount?"""
+convertInvalidAmountMessage = """Did you enter a valid amount?"""
+convertPriceErrorMessage = """🚫 Couldn't fetch price."""
+convertResultMessage = """%.2f LKR is about %d sat."""

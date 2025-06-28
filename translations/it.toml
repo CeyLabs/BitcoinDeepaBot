@@ -308,3 +308,8 @@ inlineReceiveCreateWalletMessage = """Chatta con %s 👈 per gestire il tuo wall
 inlineReceiveYourselfMessage     = """📖 Non puoi inviare un pagamento a te stesso."""
 inlineReceiveFailedMessage       = """🚫 Pagamento non riuscito."""
 inlineReceiveCancelledMessage    = """🚫 Pagamento cancellato."""
+# CONVERT LKR TO SAT
+convertEnterAmountMessage = """Did you enter an amount?"""
+convertInvalidAmountMessage = """Did you enter a valid amount?"""
+convertPriceErrorMessage = """🚫 Couldn't fetch price."""
+convertResultMessage = """%.2f LKR is about %d sat."""

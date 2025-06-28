@@ -404,3 +404,8 @@ Aby dołączyć do grupy, napisz do %s i napisz w prywatnej wiadomości `/join <
 generateDalleHelpMessage        = """Generuj obrazy przy użyciu OpenAI DALLE 2.\nUżycie: `/generate <podpowiedź>`\nCena: 1000 sat"""
 generateDallePayInvoiceMessage  = """Opłać tę fakturę by wygenerować 4 obrazy 👇"""
 generateDalleGeneratingMessage  = """Twoje obrazy są generowane. Proszę czekaj..."""
+# CONVERT LKR TO SAT
+convertEnterAmountMessage = """Did you enter an amount?"""
+convertInvalidAmountMessage = """Did you enter a valid amount?"""
+convertPriceErrorMessage = """🚫 Couldn't fetch price."""
+convertResultMessage = """%.2f LKR is about %d sat."""

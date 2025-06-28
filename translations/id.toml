@@ -316,3 +316,8 @@ inlineReceiveCreateWalletMessage = """Bercakap dengan %s 👈 untuk mengelola do
 inlineReceiveYourselfMessage     = """📖 Kamu tidak dapat membayar diri mu sendiri."""
 inlineReceiveFailedMessage       = """🚫 Penerimaan gagal."""
 inlineReceiveCancelledMessage    = """🚫 Penerimaan dibatalkan."""
+# CONVERT LKR TO SAT
+convertEnterAmountMessage = """Did you enter an amount?"""
+convertInvalidAmountMessage = """Did you enter a valid amount?"""
+convertPriceErrorMessage = """🚫 Couldn't fetch price."""
+convertResultMessage = """%.2f LKR is about %d sat."""
