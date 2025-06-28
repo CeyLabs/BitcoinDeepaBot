@@ -17,6 +17,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
@@ -112,7 +113,7 @@ func (bot TipBot) handleInlineSendQuery(ctx intercept.Context) (intercept.Contex
 	}
 	results := make(tb.Results, len(urls)) // []tb.Result
 	for i, url := range urls {
-		inlineMessage := fmt.Sprintf(Translate(ctx, "inlineSendMessage"), fromUserStr, amount)
+		inlineMessage := fmt.Sprintf(Translate(ctx, "inlineSendMessage"), fromUserStr, utils.CommaInt(int64(amount)))
 
 		// modify message if payment is to specific user
 		if to_SpecificUser {
@@ -125,8 +126,8 @@ func (bot TipBot) handleInlineSendQuery(ctx intercept.Context) (intercept.Contex
 		result := &tb.ArticleResult{
 			// URL:         url,
 			Text:        inlineMessage,
-			Title:       fmt.Sprintf(TranslateUser(ctx, "inlineResultSendTitle"), amount),
-			Description: fmt.Sprintf(TranslateUser(ctx, "inlineResultSendDescription"), amount),
+			Title:       fmt.Sprintf(TranslateUser(ctx, "inlineResultSendTitle"), utils.CommaInt(int64(amount))),
+			Description: fmt.Sprintf(TranslateUser(ctx, "inlineResultSendDescription"), utils.CommaInt(int64(amount))),
 			// required for photos
 			ThumbURL: url,
 		}
@@ -237,7 +238,7 @@ func (bot *TipBot) acceptInlineSendHandler(ctx intercept.Context) (intercept.Con
 
 	log.Infof("[💸 sendInline] Send from %s to %s (%d sat).", fromUserStr, toUserStr, amount)
 
-	inlineSend.Message = fmt.Sprintf("%s", fmt.Sprintf(i18n.Translate(inlineSend.LanguageCode, "inlineSendUpdateMessageAccept"), amount, fromUserStrMd, toUserStrMd))
+	inlineSend.Message = fmt.Sprintf("%s", fmt.Sprintf(i18n.Translate(inlineSend.LanguageCode, "inlineSendUpdateMessageAccept"), utils.CommaInt(int64(amount)), fromUserStrMd, toUserStrMd))
 	memo := inlineSend.Memo
 	if len(memo) > 0 {
 		inlineSend.Message = inlineSend.Message + fmt.Sprintf(i18n.Translate(inlineSend.LanguageCode, "inlineSendAppendMemo"), memo)
@@ -247,8 +248,8 @@ func (bot *TipBot) acceptInlineSendHandler(ctx intercept.Context) (intercept.Con
 	}
 	bot.tryEditMessage(c, inlineSend.Message, &tb.ReplyMarkup{})
 	// notify users
-	bot.trySendMessage(to.Telegram, fmt.Sprintf(i18n.Translate(to.Telegram.LanguageCode, "sendReceivedMessage"), fromUserStrMd, amount))
-	bot.trySendMessage(fromUser.Telegram, fmt.Sprintf(i18n.Translate(fromUser.Telegram.LanguageCode, "sendSentMessage"), amount, toUserStrMd))
+	bot.trySendMessage(to.Telegram, fmt.Sprintf(i18n.Translate(to.Telegram.LanguageCode, "sendReceivedMessage"), fromUserStrMd, utils.CommaInt(int64(amount))))
+	bot.trySendMessage(fromUser.Telegram, fmt.Sprintf(i18n.Translate(fromUser.Telegram.LanguageCode, "sendSentMessage"), utils.CommaInt(int64(amount)), toUserStrMd))
 	if err != nil {
 		errmsg := fmt.Errorf("[sendInline] Error: Send message to %s: %s", toUserStr, err)
 		log.Warnln(errmsg)

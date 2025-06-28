@@ -17,6 +17,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/runtime"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/str"
 	"github.com/LightningTipBot/LightningTipBot/pkg/lightning"
@@ -183,7 +184,7 @@ func (bot *TipBot) sendHandler(ctx intercept.Context) (intercept.Context, error)
 	}
 
 	// entire text of the inline object
-	confirmText := fmt.Sprintf(Translate(ctx, "confirmSendMessage"), str.MarkdownEscape(toUserStrMention), amount)
+	confirmText := fmt.Sprintf(Translate(ctx, "confirmSendMessage"), str.MarkdownEscape(toUserStrMention), utils.CommaInt(int64(amount)))
 	if len(sendMemo) > 0 {
 		confirmText = confirmText + fmt.Sprintf(Translate(ctx, "confirmSendAppendMemo"), str.MarkdownEscape(sendMemo))
 	}
@@ -342,18 +343,18 @@ func (bot *TipBot) confirmSendHandler(ctx intercept.Context) (intercept.Context,
 	log.Infof("[💸 send] Send from %s to %s (%d sat).", fromUserStr, toUserStr, amount)
 
 	// notify to user
-	bot.trySendMessage(to.Telegram, fmt.Sprintf(i18n.Translate(to.Telegram.LanguageCode, "sendReceivedMessage"), fromUserStrMd, amount))
+	bot.trySendMessage(to.Telegram, fmt.Sprintf(i18n.Translate(to.Telegram.LanguageCode, "sendReceivedMessage"), fromUserStrMd, utils.CommaInt(int64(amount))))
 	// bot.trySendMessage(from.Telegram, fmt.Sprintf(Translate(ctx, "sendSentMessage"), amount, toUserStrMd))
 	if ctx.Callback().Message.Private() {
 		// if the command was invoked in private chat
 		// the edit below was cool, but we need to get rid of the replymarkup inline keyboard thingy for the main menu to pop up
 		// bot.tryEditMessage(c.Message, fmt.Sprintf(i18n.Translate(sendData.LanguageCode, "sendSentMessage"), amount, toUserStrMd), &tb.ReplyMarkup{})
 		bot.tryDeleteMessage(ctx.Callback().Message)
-		bot.trySendMessage(ctx.Callback().Sender, fmt.Sprintf(i18n.Translate(sendData.LanguageCode, "sendSentMessage"), amount, toUserStrMd))
+		bot.trySendMessage(ctx.Callback().Sender, fmt.Sprintf(i18n.Translate(sendData.LanguageCode, "sendSentMessage"), utils.CommaInt(int64(amount)), toUserStrMd))
 	} else {
 		// if the command was invoked in group chat
-		bot.trySendMessage(ctx.Callback().Sender, fmt.Sprintf(i18n.Translate(from.Telegram.LanguageCode, "sendSentMessage"), amount, toUserStrMd))
-		bot.tryEditMessage(ctx.Callback().Message, fmt.Sprintf(i18n.Translate(sendData.LanguageCode, "sendPublicSentMessage"), amount, fromUserStrMd, toUserStrMd), &tb.ReplyMarkup{})
+		bot.trySendMessage(ctx.Callback().Sender, fmt.Sprintf(i18n.Translate(from.Telegram.LanguageCode, "sendSentMessage"), utils.CommaInt(int64(amount)), toUserStrMd))
+		bot.tryEditMessage(ctx.Callback().Message, fmt.Sprintf(i18n.Translate(sendData.LanguageCode, "sendPublicSentMessage"), utils.CommaInt(int64(amount)), fromUserStrMd, toUserStrMd), &tb.ReplyMarkup{})
 	}
 	// send memo if it was present
 	if len(sendMemo) > 0 {

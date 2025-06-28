@@ -12,6 +12,7 @@ import (
 
 	"github.com/LightningTipBot/LightningTipBot/internal/runtime/mutex"
 	"github.com/LightningTipBot/LightningTipBot/internal/storage"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 
 	"github.com/eko/gocache/store"
 	"github.com/skip2/go-qrcode"
@@ -101,7 +102,7 @@ func (bot TipBot) handleInlineReceiveQuery(ctx intercept.Context) (intercept.Con
 	}
 	results := make(tb.Results, len(urls)) // []tb.Result
 	for i, url := range urls {
-		inlineMessage := fmt.Sprintf(Translate(ctx, "inlineReceiveMessage"), toUserStr, amount)
+		inlineMessage := fmt.Sprintf(Translate(ctx, "inlineReceiveMessage"), toUserStr, utils.CommaInt(int64(amount)))
 
 		// modify message if payment is to specific user
 		if from_SpecificUser {
@@ -114,8 +115,8 @@ func (bot TipBot) handleInlineReceiveQuery(ctx intercept.Context) (intercept.Con
 		result := &tb.ArticleResult{
 			// URL:         url,
 			Text:        inlineMessage,
-			Title:       fmt.Sprintf(TranslateUser(ctx, "inlineResultReceiveTitle"), amount),
-			Description: fmt.Sprintf(TranslateUser(ctx, "inlineResultReceiveDescription"), amount),
+			Title:       fmt.Sprintf(TranslateUser(ctx, "inlineResultReceiveTitle"), utils.CommaInt(int64(amount))),
+			Description: fmt.Sprintf(TranslateUser(ctx, "inlineResultReceiveDescription"), utils.CommaInt(int64(amount))),
 			// required for photos
 			ThumbURL: url,
 		}
@@ -337,8 +338,8 @@ func (bot *TipBot) finishInlineReceiveHandler(ctx context.Context, c *tb.Callbac
 
 	bot.tryEditMessage(inlineReceive.Message, inlineReceive.MessageText, &tb.ReplyMarkup{})
 	// notify users
-	bot.trySendMessage(to.Telegram, fmt.Sprintf(i18n.Translate(to.Telegram.LanguageCode, "sendReceivedMessage"), fromUserStrMd, inlineReceive.Amount))
-	bot.trySendMessage(from.Telegram, fmt.Sprintf(i18n.Translate(from.Telegram.LanguageCode, "sendSentMessage"), inlineReceive.Amount, toUserStrMd))
+	bot.trySendMessage(to.Telegram, fmt.Sprintf(i18n.Translate(to.Telegram.LanguageCode, "sendReceivedMessage"), fromUserStrMd, utils.CommaInt(int64(inlineReceive.Amount))))
+	bot.trySendMessage(from.Telegram, fmt.Sprintf(i18n.Translate(from.Telegram.LanguageCode, "sendSentMessage"), utils.CommaInt(int64(inlineReceive.Amount)), toUserStrMd))
 	if err != nil {
 		errmsg := fmt.Errorf("[acceptInlineReceiveHandler] Error: Receive message to %s: %s", toUserStr, err)
 		log.Warnln(errmsg)

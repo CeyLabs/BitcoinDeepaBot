@@ -19,6 +19,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/runtime"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/str"
 	lnurl "github.com/fiatjaf/go-lnurl"
@@ -180,7 +181,7 @@ func (bot *TipBot) lnurlWithdrawHandlerWithdraw(ctx intercept.Context) (intercep
 		return ctx, fmt.Errorf("invalid type")
 	}
 
-	confirmText := fmt.Sprintf(Translate(ctx, "confirmLnurlWithdrawMessage"), lnurlWithdrawState.Amount/1000)
+	confirmText := fmt.Sprintf(Translate(ctx, "confirmLnurlWithdrawMessage"), utils.CommaInt(int64(lnurlWithdrawState.Amount/1000)))
 	if len(lnurlWithdrawState.LNURLWithdrawResponse.DefaultDescription) > 0 {
 		confirmText = confirmText + fmt.Sprintf(Translate(ctx, "confirmPayAppendMemo"), str.MarkdownEscape(lnurlWithdrawState.LNURLWithdrawResponse.DefaultDescription))
 	}

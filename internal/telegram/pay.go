@@ -15,6 +15,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/runtime"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/str"
 	lnurl "github.com/fiatjaf/go-lnurl"
@@ -114,7 +115,7 @@ func (bot *TipBot) payHandler(ctx intercept.Context) (intercept.Context, error) 
 		bot.trySendMessage(ctx.Sender(), Translate(ctx, "feeReserveMessage"))
 	}
 
-	confirmText := fmt.Sprintf(Translate(ctx, "confirmPayInvoiceMessage"), amount)
+	confirmText := fmt.Sprintf(Translate(ctx, "confirmPayInvoiceMessage"), utils.CommaInt(int64(amount)))
 	if len(bolt11.Description) > 0 {
 		confirmText = confirmText + fmt.Sprintf(Translate(ctx, "confirmPayAppendMemo"), str.MarkdownEscape(bolt11.Description))
 	}
