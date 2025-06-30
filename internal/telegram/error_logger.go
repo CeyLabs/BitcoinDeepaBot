@@ -51,11 +51,17 @@ func (el *ErrorLogger) LogError(err error, context string, userInfo ...interface
 		return
 	}
 
+	// Filter out annoying/irrelevant error messages
+	errorMsg := err.Error()
+	if strings.Contains(errorMsg, "[requirePrivateChatInterceptor]") {
+		return // Skip logging this specific interceptor error
+	}
+
 	// Format error message
-	errorMsg := el.formatErrorMessage(err, context, userInfo...)
+	formattedMsg := el.formatErrorMessage(err, context, userInfo...)
 
 	// Send to Telegram group
-	go el.sendToTelegram(errorMsg)
+	go el.sendToTelegram(formattedMsg)
 }
 
 // LogPanic logs a panic with stack trace to the Telegram group

@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"runtime/debug"
+	"strings"
 
 	"github.com/LightningTipBot/LightningTipBot/internal"
 	"github.com/LightningTipBot/LightningTipBot/internal/api"
@@ -47,6 +48,11 @@ func main() {
 func startApiServer(bot *telegram.TipBot) {
 	// log errors from interceptors
 	bot.Telegram.OnError = func(err error, ctx tb.Context) {
+		// Filter out annoying interceptor errors
+		if err != nil && strings.Contains(err.Error(), "[requirePrivateChatInterceptor]") {
+			return // Skip logging this specific error
+		}
+
 		// Log errors to Telegram group
 		if bot.ErrorLogger != nil {
 			userInfo := []interface{}{}
