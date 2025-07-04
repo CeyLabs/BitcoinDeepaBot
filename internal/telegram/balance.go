@@ -5,7 +5,7 @@ import (
 
         "github.com/LightningTipBot/LightningTipBot/internal/errors"
         "github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
-        thirdparty "github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
+        "github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
         "github.com/LightningTipBot/LightningTipBot/internal/utils"
 
         log "github.com/sirupsen/logrus"
