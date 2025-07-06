@@ -11,6 +11,7 @@ import (
 
 	"github.com/LightningTipBot/LightningTipBot/internal"
 	"github.com/LightningTipBot/LightningTipBot/internal/str"
+	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
 	log "github.com/sirupsen/logrus"
@@ -131,13 +132,13 @@ func (bot *TipBot) tipHandler(ctx intercept.Context) (intercept.Context, error) 
 	log.Infof("[💸 tip] Tip from %s to %s (%d sat).", fromUserStr, toUserStr, amount)
 
 	// notify users
-	bot.trySendMessage(from.Telegram, fmt.Sprintf(i18n.Translate(from.Telegram.LanguageCode, "tipSentMessage"), amount, toUserStrMd))
+	bot.trySendMessage(from.Telegram, fmt.Sprintf(i18n.Translate(from.Telegram.LanguageCode, "tipSentMessage"), thirdparty.FormatSatsWithLKR(amount), toUserStrMd))
 
 	// forward tipped message to user once
 	if !messageHasTip {
 		bot.tryForwardMessage(to.Telegram, m.ReplyTo, tb.Silent)
 	}
-	bot.trySendMessage(to.Telegram, fmt.Sprintf(i18n.Translate(to.Telegram.LanguageCode, "tipReceivedMessage"), fromUserStrMd, amount))
+	bot.trySendMessage(to.Telegram, fmt.Sprintf(i18n.Translate(to.Telegram.LanguageCode, "tipReceivedMessage"), fromUserStrMd, thirdparty.FormatSatsWithLKR(amount)))
 
 	if len(tipMemo) > 0 {
 		bot.trySendMessage(to.Telegram, fmt.Sprintf("✉️ %s", str.MarkdownEscape(tipMemo)))

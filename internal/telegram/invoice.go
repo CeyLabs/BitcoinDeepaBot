@@ -21,8 +21,9 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/runtime"
        "github.com/LightningTipBot/LightningTipBot/internal/str"
-       "github.com/skip2/go-qrcode"
+       "github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
        "github.com/LightningTipBot/LightningTipBot/internal/utils"
+       "github.com/skip2/go-qrcode"
        tb "gopkg.in/lightningtipbot/telebot.v3"
 )
 
@@ -222,16 +223,16 @@ func (bot *TipBot) notifyInvoiceReceivedEvent(event Event) {
 	}
 
 	if invoiceEvent.UserCurrency == "" || strings.ToLower(invoiceEvent.UserCurrency) == "btc" {
-		bot.trySendMessage(invoiceEvent.User.Telegram, fmt.Sprintf(i18n.Translate(invoiceEvent.User.Telegram.LanguageCode, "invoiceReceivedMessage"), invoiceEvent.Amount))
+		bot.trySendMessage(invoiceEvent.User.Telegram, fmt.Sprintf(i18n.Translate(invoiceEvent.User.Telegram.LanguageCode, "invoiceReceivedMessage"), thirdparty.FormatSatsWithLKR(invoiceEvent.Amount)))
 	} else {
                fiatAmount, err := SatoshisToFiat(invoiceEvent.Amount, strings.ToUpper(invoiceEvent.UserCurrency))
                if err != nil {
                         log.Errorln(err)
                         // fallback to satoshis
-                        bot.trySendMessage(invoiceEvent.User.Telegram, fmt.Sprintf(i18n.Translate(invoiceEvent.User.Telegram.LanguageCode, "invoiceReceivedMessage"), invoiceEvent.Amount))
+                        bot.trySendMessage(invoiceEvent.User.Telegram, fmt.Sprintf(i18n.Translate(invoiceEvent.User.Telegram.LanguageCode, "invoiceReceivedMessage"), thirdparty.FormatSatsWithLKR(invoiceEvent.Amount)))
                         return
                }
-               bot.trySendMessage(invoiceEvent.User.Telegram, fmt.Sprintf(i18n.Translate(invoiceEvent.User.Telegram.LanguageCode, "invoiceReceivedCurrencyMessage"), invoiceEvent.Amount, utils.FormatFloatWithCommas(fiatAmount), strings.ToUpper(invoiceEvent.UserCurrency)))
+               bot.trySendMessage(invoiceEvent.User.Telegram, fmt.Sprintf(i18n.Translate(invoiceEvent.User.Telegram.LanguageCode, "invoiceReceivedCurrencyMessage"), thirdparty.FormatSatsWithLKR(invoiceEvent.Amount), utils.FormatFloatWithCommas(fiatAmount), strings.ToUpper(invoiceEvent.UserCurrency)))
        }
 }
 
