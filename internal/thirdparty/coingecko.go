@@ -61,3 +61,15 @@ func GetSatPrice() (float64, float64, error) {
 
 	return LKRPerSat, USDPerSat, nil
 }
+
+// FormatSatsWithLKR formats sats amount with LKR conversion in the format: {amount} sats (රු. {lkr_amount})
+func FormatSatsWithLKR(amount int64) string {
+    lkrPerSat, _, err := GetSatPrice()
+    if err != nil {
+        // Fallback to sats only if LKR price is unavailable
+        return fmt.Sprintf("%d sats", amount)
+    }
+    
+    lkrValue := lkrPerSat * float64(amount)
+    return fmt.Sprintf("%d sats (රු. %s)", amount, utils.FormatFloatWithCommas(lkrValue))
+}

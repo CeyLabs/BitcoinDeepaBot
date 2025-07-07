@@ -143,7 +143,7 @@ startNoUsernameMessage    = """☝️ Vous n'avez pas encore de nom d'utilisateu
 
 # BALANCE
 
-balanceMessage      = """👑 *Votre solde:* %d sat(s). (%.2f USD / %.2f LKR)"""
+balanceMessage      = """👑 *Votre solde:* %d sat(s). (%s USD / %s LKR)"""
 balanceErrorMessage = """🚫 Impossible de récupérer votre solde. Essayez à nouveau."""
 
 # TIP
@@ -184,7 +184,7 @@ sendHelpText               = """📖 Oops, cela n'a pas fonctionné. %s
 # INVOICE
 
 invoiceReceivedMessage    = """⚡️ Vous avez reçu %d sat."""
-invoiceReceivedCurrencyMessage    = """⚡️ Vous avez reçu %d sat (%.2f %s)."""
+invoiceReceivedCurrencyMessage    = """⚡️ Vous avez reçu %d sat (%s %s)."""
 invoiceEnterAmountMessage = """Avez-vous choisi un montant ?"""
 invoiceValidAmountMessage = """Avez-vous choisi un montant correct ?"""
 invoiceHelpText           = """📖 Oops, cela n'a pas fonctionné. %s

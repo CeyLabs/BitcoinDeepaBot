@@ -19,6 +19,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/runtime/mutex"
 	"github.com/LightningTipBot/LightningTipBot/internal/storage"
 	"github.com/LightningTipBot/LightningTipBot/internal/str"
+	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 	log "github.com/sirupsen/logrus"
 	"github.com/skip2/go-qrcode"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
@@ -258,7 +259,7 @@ func (bot *TipBot) getSendPayButton(ctx intercept.Context, ticket TicketEvent) (
 		ticketPayConfirmationMenu.Row(
 			btnPayTicket),
 	)
-	confirmText := fmt.Sprintf(Translate(ctx, "confirmPayInvoiceMessage"), ticket.Group.Ticket.Price)
+	confirmText := fmt.Sprintf(Translate(ctx, "confirmPayInvoiceMessage"), thirdparty.FormatSatsWithLKR(ticket.Group.Ticket.Price))
 	// if len(ticket.Group.Ticket.Memo) > 0 {
 	// 	confirmText = confirmText + fmt.Sprintf(Translate(ctx, "confirmPayAppendMemo"), str.MarkdownEscape(ticket.Group.Ticket.Memo))
 	// }
@@ -307,7 +308,7 @@ func (bot *TipBot) groupConfirmPayButtonHandler(ctx intercept.Context) (intercep
 			bot.tryEditMessage(c, fmt.Sprintf(i18n.Translate(ticketEvent.LanguageCode, "invoicePaymentFailedMessage"), err.Error()), &tb.ReplyMarkup{})
 		}
 		if bot.ErrorLogger != nil {
-			bot.ErrorLogger.LogPaymentError(err, "Join Ticket Payment", ticketEvent.Invoice.PaymentHash, user.Telegram)
+			bot.ErrorLogger.LogPaymentError(err, ticketEvent.Group.Ticket.Price, "Join Ticket Payment", ticketEvent.Invoice.PaymentRequest, user.Telegram)
 		}
 		log.Errorln(errmsg)
 		return ctx, err

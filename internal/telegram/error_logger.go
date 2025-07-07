@@ -3,6 +3,7 @@ package telegram
 import (
 	"fmt"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -135,6 +136,14 @@ func (el *ErrorLogger) formatErrorMessage(err error, context string, userInfo ..
 
 	// Add stack trace for debugging (limited to 3 most recent calls)
 	if pc, file, line, ok := runtime.Caller(2); ok {
+		// if the caller is within this file, step one level further up the stack
+		if strings.Contains(file, "error_logger.go") {
+			if pc2, file2, line2, ok2 := runtime.Caller(3); ok2 {
+				pc = pc2
+				file = file2
+				line = line2
+			}
+		}
 		funcName := runtime.FuncForPC(pc).Name()
 		msg += fmt.Sprintf("\n*Location:* `%s:%d` in `%s`", el.escapeMarkdownV2(file), line, el.escapeMarkdownV2(funcName))
 	}
@@ -278,17 +287,66 @@ func (el *ErrorLogger) getUserStrV2(user *tb.User) string {
 	return fmt.Sprintf("%s %s", el.escapeMarkdownV2(user.FirstName), el.escapeMarkdownV2(user.LastName))
 }
 
-// LogPaymentError logs payment-related errors with detailed information
-func (el *ErrorLogger) LogPaymentError(err error, paymentDetails, invoice string, user *tb.User) {
-	context := fmt.Sprintf("Payment Failure - %s", paymentDetails)
-
-	userInfo := fmt.Sprintf("> *User:* %s \\(ID: %d\\)", el.getUserStrV2(user), user.ID)
-	if len(invoice) > 50 {
-		invoice = invoice[:50] + "..."
+// formatSats returns a comma separated representation of satoshi amounts
+func formatSats(amount int64) string {
+	s := strconv.FormatInt(amount, 10)
+	if len(s) <= 3 {
+		return s
 	}
-	paymentInfo := fmt.Sprintf("> *Invoice:* `%s`\n> *Payment Error:* `%s`", el.escapeMarkdownV2(invoice), el.escapeMarkdownV2(err.Error()))
+	var b strings.Builder
+	pre := len(s) % 3
+	if pre > 0 {
+		b.WriteString(s[:pre])
+		if len(s) > pre {
+			b.WriteRune(',')
+		}
+	}
+	for i := pre; i < len(s); i += 3 {
+		if i > 0 && i != pre {
+			b.WriteRune(',')
+		}
+		b.WriteString(s[i : i+3])
+	}
+	return b.String()
+}
 
-	el.LogError(err, context, user, userInfo, paymentInfo)
+// LogPaymentError logs payment-related errors with detailed information
+func (el *ErrorLogger) LogPaymentError(err error, amount int64, memo, invoice string, user *tb.User) {
+	if !el.enabled || err == nil {
+		return
+	}
+
+	if len(invoice) > 80 {
+		invoice = invoice[:80] + "..."
+	}
+	if memo == "" {
+		memo = "None"
+	}
+
+	timestamp := time.Now().Format("2006-01-02 15:04:05 UTC")
+
+	msg := fmt.Sprintf("🚫 Payment Error for %s (ID: %d)\n\n", el.getUserStrV2(user), user.ID)
+	msg += fmt.Sprintf("💰 Amount: %s sats\n", el.escapeMarkdownV2(formatSats(amount)))
+	msg += fmt.Sprintf("📝 Memo: %s\n", el.escapeMarkdownV2(memo))
+	msg += fmt.Sprintf("📄 Invoice: %s\n", el.escapeMarkdownV2(invoice))
+	msg += fmt.Sprintf("❗ Error: %s\n\n", el.escapeMarkdownV2(err.Error()))
+
+	if _, file, line, ok := runtime.Caller(1); ok {
+		if strings.Contains(file, "error_logger.go") {
+			if _, file2, line2, ok2 := runtime.Caller(2); ok2 {
+				file = file2
+				line = line2
+			}
+		}
+		if idx := strings.Index(file, "/internal/"); idx > -1 {
+			file = file[idx:]
+		}
+		msg += fmt.Sprintf("📍 Logged at:\n%s:%d\n(from github.com/LightningTipBot/LightningTipBot)", el.escapeMarkdownV2(file), line)
+	}
+
+	msg += fmt.Sprintf("\n🕒 Time: %s", el.escapeMarkdownV2(timestamp))
+
+	go el.sendToTelegram(msg)
 }
 
 // LogTransactionError logs transaction-related errors with sender/receiver info

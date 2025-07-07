@@ -1,15 +1,16 @@
 package telegram
 
 import (
-	"fmt"
+        "fmt"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/errors"
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
-	thirdparty "github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
+        "github.com/LightningTipBot/LightningTipBot/internal/errors"
+        "github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
+        "github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
+        "github.com/LightningTipBot/LightningTipBot/internal/utils"
 
-	log "github.com/sirupsen/logrus"
+        log "github.com/sirupsen/logrus"
 
-	tb "gopkg.in/lightningtipbot/telebot.v3"
+        tb "gopkg.in/lightningtipbot/telebot.v3"
 )
 
 func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, error) {
@@ -49,9 +50,9 @@ func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, err
 		log.Infof("[/balance] error fetching price from coingecko\n")
 	}
 
-	USDValue := USDPerSat * float64(balance)
-	LKRValue := LKRPerSat * float64(balance)
+        USDValue := USDPerSat * float64(balance)
+        LKRValue := LKRPerSat * float64(balance)
 
-	bot.trySendMessage(ctx.Sender(), fmt.Sprintf(Translate(ctx, "balanceMessage"), balance, USDValue, LKRValue))
-	return ctx, nil
+        bot.trySendMessage(ctx.Sender(), fmt.Sprintf(Translate(ctx, "balanceMessage"), balance, utils.FormatFloatWithCommas(USDValue), utils.FormatFloatWithCommas(LKRValue)))
+        return ctx, nil
 }

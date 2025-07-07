@@ -143,7 +143,7 @@ startNoUsernameMessage    = """☝️ Kelihatannya kamu belum memiliki sebuah @u
 
 # BALANCE
 
-balanceMessage      = """👑 *Saldo mu:* %d sat(s). (%.2f USD / %.2f LKR)"""
+balanceMessage      = """👑 *Saldo mu:* %d sat(s). (%s USD / %s LKR)"""
 balanceErrorMessage = """🚫 Tidak dapat memeriksa saldo mu. Tolong coba lagi nanti."""
 
 # TIP
@@ -184,7 +184,7 @@ sendHelpText               = """📖 Waduh, itu tidak berhasil. %s
 # INVOICE
 
 invoiceReceivedMessage    = """⚡️ Kamu menerima %d sat."""
-invoiceReceivedCurrencyMessage    = """⚡️ Kamu menerima %d sat (%.2f %s)."""
+invoiceReceivedCurrencyMessage    = """⚡️ Kamu menerima %d sat (%s %s)."""
 invoiceEnterAmountMessage = """Apakah kamu sudah memasukkan jumlah?"""
 invoiceValidAmountMessage = """Apakah kamu memasukkan jumlah yang benar?"""
 invoiceHelpText           = """📖 Waduh, itu tidak berhasil. %s

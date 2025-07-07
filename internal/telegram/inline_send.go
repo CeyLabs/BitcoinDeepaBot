@@ -17,6 +17,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
+	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
@@ -112,7 +113,7 @@ func (bot TipBot) handleInlineSendQuery(ctx intercept.Context) (intercept.Contex
 	}
 	results := make(tb.Results, len(urls)) // []tb.Result
 	for i, url := range urls {
-		inlineMessage := fmt.Sprintf(Translate(ctx, "inlineSendMessage"), fromUserStr, amount)
+		inlineMessage := fmt.Sprintf(Translate(ctx, "inlineSendMessage"), fromUserStr, thirdparty.FormatSatsWithLKR(amount))
 
 		// modify message if payment is to specific user
 		if to_SpecificUser {

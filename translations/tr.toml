@@ -142,7 +142,7 @@ startNoUsernameMessage = """☝️ Henüz bir Telegram kullanıcı @adın yok gi
 
 # BALANCE
 
-balanceMessage      = """👑 *Kredin:* %d sat(s). (%.2f USD / %.2f LKR)"""
+balanceMessage      = """👑 *Kredin:* %d sat(s). (%s USD / %s LKR)"""
 balanceErrorMessage = """🚫 Şu an kredini okuyamıyorum. Lütfen daha sonra tekrar dene."""
 
 # TIP
@@ -183,7 +183,7 @@ sendHelpText = """📖 Hoppalaa… olmadı. %s
 # INVOICE
 
 invoiceReceivedMessage    = """⚡️ %d sat sana geldi."""
-invoiceReceivedCurrencyMessage    = """⚡️ %d sat (%.2f %s) sana geldi."""
+invoiceReceivedCurrencyMessage    = """⚡️ %d sat (%s %s) sana geldi."""
 invoiceEnterAmountMessage = """Miktar girdin mi?"""
 invoiceValidAmountMessage = """Geçerli bir miktar girdin mi?"""
 invoiceHelpText           = """📖 Hoppalaa… olmadı. %s

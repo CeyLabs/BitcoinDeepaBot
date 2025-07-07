@@ -143,7 +143,7 @@ startNoUsernameMessage    = """☝️ Het lijkt erop dat je nog geen Telegram @ 
 
 # BALANCE
 
-balanceMessage      = """👑 *Uw saldo:* %d sat(s). (%.2f USD / %.2f LKR)"""
+balanceMessage      = """👑 *Uw saldo:* %d sat(s). (%s USD / %s LKR)"""
 balanceErrorMessage = """🚫 Kon uw saldo niet ophalen. Probeer het later nog eens."""
 
 # TIP
@@ -184,7 +184,7 @@ sendHelpText               = """📖 Oeps, dat werkte niet. %s
 # INVOICE
 
 invoiceReceivedMessage    = """⚡️ Je hebt %d sat ontvangen ."""
-invoiceReceivedCurrencyMessage    = """⚡️ Je hebt %d sat (%.2f %s) ontvangen."""
+invoiceReceivedCurrencyMessage    = """⚡️ Je hebt %d sat (%s %s) ontvangen."""
 invoiceEnterAmountMessage = """Heb je een bedrag ingevoerd?"""
 invoiceValidAmountMessage = """Heeft u een geldig bedrag ingevoerd?"""
 invoiceHelpText           = """📖 Oeps, dat werkte niet. %s
