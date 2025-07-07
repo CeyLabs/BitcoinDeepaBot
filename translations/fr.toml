@@ -309,7 +309,7 @@ inlineReceiveYourselfMessage     = """📖 Vous ne pouvez pas vous envoyer de po
 inlineReceiveFailedMessage       = """🚫 La réception a échoué."""
 inlineReceiveCancelledMessage    = """🚫 Réception annulée."""
 # CONVERT LKR TO SAT
-convertEnterAmountMessage = """Did you enter an amount?"""
-convertInvalidAmountMessage = """Did you enter a valid amount?"""
-convertPriceErrorMessage = """🚫 Couldn't fetch price."""
-convertResultMessage = """%.2f LKR is about %d sat."""
+convertEnterAmountMessage = """Avez-vous saisi un montant ?"""
+convertInvalidAmountMessage = """Avez-vous saisi un montant valide ?"""
+convertPriceErrorMessage = """🚫 Impossible de récupérer le prix."""
+convertResultMessage = """%.2f LKR équivaut à environ %d sat."""

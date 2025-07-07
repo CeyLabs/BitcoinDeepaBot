@@ -317,7 +317,7 @@ inlineReceiveYourselfMessage     = """📖 Kamu tidak dapat membayar diri mu sen
 inlineReceiveFailedMessage       = """🚫 Penerimaan gagal."""
 inlineReceiveCancelledMessage    = """🚫 Penerimaan dibatalkan."""
 # CONVERT LKR TO SAT
-convertEnterAmountMessage = """Did you enter an amount?"""
-convertInvalidAmountMessage = """Did you enter a valid amount?"""
-convertPriceErrorMessage = """🚫 Couldn't fetch price."""
-convertResultMessage = """%.2f LKR is about %d sat."""
+convertEnterAmountMessage = """Apakah kamu sudah memasukkan jumlah?"""
+convertInvalidAmountMessage = """Apakah kamu memasukkan jumlah yang benar?"""
+convertPriceErrorMessage = """🚫 Tidak dapat mengambil harga."""
+convertResultMessage = """%.2f LKR sekitar %d sat."""

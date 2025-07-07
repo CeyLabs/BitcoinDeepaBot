@@ -404,7 +404,7 @@ generateDalleHelpMessage        = """Vytvořit obrázky pomocí OpenAI DALLE 2.\
 generateDallePayInvoiceMessage  = """Zaplať tuto invoice pro vytvoření 4 obrázků 👇"""
 generateDalleGeneratingMessage  = """Tvé obrázky se generují. Chvilku strpení..."""
 # CONVERT LKR TO SAT
-convertEnterAmountMessage = """Did you enter an amount?"""
-convertInvalidAmountMessage = """Did you enter a valid amount?"""
-convertPriceErrorMessage = """🚫 Couldn't fetch price."""
-convertResultMessage = """%.2f LKR is about %d sat."""
+convertEnterAmountMessage = """Zadal jsi částku?"""
+convertInvalidAmountMessage = """Zadal jsi platnou částku?"""
+convertPriceErrorMessage = """🚫 Nepodařilo se získat cenu."""
+convertResultMessage = """%.2f LKR je přibližně %d sat."""
