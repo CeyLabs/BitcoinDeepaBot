@@ -163,7 +163,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 
 	if balance < req.Amount {
 		log.Warnf("[api/send] Insufficient balance for %s: %d < %d", fromUsername, balance, req.Amount)
-		RespondError(w, fmt.Sprintf("Insufficient balance: %d sat available, %d sat required", balance, req.Amount))
+		RespondError(w, fmt.Sprintf("Insufficient balance: %d sat(s) available, %d sat(s) required", balance, req.Amount))
 		return
 	}
 
@@ -208,7 +208,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 
 	// Check if amount requires admin approval
 	if requiresApproval {
-		log.Infof("[api/send] Large transaction requires admin approval: %s -> %s (%d sat)", fromUsername, toIdentifier, req.Amount)
+		log.Infof("[api/send] Large transaction requires admin approval: %s -> %s (%d sat(s))", fromUsername, toIdentifier, req.Amount)
 
 		// Create pending transaction
 		clientIP := getClientIP(r)
@@ -230,7 +230,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 
 		response := SendResponse{
 			Success: false,
-			Message: fmt.Sprintf("Transaction requires admin approval (amount: %d sat > threshold: %d sat). Approval request sent to you via Telegram. Transaction ID: %s",
+			Message: fmt.Sprintf("Transaction requires admin approval (amount: %d sat(s) > threshold: %d sat(s)). Approval request sent to you via Telegram. Transaction ID: %s",
 				req.Amount, GetAdminApprovalThreshold(), pendingTx.ID),
 			FromUser: fromUsername,
 			ToUser:   toIdentifier,
@@ -266,11 +266,11 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Infof("[api/send] ✅ API Send successful: %s -> %s (%d sat)", fromUserStr, toUserStr, req.Amount)
+	log.Infof("[api/send] ✅ API Send successful: %s -> %s (%d sat(s))", fromUserStr, toUserStr, req.Amount)
 
 	// Send notification to recipient with memo included in same message
 	fromUserStrMd := telegram.GetUserStrMd(fromUser.Telegram)
-	notificationMsg := fmt.Sprintf("💰 You received %d sat from %s via Automated API", req.Amount, fromUserStrMd)
+	notificationMsg := fmt.Sprintf("💰 You received %d sat(s) from %s via Automated API", req.Amount, fromUserStrMd)
 	if req.Memo != "" {
 		notificationMsg += fmt.Sprintf("\n✉️ Memo: %s", str.MarkdownEscape(req.Memo))
 	}
@@ -282,7 +282,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 
 	// Send confirmation to sender (from user) - same format as /send command
 	toUserStrMd := telegram.GetUserStrMd(toUser.Telegram)
-	senderConfirmationMsg := fmt.Sprintf("✅ Payment sent successfully!\n\n💸 Amount: %d sat\n👤 To: %s", req.Amount, toUserStrMd)
+	senderConfirmationMsg := fmt.Sprintf("✅ Payment sent successfully!\n\n💸 Amount: %d sat(s)\n👤 To: %s", req.Amount, toUserStrMd)
 	if req.Memo != "" {
 		senderConfirmationMsg += fmt.Sprintf("\n✉️ Memo: %s", str.MarkdownEscape(req.Memo))
 	}

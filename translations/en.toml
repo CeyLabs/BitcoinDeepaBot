@@ -148,7 +148,7 @@ startNoUsernameMessage    = """☝️ It looks like you don't have a Telegram @u
 
 # BALANCE
 
-balanceMessage      = """👑 *Your balance:* %d sat(s). (%s USD / %s LKR)"""
+balanceMessage      = """👑 *Your balance:* %d sat(s). (%s USD / රු. %s)"""
 balanceErrorMessage = """🚫 Could not fetch your balance. Please try again later."""
 
 # TIP
@@ -158,8 +158,8 @@ tipInviteGroupMessage = """ℹ️ By the way, you can invite this bot to any gro
 tipEnterAmountMessage = """Did you enter an amount?"""
 tipValidAmountMessage = """Did you enter a valid amount?"""
 tipYourselfMessage    = """📖 You can't tip yourself."""
-tipSentMessage        = """💸 %d sat sent to %s."""
-tipReceivedMessage    = """🏅 %s has tipped you %d sat."""
+tipSentMessage        = """💸 %s sent to %s."""
+tipReceivedMessage    = """🏅 %s has tipped you %s."""
 tipErrorMessage       = """🚫 Tip failed."""
 tipUndefinedErrorMsg  = """please try again later."""
 tipHelpText           = """📖 Oops, that didn't work. %s
@@ -171,11 +171,11 @@ tipHelpText           = """📖 Oops, that didn't work. %s
 
 sendValidAmountMessage     = """Did you enter a valid amount?"""
 sendUserHasNoWalletMessage = """🚫 User %s hasn't created a wallet yet."""
-sendSentMessage            = """💸 %d sat sent to %s."""
-sendPublicSentMessage      = """💸 %d sat sent from %s to %s."""
-sendReceivedMessage        = """🏅 %s sent you %d sat."""
+sendSentMessage            = """💸 %s sent to %s."""
+sendPublicSentMessage      = """💸 %s sent from %s to %s."""
+sendReceivedMessage        = """🏅 %s sent you %s."""
 sendErrorMessage           = """🚫 Send failed."""
-confirmSendMessage         = """Do you want to pay to %s?\n\n💸 Amount: %d sat"""
+confirmSendMessage         = """Do you want to pay to %s?\n\n💸 Amount: %s"""
 confirmSendAppendMemo      = """\n✉️ %s"""
 sendCancelledMessage       = """🚫 Send cancelled."""
 errorTryLaterMessage       = """🚫 Error. Please try again later."""
@@ -188,8 +188,8 @@ sendHelpText               = """📖 Oops, that didn't work. %s
 
 # INVOICE
 
-invoiceReceivedMessage    = """⚡️ You received %d sat."""
-invoiceReceivedCurrencyMessage    = """⚡️ You received %d sat (%s %s)."""
+invoiceReceivedMessage    = """⚡️ You received %s."""
+invoiceReceivedCurrencyMessage    = """⚡️ You received %s (%s %s)."""
 invoiceEnterAmountMessage = """Did you enter an amount?"""
 invoiceValidAmountMessage = """Did you enter a valid amount?"""
 invoiceHelpText           = """📖 Oops, that didn't work. %s
@@ -205,11 +205,11 @@ invoicePaidMessage          = """⚡️ Payment sent."""
 invoicePublicPaidMessage    = """⚡️ Payment sent by %s."""
 invalidInvoiceHelpMessage    = """Did you enter a valid Lightning invoice? Try /send if you want to send to a Telegram user or to a Lightning address."""
 invoiceNoAmountMessage       = """🚫 Can't pay invoices without an amount."""
-insufficientFundsMessage     = """🚫 Insufficient funds. You have %d sat but you need at least %d sat."""
+insufficientFundsMessage     = """🚫 Insufficient funds. You have %s but you need at least %s."""
 feeReserveMessage            = """⚠️ Sending your entire balance might fail because of network fees. Reserve at least 1% for fees."""
 invoicePaymentFailedMessage  = """🚫 Payment failed: %s"""
 invoiceUndefinedErrorMessage = """Could not pay invoice."""
-confirmPayInvoiceMessage     = """Do you want to send this payment?\n\n💸 Amount: %d sat"""
+confirmPayInvoiceMessage     = """Do you want to send this payment?\n\n💸 Amount: %s"""
 confirmPayAppendMemo         = """\n✉️ %s"""
 payHelpText                  = """📖 Oops, that didn't work. %s
 
@@ -258,7 +258,7 @@ loginCancelledMessage           = """🚫 Login cancelled."""
 
 # LNURL WITHDRAW
 
-confirmLnurlWithdrawMessage     = """Do you want to make this withdrawal?\n\n💸 Amount: %d sat"""
+confirmLnurlWithdrawMessage     = """Do you want to make this withdrawal?\n\n💸 Amount: %s"""
 lnurlPreparingWithdraw        = """🧮 Preparing withdrawal..."""
 lnurlWithdrawFailed             = """🚫 Withdrawal failed."""
 lnurlWithdrawCancelled             = """🚫 Withdrawal cancelled."""
@@ -289,21 +289,21 @@ apiHiddenMessage               = """🔍 Keys hidden. Enter /api to see them aga
 
 inlineQueryFaucetTitle        = """🚰 Create a faucet."""
 inlineQueryFaucetDescription  = """Usage: @%s faucet <capacity> <per_user>"""
-inlineResultFaucetTitle       = """🚰 Create a %d sat faucet."""
+inlineResultFaucetTitle       = """🚰 Create a %s faucet."""
 inlineResultFaucetDescription = """👉 Click here to create a faucet in this chat."""
 
-inlineFaucetMessage                     = """Press ✅ to collect %d sat from %s's faucet.
+inlineFaucetMessage                     = """Press ✅ to collect %s from %s's faucet.
 
-🚰 Remaining: %d/%d sat (given to %d/%d users)
+🚰 Remaining: %s/%s (given to %d/%d users)
 %s"""
-inlineFaucetEndedMessage                = """🚰 Faucet empty 🍺\n\n🏅 %d sat given to %d users."""
+inlineFaucetEndedMessage                = """🚰 Faucet empty 🍺\n\n🏅 %s given to %d users."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""
 inlineFaucetCreateWalletMessage         = """Chat with %s 👈 to manage your wallet."""
 inlineFaucetCancelledMessage            = """🚫 Faucet cancelled."""
 inlineFaucetInvalidPeruserAmountMessage = """🚫 Peruser amount not divisor of capacity or too low (min 5 sat)."""
 inlineFaucetInvalidAmountMessage        = """🚫 Invalid amount."""
-inlineFaucetSentMessage                 = """🚰 %d sat sent to %s."""
-inlineFaucetReceivedMessage             = """🚰 %s sent you %d sat."""
+inlineFaucetSentMessage                 = """🚰 %s sent to %s."""
+inlineFaucetReceivedMessage             = """🚰 %s sent you %s."""
 inlineFaucetHelpFaucetInGroup           = """Create a faucet in a group with the bot inside or use 👉 inline command (/advanced for more)."""
 inlineFaucetAlreadyTookMessage          = """🚫 You already took from this faucet."""
 inlineFaucetHelpText                    = """📖 Oops, that didn't work. %s
@@ -315,12 +315,12 @@ inlineFaucetHelpText                    = """📖 Oops, that didn't work. %s
 
 inlineQuerySendTitle            = """💸 Send payment to a chat."""
 inlineQuerySendDescription      = """Usage: @%s send <amount> [<user>] [<memo>]"""
-inlineResultSendTitle           = """💸 Send %d sat."""
-inlineResultSendDescription     = """👉 Click to send %d sat to this chat."""
+inlineResultSendTitle           = """💸 Send %s."""
+inlineResultSendDescription     = """👉 Click to send %s to this chat."""
 
-inlineSendMessage              = """Press ✅ to receive payment from %s.\n\n💸 Amount: %d sat"""
+inlineSendMessage              = """Press ✅ to receive payment from %s.\n\n💸 Amount: %s"""
 inlineSendAppendMemo           = """\n✉️ %s"""
-inlineSendUpdateMessageAccept  = """💸 %d sat sent from %s to %s."""
+inlineSendUpdateMessageAccept  = """💸 %s sent from %s to %s."""
 inlineSendCreateWalletMessage  = """Chat with %s 👈 to manage your wallet."""
 sendYourselfMessage            = """📖 You can't pay to yourself."""
 inlineSendFailedMessage        = """🚫 Send failed."""
@@ -331,12 +331,12 @@ inlineSendBalanceLowMessage    = """🚫 Your balance is too low."""
 
 inlineQueryReceiveTitle        = """🏅 Request a payment in a chat."""
 inlineQueryReceiveDescription  = """Usage: @%s receive <amount> [<user>] [<memo>]"""
-inlineResultReceiveTitle       = """🏅 Receive %d sat."""
-inlineResultReceiveDescription = """👉 Click to request a payment of %d sat."""
+inlineResultReceiveTitle       = """🏅 Receive %s."""
+inlineResultReceiveDescription = """👉 Click to request a payment of %s."""
 
-inlineReceiveMessage             = """Press 💸 to pay to %s.\n\n💸 Amount: %d sat"""
+inlineReceiveMessage             = """Press 💸 to pay to %s.\n\n💸 Amount: %s"""
 inlineReceiveAppendMemo          = """\n✉️ %s"""
-inlineReceiveUpdateMessageAccept = """💸 %d sat sent from %s to %s."""
+inlineReceiveUpdateMessageAccept = """💸 %s sent from %s to %s."""
 inlineReceiveCreateWalletMessage = """Chat with %s 👈 to manage your wallet."""
 inlineReceiveYourselfMessage     = """📖 You can't pay to yourself."""
 inlineReceiveFailedMessage       = """🚫 Receive failed."""
@@ -346,20 +346,20 @@ inlineReceiveCancelledMessage    = """🚫 Receive cancelled."""
 
 inlineQueryTipjarTitle        = """🍯 Create a tipjar."""
 inlineQueryTipjarDescription  = """Usage: @%s tipjar <capacity> <per_user>"""
-inlineResultTipjarTitle       = """🍯 Create a %d sat tipjar."""
+inlineResultTipjarTitle       = """🍯 Create a %s tipjar."""
 inlineResultTipjarDescription = """👉 Click here to create a tipjar in this chat."""
 
-inlineTipjarMessage                     = """Press 💸 to *pay %d sat* to this tipjar by %s.
+inlineTipjarMessage                     = """Press 💸 to *pay %s* to this tipjar by %s.
 
-🙏 Given: *%d*/%d sat (by %d users)
+🙏 Given: *%s*/%s (by %d users)
 %s"""
-inlineTipjarEndedMessage                = """🍯 %s's tipjar is full ⭐️\n\n🏅 %d sat given by %d users."""
+inlineTipjarEndedMessage                = """🍯 %s's tipjar is full ⭐️\n\n🏅 %s given by %d users."""
 inlineTipjarAppendMemo                  = """\n✉️ %s"""
 inlineTipjarCancelledMessage            = """🚫 Tipjar cancelled."""
 inlineTipjarInvalidPeruserAmountMessage = """🚫 Peruser amount not divisor of capacity."""
 inlineTipjarInvalidAmountMessage        = """🚫 Invalid amount."""
-inlineTipjarSentMessage                 = """🍯 %d sat sent to %s."""
-inlineTipjarReceivedMessage             = """🍯 %s sent you %d sat."""
+inlineTipjarSentMessage                 = """🍯 %s sent to %s."""
+inlineTipjarReceivedMessage             = """🍯 %s sent you %s."""
 inlineTipjarHelpTipjarInGroup           = """Create a tipjar in a group with the bot inside or use 👉 inline command (/advanced for more)."""
 inlineTipjarHelpText                    = """📖 Oops, that didn't work. %s
 
@@ -374,11 +374,11 @@ groupTicketIssuedGroupMessage       = """🎟 User %s has received a ticket for 
 groupPayInvoiceMessage              = """🎟 To join the group %s, pay the invoice above."""
 groupBotIsNotAdminMessage           = """🚫 Oops, that didn't work. You must make me admin and grant me rights to invite and ban users."""
 groupNameExists                     = """🚫 A group with this name already exists. Please choose a different name."""
-groupAddedMessagePrivate            = """🎟 Tickets for group `%s` added.\n\nAlias: `%s` Price: %d sat\n\nTo request a ticket for this group, start a private chat with %s and write `/join %s`."""
+groupAddedMessagePrivate            = """🎟 Tickets for group `%s` added.\n\nAlias: `%s` Price: %s\n\nTo request a ticket for this group, start a private chat with %s and write `/join %s`."""
 groupAddedMessagePublic             = """🎟 Tickets enabled."""
 groupNotFoundMessage                = """🚫 Could not find a group with this name."""
-groupReceiveTicketInvoiceCommission = """🎟 You received *%d sat* (excl. %d sat commission) for a ticket for group `%s` paid by user %s."""
-groupReceiveTicketInvoice           = """🎟 You received *%d sat* for a ticket for group `%s` paid by user %s."""
+groupReceiveTicketInvoiceCommission = """🎟 You received *%s* (excl. %s commission) for a ticket for group `%s` paid by user %s."""
+groupReceiveTicketInvoice           = """🎟 You received *%s* for a ticket for group `%s` paid by user %s."""
 commandPrivateMessage               = """Please use this command in a private chat with %s."""
 groupHelpMessage                    = """👥 *Group commands*
 
@@ -407,6 +407,11 @@ For admins (in group chat): `/group add <group_name> [<ticket_price>]`\nExample:
 For users (in private chat): `/join <group_name>`\nExample: `/join TheBestBitcoinGroup`"""
 
 # DALLE GENERATE
-generateDalleHelpMessage        = """Generate images using OpenAI DALLE 2.\nUsage: `/generate <prompt>`\nPrice: 1000 sat"""
+generateDalleHelpMessage        = """Generate images using OpenAI DALLE 2.\nUsage: `/generate <prompt>`\nPrice: %s"""
 generateDallePayInvoiceMessage  = """Pay this invoice to generate four images 👇"""
 generateDalleGeneratingMessage  = """Your images are being generated. Please wait..."""
+# CONVERT LKR TO SAT
+convertEnterAmountMessage = """Did you enter an amount?"""
+convertInvalidAmountMessage = """Did you enter a valid amount?"""
+convertPriceErrorMessage = """🚫 Couldn't fetch price."""
+convertResultMessage = """%.2f LKR is about %d sat."""

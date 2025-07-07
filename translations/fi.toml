@@ -409,4 +409,8 @@ Käyttäjille (yksityskeskusteluissa): `/join <group_name>`\nEsimerkki: `/join T
 # DALLE GENERATE
 generateDalleHelpMessage        = """Luo OpenAI DALLE 2. -kuvia\nUsage: `/generate <prompt>`\nPrice: 1000 sat"""
 generateDallePayInvoiceMessage  = """Maksa tämä lasku ja neljä kuvaa luotaan 👇"""
-generateDalleGeneratingMessage  = """Kuvia luodaan. Odota hetkinen..."""
+generateDalleGeneratingMessage  = """Kuvia luodaan. Odota hetkinen..."""# CONVERT LKR TO SAT
+convertEnterAmountMessage   = """Syötithän määrän?"""
+convertInvalidAmountMessage = """Syötithän määrän oikein?"""
+convertPriceErrorMessage    = """🚫 Hintaa ei saatu haettua."""
+convertResultMessage        = """%.2f LKR on noin %d sat."""

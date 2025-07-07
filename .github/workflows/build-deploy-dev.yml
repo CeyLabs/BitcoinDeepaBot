@@ -1,0 +1,190 @@
+name: BitcoinDeepaBot Deployment - Dev
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - main
+
+defaults:
+  run:
+    working-directory: .
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest      
+    env:
+      GO_VERSION: "1.21"
+      PROJECT_NAME: "⚡ BitcoinDeepaBot - Dev"
+      DEPLOY_PATH: "/root/projects/bitcoin/deepa-bot/dev/"
+      PROJECT_DIR: "bot"
+      SERVICE_NAME: "bitcoin_deepa_bot_dev.service"
+      BINARY_NAME: "BitcoinDeepaBot"
+    
+    steps:
+      - name: Notify Build Start
+        run: |          
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.DEV_ACTIONS_BOT_TOKEN }}/sendMessage \
+          -d chat_id="${{ secrets.DEV_ACTIONS_GROUP_ID }}" \
+          -d text="
+          ${{ env.PROJECT_NAME }} Build Started 🚀
+          📁 Repository: ${{ github.repository }}
+          👤 Initiator: ${{ github.actor }}
+          🌿 Branch: ${{ github.ref_name }}
+          🕒 Timestamp: ${{ github.event.head_commit.timestamp}} 
+          📝 Commit Message: ${{ github.event.head_commit.message }}"
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go Environment
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Build Environment
+        run: |
+          go mod download
+          go mod verify
+
+      - name: Run Tests
+        run: |
+          go test -v ./...
+
+      - name: Run Go Vet
+        run: |
+          go vet ./...
+
+      - name: Build Application
+        run: |
+          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o ${{ env.BINARY_NAME }} .
+
+      - name: Notify Build Complete
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.DEV_ACTIONS_BOT_TOKEN }}/sendMessage \
+            -d chat_id="${{ secrets.DEV_ACTIONS_GROUP_ID }}" \
+            -d text="
+          ${{ env.PROJECT_NAME }} Build Complete 🛠
+          📁 Repository: ${{ github.repository }}
+          👤 Initiator: ${{ github.actor }}
+          🌿 Branch: ${{ github.ref_name }}
+          🕒 Timestamp: ${{ github.event.head_commit.timestamp }}
+          📝 Commit Message: ${{ github.event.head_commit.message }}"
+
+      # Only deploy if this is a push to develop branch (not a PR)
+      - name: Create Deploy Path
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USERNAME }}
+          key: ${{ secrets.DEV_SERVER_KEY }}
+          port: ${{ secrets.DEV_SERVER_PORT }}
+          script: |
+            sudo mkdir -p ${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}
+      
+      - name: Copy Files to Development Server
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USERNAME }}
+          key: ${{ secrets.DEV_SERVER_KEY }}
+          port: ${{ secrets.DEV_SERVER_PORT }}
+          source: "."
+          target: "${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}"
+          rm: true
+
+      - name: Deploy to Development
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USERNAME }}
+          key: ${{ secrets.DEV_SERVER_KEY }}
+          port: ${{ secrets.DEV_SERVER_PORT }}          
+          script: | 
+            cd ${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}
+
+            # Install Go if not already installed
+            if ! command -v go &> /dev/null; then
+              echo "Installing Go..."
+              wget https://go.dev/dl/go${{ env.GO_VERSION }}.linux-amd64.tar.gz
+              sudo rm -rf /usr/local/go
+              sudo tar -C /usr/local -xzf go${{ env.GO_VERSION }}.linux-amd64.tar.gz
+              echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+              export PATH=$PATH:/usr/local/go/bin
+            fi
+
+            # Set Go environment
+            export PATH=$PATH:/usr/local/go/bin
+            export GOPATH=$HOME/go
+            export GOOS=linux
+            export GOARCH=amd64
+
+            # Create configuration file from environment variables
+            echo "${{ secrets.CONFIG_YAML_DEV }}" > config.yaml
+
+            # Make binary executable
+            chmod +x ${{ env.BINARY_NAME }}
+
+            # Update service definition
+            sudo bash -c 'cat > "/etc/systemd/system/${{ env.SERVICE_NAME }}" <<- EOM
+            [Unit]
+            Description=${{ env.PROJECT_NAME }}
+            After=network.target
+
+            [Service]
+            Type=simple
+            Restart=always
+            RestartSec=5s
+            WorkingDirectory=${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}
+            ExecStart=${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}/${{ env.BINARY_NAME }}
+            Environment=HOME=/root
+            User=root
+            
+            [Install]
+            WantedBy=multi-user.target
+            EOM'
+
+            # Create data directory if it doesn't exist
+            mkdir -p data/dalle
+
+            # Reload systemd and restart service
+            sudo systemctl daemon-reload
+            sudo systemctl enable ${{ env.SERVICE_NAME }}
+            sudo systemctl restart ${{ env.SERVICE_NAME }}
+
+            # Wait a moment and check service status
+            sleep 3
+            sudo systemctl status ${{ env.SERVICE_NAME }} --no-pager
+
+      - name: Notify Deploy Complete
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.DEV_ACTIONS_BOT_TOKEN }}/sendMessage \
+            -d chat_id="${{ secrets.DEV_ACTIONS_GROUP_ID }}" \
+            -d text="
+          ${{ env.PROJECT_NAME }} Deploy Complete ✅
+          📁 Repository: ${{ github.repository }}
+          👤 Initiator: ${{ github.actor }}
+          🌿 Branch: ${{ github.ref_name }}
+          🕒 Timestamp: ${{ github.event.head_commit.timestamp }}
+          📝 Commit Message: ${{ github.event.head_commit.message }}"
+
+      - name: Notify Failure
+        if: failure()
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.DEV_ACTIONS_BOT_TOKEN }}/sendMessage \
+            -d chat_id="${{ secrets.DEV_ACTIONS_GROUP_ID }}" \
+            -d text="
+          ❌ ${{ env.PROJECT_NAME }} Failed!
+          📁 Repository: ${{ github.repository }}
+          👤 Initiator: ${{ github.actor }}
+          🌿 Branch: ${{ github.ref_name }}
+          🕒 Timestamp: ${{ github.event.head_commit.timestamp }}
+          📝 Commit Message: ${{ github.event.head_commit.message }}
+          
+          Please check the GitHub Actions logs for more details."

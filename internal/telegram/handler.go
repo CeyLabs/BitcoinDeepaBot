@@ -466,6 +466,17 @@ func (bot TipBot) getHandler() []InterceptionWrapper {
 			},
 		},
 		{
+			Endpoints: []interface{}{"/lkrsats", &btnConvertMainMenu},
+			Handler:   bot.lkrToSatHandler,
+			Interceptor: &Interceptor{
+				Before: []intercept.Func{
+					bot.requirePrivateChatInterceptor,
+					bot.localizerInterceptor,
+					bot.logMessageInterceptor,
+				},
+			},
+		},
+		{
 			Endpoints: []interface{}{"/advanced"},
 			Handler:   bot.advancedHelpHandler,
 			Interceptor: &Interceptor{

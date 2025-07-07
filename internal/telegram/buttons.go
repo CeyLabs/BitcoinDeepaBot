@@ -7,6 +7,7 @@ import (
 
 	"github.com/LightningTipBot/LightningTipBot/internal"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
+	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 )
@@ -24,6 +25,7 @@ const (
 	MainMenuCommandInvoice = "⚡️ Invoice"
 	MainMenuCommandHelp    = "📖 Help"
 	MainMenuCommandSend    = "⤴️"
+	MainMenuCommandConvert = "LKR→Sat"
 	SendMenuCommandEnter   = "👤 Enter"
 )
 
@@ -34,6 +36,7 @@ var (
 	btnSendMainMenu    = mainMenu.Text(MainMenuCommandSend)
 	btnBalanceMainMenu = mainMenu.Text(MainMenuCommandBalance)
 	btnInvoiceMainMenu = mainMenu.Text(MainMenuCommandInvoice)
+	btnConvertMainMenu = mainMenu.Text(MainMenuCommandConvert)
 
 	sendToMenu       = &tb.ReplyMarkup{ResizeKeyboard: true}
 	sendToButtons    = []tb.Btn{}
@@ -45,7 +48,7 @@ func init() {
 	mainMenu.Reply(
 		mainMenu.Row(btnBalanceMainMenu),
 		// mainMenu.Row(btnInvoiceMainMenu, btnWebAppMainMenu, btnSendMainMenu, btnHelpMainMenu), // TODO: fix btnSendMainMenu
-		mainMenu.Row(btnInvoiceMainMenu, btnHelpMainMenu),
+		mainMenu.Row(btnInvoiceMainMenu, btnConvertMainMenu, btnHelpMainMenu),
 	)
 }
 
@@ -100,8 +103,10 @@ func (bot *TipBot) mainMenuBalanceButtonUpdate(to int64) {
 	if user.Wallet != nil {
 		amount, err := bot.GetUserBalanceCached(user)
 		if err == nil {
-			log.Tracef("[appendMainMenu] user %s balance %d sat", GetUserStr(user.Telegram), amount)
-			MainMenuCommandBalance := fmt.Sprintf("%s %d sat", MainMenuCommandBalance, amount)
+
+			log.Tracef("[appendMainMenu] user %s balance %d sat(s)", GetUserStr(user.Telegram), amount)
+			MainMenuCommandBalance := fmt.Sprintf("%s %d sat(s)", MainMenuCommandBalance, thirdparty.FormatSatsWithLKR(amount))
+
 			btnBalanceMainMenu = mainMenu.Text(MainMenuCommandBalance)
 		}
 
@@ -109,7 +114,7 @@ func (bot *TipBot) mainMenuBalanceButtonUpdate(to int64) {
 		mainMenu.Reply(
 			mainMenu.Row(btnBalanceMainMenu),
 			// mainMenu.Row(btnInvoiceMainMenu, btnWebAppMainMenu, btnSendMainMenu, btnHelpMainMenu), // TODO: fix btnSendMainMenu
-			mainMenu.Row(btnInvoiceMainMenu, btnHelpMainMenu),
+			mainMenu.Row(btnInvoiceMainMenu, btnConvertMainMenu, btnHelpMainMenu),
 		)
 	}
 }

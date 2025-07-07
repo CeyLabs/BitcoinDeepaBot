@@ -109,7 +109,7 @@ func init() {
 		log.Printf("Dalle is disabled. No worker started.")
 		return
 	}
-	log.Printf("Starting Dalle image generation. Worker: %d, Price: %d sat", workers, internal.Configuration.Generate.DallePrice)
+	log.Printf("Starting Dalle image generation. Worker: %d, Price: %d sat(s)", workers, internal.Configuration.Generate.DallePrice)
 	jobChan = make(chan func(workerId int), workers)
 	for i := 0; i < workers; i++ {
 		go worker(jobChan, i)
@@ -250,7 +250,7 @@ func (bot *TipBot) dalleRefundUser(user *lnbits.User, message string) error {
 		log.Errorln(err)
 		return err
 	}
-	log.Warnf("[DALLE] refunding user %s with %d sat", GetUserStr(user.Telegram), internal.Configuration.Generate.DallePrice)
+	log.Warnf("[DALLE] refunding user %s with %d sat(s)", GetUserStr(user.Telegram), internal.Configuration.Generate.DallePrice)
 
 	var err_reason string
 	if len(message) > 0 {

@@ -15,6 +15,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/runtime"
+	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/str"
 	lnurl "github.com/fiatjaf/go-lnurl"
@@ -106,7 +107,7 @@ func (bot *TipBot) payHandler(ctx intercept.Context) (intercept.Context, error) 
 
 	if amount > balance {
 		NewMessage(ctx.Message(), WithDuration(0, bot))
-		bot.trySendMessage(ctx.Sender(), fmt.Sprintf(Translate(ctx, "insufficientFundsMessage"), balance, amount))
+		bot.trySendMessage(ctx.Sender(), fmt.Sprintf(Translate(ctx, "insufficientFundsMessage"), thirdparty.FormatSatsWithLKR(balance), thirdparty.FormatSatsWithLKR(amount)))
 		return ctx, errors.Create(errors.InvalidSyntaxError)
 	}
 	// send warning that the invoice might fail due to missing fee reserve
@@ -114,7 +115,7 @@ func (bot *TipBot) payHandler(ctx intercept.Context) (intercept.Context, error) 
 		bot.trySendMessage(ctx.Sender(), Translate(ctx, "feeReserveMessage"))
 	}
 
-	confirmText := fmt.Sprintf(Translate(ctx, "confirmPayInvoiceMessage"), amount)
+	confirmText := fmt.Sprintf(Translate(ctx, "confirmPayInvoiceMessage"), thirdparty.FormatSatsWithLKR(amount))
 	if len(bolt11.Description) > 0 {
 		confirmText = confirmText + fmt.Sprintf(Translate(ctx, "confirmPayAppendMemo"), str.MarkdownEscape(bolt11.Description))
 	}

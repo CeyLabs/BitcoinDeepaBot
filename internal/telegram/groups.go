@@ -19,6 +19,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/runtime/mutex"
 	"github.com/LightningTipBot/LightningTipBot/internal/storage"
 	"github.com/LightningTipBot/LightningTipBot/internal/str"
+	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 	log "github.com/sirupsen/logrus"
 	"github.com/skip2/go-qrcode"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
@@ -258,7 +259,7 @@ func (bot *TipBot) getSendPayButton(ctx intercept.Context, ticket TicketEvent) (
 		ticketPayConfirmationMenu.Row(
 			btnPayTicket),
 	)
-	confirmText := fmt.Sprintf(Translate(ctx, "confirmPayInvoiceMessage"), ticket.Group.Ticket.Price)
+	confirmText := fmt.Sprintf(Translate(ctx, "confirmPayInvoiceMessage"), thirdparty.FormatSatsWithLKR(ticket.Group.Ticket.Price))
 	// if len(ticket.Group.Ticket.Memo) > 0 {
 	// 	confirmText = confirmText + fmt.Sprintf(Translate(ctx, "confirmPayAppendMemo"), str.MarkdownEscape(ticket.Group.Ticket.Memo))
 	// }
@@ -297,7 +298,7 @@ func (bot *TipBot) groupConfirmPayButtonHandler(ctx intercept.Context) (intercep
 		return ctx, errors.Create(errors.UserNoWalletError)
 	}
 
-	log.Infof("[/pay] Attempting %s's invoice %s (%d sat)", GetUserStr(user.Telegram), ticketEvent.ID, ticketEvent.Group.Ticket.Price)
+	log.Infof("[/pay] Attempting %s's invoice %s (%d sat(s))", GetUserStr(user.Telegram), ticketEvent.ID, ticketEvent.Group.Ticket.Price)
 	// // pay invoice
 	_, err = user.Wallet.Pay(lnbits.PaymentParams{Out: true, Bolt11: ticketEvent.Invoice.PaymentRequest}, bot.Client)
 	if err != nil {
@@ -502,7 +503,7 @@ func (bot TipBot) addJoinTicketPayWallHandler(ctx intercept.Context) (intercept.
 	}
 
 	bot.DB.Groups.Save(group)
-	log.Infof("[group] Ticket of %d sat added to group %s.", group.Ticket.Price, group.Name)
+	log.Infof("[group] Ticket of %d sat(s) added to group %s.", group.Ticket.Price, group.Name)
 	bot.trySendMessage(m.Chat, Translate(ctx, "groupAddedMessagePublic"))
 
 	return ctx, nil
@@ -574,7 +575,7 @@ func (bot TipBot) addGroupHandler(ctx intercept.Context) (intercept.Context, err
 	}
 
 	bot.DB.Groups.Save(group)
-	log.Infof("[group] Ticket of %d sat added to group %s.", group.Ticket.Price, group.Name)
+	log.Infof("[group] Ticket of %d sat(s) added to group %s.", group.Ticket.Price, group.Name)
 	bot.trySendMessage(m.Chat, fmt.Sprintf(Translate(ctx, "groupAddedMessagePrivate"), str.MarkdownEscape(m.Chat.Title), group.Name, group.Ticket.Price, GetUserStrMd(bot.Telegram.Me), group.Name))
 
 	return ctx, nil

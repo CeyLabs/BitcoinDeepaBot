@@ -5,7 +5,7 @@ import (
 
         "github.com/LightningTipBot/LightningTipBot/internal/errors"
         "github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
-        thirdparty "github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
+        "github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
         "github.com/LightningTipBot/LightningTipBot/internal/utils"
 
         log "github.com/sirupsen/logrus"
@@ -43,7 +43,7 @@ func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, err
 		return ctx, err
 	}
 
-	log.Infof("[/balance] %s's balance: %d sat\n", usrStr, balance)
+	log.Infof("[/balance] %s's balance: %d sat(s)\n", usrStr, balance)
 
 	LKRPerSat, USDPerSat, err := thirdparty.GetSatPrice()
 	if err != nil {
