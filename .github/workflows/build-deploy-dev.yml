@@ -108,24 +108,11 @@ jobs:
           script: | 
             cd ${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}
 
-            # Install Go if not already installed
-            if ! command -v go &> /dev/null; then
-              echo "Installing Go..."
-              wget https://go.dev/dl/go${{ env.GO_VERSION }}.linux-amd64.tar.gz
-              sudo rm -rf /usr/local/go
-              sudo tar -C /usr/local -xzf go${{ env.GO_VERSION }}.linux-amd64.tar.gz
-              echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-              export PATH=$PATH:/usr/local/go/bin
-            fi
-
             # Set Go environment
             export PATH=$PATH:/usr/local/go/bin
             export GOPATH=$HOME/go
             export GOOS=linux
             export GOARCH=amd64
-
-            # Create configuration file from environment variables
-            echo "${{ secrets.CONFIG_YAML_DEV }}" > config.yaml
 
             # Make binary executable
             chmod +x ${{ env.BINARY_NAME }}
