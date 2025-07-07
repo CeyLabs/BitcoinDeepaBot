@@ -234,10 +234,10 @@ func getTicketCommission(ticket *Ticket) int64 {
 	if ticket.Price < 20 {
 		return 0
 	}
-	// 2% cut + 100 sat base fee
+	// 2% cut + 100 sat(s) base fee
 	commissionSat := ticket.Price*ticket.Cut/100 + ticket.BaseFee
 	if ticket.Price <= 1000 {
-		// if < 1000, then 10% cut + 10 sat base fee
+		// if < 1000, then 10% cut + 10 sat(s) base fee
 		commissionSat = ticket.Price*ticket.CutCheap/100 + ticket.BaseFeeCheap
 	}
 	return commissionSat

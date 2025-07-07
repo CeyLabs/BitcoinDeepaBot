@@ -66,13 +66,13 @@ func TestMessage_getTooltipMessage(t *testing.T) {
 			name:   "1",
 			args:   args{botUserName: "@test-bot", notInitializedWallet: true},
 			fields: fields{Message: Message{}, TipAmount: 10, Ntips: 1, Tippers: append(tippers, tipper1)},
-			want:   "🏅 10 sat (by @username1)\n🗑 Chat with @test-bot to manage your wallet.",
+			want:   "🏅 10 sat(s) (by @username1)\n🗑 Chat with @test-bot to manage your wallet.",
 		},
 		{
 			name:   "2",
 			args:   args{botUserName: "@test-bot", notInitializedWallet: true},
 			fields: fields{Message: Message{}, TipAmount: 100, Ntips: 6, Tippers: append(tippers, tipper1, tipper2, tipper3, tipper4, tipper5, tipper6)},
-			want:   "🏅 100 sat (6 tips by @username1, @username2, @username3, @username4, @username5, ... and others)\n🗑 Chat with @test-bot to manage your wallet.",
+			want:   "🏅 100 sat(s) (6 tips by @username1, @username2, @username3, @username4, @username5, ... and others)\n🗑 Chat with @test-bot to manage your wallet.",
 		},
 	}
 	for _, tt := range tests {
