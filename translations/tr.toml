@@ -307,3 +307,8 @@ inlineReceiveCreateWalletMessage = """%s 👈 ile cüzdanı kullanmak için sohb
 inlineReceiveYourselfMessage = """📖 Kendi kendine ödeme yapamazsın."""
 inlineReceiveFailedMessage = """🚫 İstek başarısız."""
 inlineReceiveCancelledMessage = """🚫 İstek iptal edildi."""
+# CONVERT LKR TO SAT
+convertEnterAmountMessage = """Bir miktar girdiniz mi?"""
+convertInvalidAmountMessage = """Geçerli bir miktar girdiniz mi?"""
+convertPriceErrorMessage = """🚫 Fiyat alınamadı."""
+convertResultMessage = """%.2f LKR yaklaşık %d sat."""
