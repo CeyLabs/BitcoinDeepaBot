@@ -17,6 +17,7 @@ import (
 
 	"github.com/LightningTipBot/LightningTipBot/internal/errors"
 	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
+	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 
@@ -192,7 +193,7 @@ func (bot TipBot) faucetHandler(ctx intercept.Context) (intercept.Context, error
 	}
 	fromUserStr := GetUserStr(ctx.Message().Sender)
 	mFaucet := bot.trySendMessage(ctx.Message().Chat, inlineFaucet.Message, bot.makeFaucetKeyboard(ctx, inlineFaucet.ID))
-	log.Infof("[faucet] %s created faucet %s: %d sat (%d per user)", fromUserStr, inlineFaucet.ID, inlineFaucet.Amount, inlineFaucet.PerUserAmount)
+	log.Infof("[faucet] %s created faucet %s: %d sat(s) (%d per user)", fromUserStr, inlineFaucet.ID, inlineFaucet.Amount, inlineFaucet.PerUserAmount)
 
 	// log faucet link if possible
 	if mFaucet != nil && mFaucet.Chat != nil {
@@ -226,7 +227,7 @@ func (bot TipBot) handleInlineFaucetQuery(ctx intercept.Context) (intercept.Cont
 		results[i].SetResultID(inlineFaucet.ID)
 
 		bot.Cache.Set(inlineFaucet.ID, inlineFaucet, &store.Options{Expiration: 5 * time.Minute})
-		log.Infof("[faucet] %s:%d created inline faucet %s: %d sat (%d per user)", GetUserStr(inlineFaucet.From.Telegram), inlineFaucet.From.Telegram.ID, inlineFaucet.ID, inlineFaucet.Amount, inlineFaucet.PerUserAmount)
+		log.Infof("[faucet] %s:%d created inline faucet %s: %d sat(s) (%d per user)", GetUserStr(inlineFaucet.From.Telegram), inlineFaucet.From.Telegram.ID, inlineFaucet.ID, inlineFaucet.Amount, inlineFaucet.PerUserAmount)
 	}
 
 	err = bot.Telegram.Answer(ctx.Query(), &tb.QueryResponse{
@@ -257,7 +258,7 @@ func (bot *TipBot) acceptInlineFaucetHandler(ctx intercept.Context) (intercept.C
 	from := inlineFaucet.From
 	// failsafe for queued users
 	if !inlineFaucet.Active {
-		log.Tracef(fmt.Sprintf("[faucet] faucet %s inactive. Remaining: %d sat", inlineFaucet.ID, inlineFaucet.RemainingAmount))
+		log.Tracef(fmt.Sprintf("[faucet] faucet %s inactive. Remaining: %d sat(s)", inlineFaucet.ID, inlineFaucet.RemainingAmount))
 		bot.finishFaucet(ctx, c, inlineFaucet)
 		return ctx, errors.Create(errors.NotActiveError)
 	}
@@ -327,14 +328,14 @@ func (bot *TipBot) acceptInlineFaucetHandler(ctx intercept.Context) (intercept.C
 		inlineFaucet.To = append(inlineFaucet.To, to)
 		inlineFaucet.RemainingAmount = inlineFaucet.RemainingAmount - inlineFaucet.PerUserAmount
 		go func() {
-			to_message := fmt.Sprintf(i18n.Translate(to.Telegram.LanguageCode, "inlineFaucetReceivedMessage"), fromUserStrMd, inlineFaucet.PerUserAmount)
+			to_message := fmt.Sprintf(i18n.Translate(to.Telegram.LanguageCode, "inlineFaucetReceivedMessage"), fromUserStrMd, thirdparty.FormatSatsWithLKR(inlineFaucet.PerUserAmount))
 			ctx.Context = context.WithValue(ctx, "callback_response", to_message)
 			bot.trySendMessage(to.Telegram, to_message)
-			bot.trySendMessage(from.Telegram, fmt.Sprintf(i18n.Translate(from.Telegram.LanguageCode, "inlineFaucetSentMessage"), inlineFaucet.PerUserAmount, toUserStrMd))
+			bot.trySendMessage(from.Telegram, fmt.Sprintf(i18n.Translate(from.Telegram.LanguageCode, "inlineFaucetSentMessage"), thirdparty.FormatSatsWithLKR(inlineFaucet.PerUserAmount), toUserStrMd))
 		}()
 
 		// build faucet message
-		inlineFaucet.Message = fmt.Sprintf(i18n.Translate(inlineFaucet.LanguageCode, "inlineFaucetMessage"), inlineFaucet.PerUserAmount, GetUserStrMd(inlineFaucet.From.Telegram), inlineFaucet.RemainingAmount, inlineFaucet.Amount, inlineFaucet.NTaken, inlineFaucet.NTotal, MakeProgressbar(inlineFaucet.RemainingAmount, inlineFaucet.Amount))
+		inlineFaucet.Message = fmt.Sprintf(i18n.Translate(inlineFaucet.LanguageCode, "inlineFaucetMessage"), thirdparty.FormatSatsWithLKR(inlineFaucet.PerUserAmount), GetUserStrMd(inlineFaucet.From.Telegram), thirdparty.FormatSatsWithLKR(inlineFaucet.RemainingAmount), thirdparty.FormatSatsWithLKR(inlineFaucet.Amount), inlineFaucet.NTaken, inlineFaucet.NTotal, MakeProgressbar(inlineFaucet.RemainingAmount, inlineFaucet.Amount))
 		memo := inlineFaucet.Memo
 		if len(memo) > 0 {
 			inlineFaucet.Message = inlineFaucet.Message + fmt.Sprintf(i18n.Translate(inlineFaucet.LanguageCode, "inlineFaucetAppendMemo"), memo)
@@ -387,7 +388,7 @@ func (bot *TipBot) cancelInlineFaucet(ctx context.Context, c *tb.Callback, ignor
 }
 
 func (bot *TipBot) finishFaucet(ctx context.Context, c *tb.Callback, inlineFaucet *InlineFaucet) {
-	inlineFaucet.Message = fmt.Sprintf(i18n.Translate(inlineFaucet.LanguageCode, "inlineFaucetEndedMessage"), inlineFaucet.Amount, inlineFaucet.NTaken)
+	inlineFaucet.Message = fmt.Sprintf(i18n.Translate(inlineFaucet.LanguageCode, "inlineFaucetEndedMessage"), thirdparty.FormatSatsWithLKR(inlineFaucet.Amount), inlineFaucet.NTaken)
 	if inlineFaucet.UserNeedsWallet {
 		inlineFaucet.Message += "\n\n" + fmt.Sprintf(i18n.Translate(inlineFaucet.LanguageCode, "inlineFaucetCreateWalletMessage"), GetUserStrMd(bot.Telegram.Me))
 	}

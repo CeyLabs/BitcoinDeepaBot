@@ -145,7 +145,7 @@ startNoUsernameMessage = """☝️ Es sieht so aus, als hättest du noch keinen 
 
 # BALANCE
 
-balanceMessage      = """👑 *Dein Guthaben:* %d sat(s). (%.2f USD / %.2f LKR)"""
+balanceMessage      = """👑 *Dein Guthaben:* %d sat(s). (%s USD / %s LKR)"""
 balanceErrorMessage = """🚫 Konnte dein Guthaben nicht abfragen. Bitte versuche es später noch einmal."""
 
 # TIP
@@ -186,7 +186,7 @@ sendHelpText = """📖 Ups, das hat nicht geklappt. %s
 # INVOICE
 
 invoiceReceivedMessage    = """⚡️ Du hast %d sat erhalten."""
-invoiceReceivedCurrencyMessage    = """⚡️ Du hast %d sat (%.2f %s) erhalten."""
+invoiceReceivedCurrencyMessage    = """⚡️ Du hast %d sat (%s %s) erhalten."""
 invoiceEnterAmountMessage = """Hast du einen Betrag eingegeben?"""
 invoiceValidAmountMessage = """Hast du einen gültigen Betrag eingegeben?"""
 invoiceHelpText           = """📖 Ups, das hat nicht geklappt. %s

@@ -16,6 +16,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/errors"
 	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
+	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
@@ -296,8 +297,8 @@ func (bot *TipBot) acceptInlineTipjarHandler(ctx intercept.Context) (intercept.C
 		inlineTipjar.From = append(inlineTipjar.From, from)
 		inlineTipjar.GivenAmount = inlineTipjar.GivenAmount + inlineTipjar.PerUserAmount
 
-		bot.trySendMessage(to.Telegram, fmt.Sprintf(i18n.Translate(to.Telegram.LanguageCode, "inlineTipjarReceivedMessage"), fromUserStrMd, inlineTipjar.PerUserAmount))
-		bot.trySendMessage(from.Telegram, fmt.Sprintf(i18n.Translate(from.Telegram.LanguageCode, "inlineTipjarSentMessage"), inlineTipjar.PerUserAmount, toUserStrMd))
+		bot.trySendMessage(to.Telegram, fmt.Sprintf(i18n.Translate(to.Telegram.LanguageCode, "inlineTipjarReceivedMessage"), fromUserStrMd, thirdparty.FormatSatsWithLKR(inlineTipjar.PerUserAmount)))
+		bot.trySendMessage(from.Telegram, fmt.Sprintf(i18n.Translate(from.Telegram.LanguageCode, "inlineTipjarSentMessage"), thirdparty.FormatSatsWithLKR(inlineTipjar.PerUserAmount), toUserStrMd))
 		if err != nil {
 			errmsg := fmt.Errorf("[tipjar] Error: Send message to %s: %s", toUserStr, err)
 			log.Warnln(errmsg)
@@ -306,10 +307,10 @@ func (bot *TipBot) acceptInlineTipjarHandler(ctx intercept.Context) (intercept.C
 		// build tipjar message
 		inlineTipjar.Message = fmt.Sprintf(
 			i18n.Translate(inlineTipjar.LanguageCode, "inlineTipjarMessage"),
-			inlineTipjar.PerUserAmount,
+			thirdparty.FormatSatsWithLKR(inlineTipjar.PerUserAmount),
 			GetUserStrMd(inlineTipjar.To.Telegram),
-			inlineTipjar.GivenAmount,
-			inlineTipjar.Amount,
+			thirdparty.FormatSatsWithLKR(inlineTipjar.GivenAmount),
+			thirdparty.FormatSatsWithLKR(inlineTipjar.Amount),
 			inlineTipjar.NGiven,
 			MakeTipjarbar(inlineTipjar.GivenAmount, inlineTipjar.Amount),
 		)
@@ -326,7 +327,7 @@ func (bot *TipBot) acceptInlineTipjarHandler(ctx intercept.Context) (intercept.C
 		inlineTipjar.Message = fmt.Sprintf(
 			i18n.Translate(inlineTipjar.LanguageCode, "inlineTipjarEndedMessage"),
 			GetUserStrMd(inlineTipjar.To.Telegram),
-			inlineTipjar.Amount,
+			thirdparty.FormatSatsWithLKR(inlineTipjar.Amount),
 			inlineTipjar.NGiven,
 		)
 		bot.tryEditMessage(c, inlineTipjar.Message)

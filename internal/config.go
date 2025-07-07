@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 
@@ -158,6 +159,15 @@ func setAPISendDefaults() {
 	if Configuration.API.Send.InternalNetwork == "" {
 		Configuration.API.Send.InternalNetwork = "10.0.0.0/24"
 	}
+
+	// Validate CIDR format
+	_, _, err := net.ParseCIDR(Configuration.API.Send.InternalNetwork)
+	if err != nil {
+		log.Errorf("Invalid internal_network CIDR format '%s': %v. Using default 10.0.0.0/24",
+			Configuration.API.Send.InternalNetwork, err)
+		Configuration.API.Send.InternalNetwork = "10.0.0.0/24"
+	}
+
 	if Configuration.API.Send.MaxAmount == 0 {
 		Configuration.API.Send.MaxAmount = 1000000 // 1M sats
 	}
@@ -179,10 +189,11 @@ func setAPISendDefaults() {
 			"CeycubeBank",
 		}
 	}
-	
+
 	// Log API Send configuration status
 	if Configuration.API.Send.Enabled {
-		log.Infof("API Send module enabled with %d whitelisted senders", len(Configuration.API.Send.WhitelistedSenders))
+		log.Infof("API Send module enabled with %d whitelisted senders, network: %s",
+			len(Configuration.API.Send.WhitelistedSenders), Configuration.API.Send.InternalNetwork)
 	} else {
 		log.Infof("API Send module disabled in configuration")
 	}
