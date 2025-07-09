@@ -15,8 +15,8 @@ jobs:
     env:
       GO_VERSION: "1.21"
       PROJECT_NAME: "⚡ BitcoinDeepaBot - Prod"
-      DEPLOY_PATH: "/root/projects/bitcoin/deepa-bot/prod/"
-      PROJECT_DIR: "bot"
+      DEPLOY_PATH: "/root/projects/ceyloncash/bitcoin-deepa/prod/"
+      PROJECT_DIR: "bitcoin-deepa-bot"
       SERVICE_NAME: "bitcoin_deepa_bot_prod.service"
       BINARY_NAME: "BitcoinDeepaBot"
     
@@ -60,7 +60,9 @@ jobs:
           🕒 Timestamp: ${{ github.event.head_commit.timestamp }}
           📝 Commit Message: ${{ github.event.head_commit.message }}"
 
-      - name: Create Deploy Path
+      # ✅ Check if .git directory exists remotely
+      - name: Check if Git Exists on Server
+        id: check_git
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -68,9 +70,20 @@ jobs:
           key: ${{ secrets.SERVER_KEY }}
           port: ${{ secrets.SERVER_PORT }}
           script: |
-            sudo mkdir -p ${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}
+            if [ -d "${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}/.git" ]; then
+              echo "true"
+            else
+              echo "false"
+            fi
+
+      # ✅ Capture the above output
+      - name: Set git_exists output
+        id: set_git_output
+        run: echo "::set-output name=git_exists::$(echo '${{ steps.check_git.outputs.stdout }}' | tr -d '\r')"
+
       
       - name: Copy Files to Server
+        if: steps.set_git_output.outputs.git_exists == 'false'
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -91,14 +104,14 @@ jobs:
           script: | 
             cd ${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}
 
-            # Install Go if not already installed
-            if ! command -v go &> /dev/null; then
-              echo "Installing Go..."
-              wget https://go.dev/dl/go${{ env.GO_VERSION }}.linux-amd64.tar.gz
-              sudo rm -rf /usr/local/go
-              sudo tar -C /usr/local -xzf go${{ env.GO_VERSION }}.linux-amd64.tar.gz
-              echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-              export PATH=$PATH:/usr/local/go/bin
+            # Handle git repository - pull if .git exists, otherwise fresh deployment
+            if [ -d ".git" ]; then
+              echo "Git repository exists, pulling latest changes..."
+              git fetch origin
+              git reset --hard origin/main
+              git clean -fd
+            else
+              echo "Fresh deployment - no git repository found"
             fi
 
             # Set Go environment
@@ -106,9 +119,6 @@ jobs:
             export GOPATH=$HOME/go
             export GOOS=linux
             export GOARCH=amd64
-
-            # Create configuration file from environment variables
-            echo "${{ secrets.CONFIG_YAML_PROD }}" > config.yaml
 
             # Make binary executable
             chmod +x ${{ env.BINARY_NAME }}

@@ -18,8 +18,8 @@ jobs:
     env:
       GO_VERSION: "1.21"
       PROJECT_NAME: "⚡ BitcoinDeepaBot - Dev"
-      DEPLOY_PATH: "/root/projects/bitcoin/deepa-bot/dev/"
-      PROJECT_DIR: "bot"
+      DEPLOY_PATH: "/root/projects/ceyloncash/bitcoin-deepa/dev/"
+      PROJECT_DIR: "bitcoin-deepa-bot"
       SERVICE_NAME: "bitcoin_deepa_bot_dev.service"
       BINARY_NAME: "BitcoinDeepaBot"
     
@@ -74,9 +74,10 @@ jobs:
           📝 Commit Message: ${{ github.event.head_commit.message }}"
 
       # Only deploy if this is a push to develop branch (not a PR)
-      - name: Create Deploy Path
+      - name: Check Git Repository and Create Deploy Path
         if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
         uses: appleboy/ssh-action@master
+        id: check_git_dev
         with:
           host: ${{ secrets.DEV_SERVER_HOST }}
           username: ${{ secrets.DEV_SERVER_USERNAME }}
@@ -84,9 +85,17 @@ jobs:
           port: ${{ secrets.DEV_SERVER_PORT }}
           script: |
             sudo mkdir -p ${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}
+            cd ${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}
+            if [ -d ".git" ]; then
+              echo "git_exists=true" >> $GITHUB_OUTPUT
+              echo "Git repository exists - will use git pull"
+            else
+              echo "git_exists=false" >> $GITHUB_OUTPUT
+              echo "No git repository - will copy files"
+            fi
       
       - name: Copy Files to Development Server
-        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop' && steps.check_git_dev.outputs.git_exists == 'false'
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.DEV_SERVER_HOST }}
@@ -108,14 +117,14 @@ jobs:
           script: | 
             cd ${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}
 
-            # Install Go if not already installed
-            if ! command -v go &> /dev/null; then
-              echo "Installing Go..."
-              wget https://go.dev/dl/go${{ env.GO_VERSION }}.linux-amd64.tar.gz
-              sudo rm -rf /usr/local/go
-              sudo tar -C /usr/local -xzf go${{ env.GO_VERSION }}.linux-amd64.tar.gz
-              echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-              export PATH=$PATH:/usr/local/go/bin
+            # Handle git repository - pull if .git exists, otherwise fresh deployment
+            if [ -d ".git" ]; then
+              echo "Git repository exists, pulling latest changes..."
+              git fetch origin
+              git reset --hard origin/develop
+              git clean -fd
+            else
+              echo "Fresh deployment - no git repository found"
             fi
 
             # Set Go environment
@@ -123,9 +132,6 @@ jobs:
             export GOPATH=$HOME/go
             export GOOS=linux
             export GOARCH=amd64
-
-            # Create configuration file from environment variables
-            echo "${{ secrets.CONFIG_YAML_DEV }}" > config.yaml
 
             # Make binary executable
             chmod +x ${{ env.BINARY_NAME }}

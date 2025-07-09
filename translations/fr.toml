@@ -308,3 +308,8 @@ inlineReceiveCreateWalletMessage = """Chat avec %s 👈 pour gérer votre wallet
 inlineReceiveYourselfMessage     = """📖 Vous ne pouvez pas vous envoyer de pourboires."""
 inlineReceiveFailedMessage       = """🚫 La réception a échoué."""
 inlineReceiveCancelledMessage    = """🚫 Réception annulée."""
+# CONVERT LKR TO SAT
+convertEnterAmountMessage = """Avez-vous saisi un montant ?"""
+convertInvalidAmountMessage = """Avez-vous saisi un montant valide ?"""
+convertPriceErrorMessage = """🚫 Impossible de récupérer le prix."""
+convertResultMessage = """%.2f LKR équivaut à environ %d sat."""

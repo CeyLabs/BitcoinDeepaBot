@@ -25,6 +25,7 @@ const (
 	MainMenuCommandInvoice = "⚡️ Invoice"
 	MainMenuCommandHelp    = "📖 Help"
 	MainMenuCommandSend    = "⤴️"
+	MainMenuCommandConvert = "LKR→Sat"
 	SendMenuCommandEnter   = "👤 Enter"
 )
 
@@ -35,6 +36,7 @@ var (
 	btnSendMainMenu    = mainMenu.Text(MainMenuCommandSend)
 	btnBalanceMainMenu = mainMenu.Text(MainMenuCommandBalance)
 	btnInvoiceMainMenu = mainMenu.Text(MainMenuCommandInvoice)
+	btnConvertMainMenu = mainMenu.Text(MainMenuCommandConvert)
 
 	sendToMenu       = &tb.ReplyMarkup{ResizeKeyboard: true}
 	sendToButtons    = []tb.Btn{}
@@ -46,7 +48,7 @@ func init() {
 	mainMenu.Reply(
 		mainMenu.Row(btnBalanceMainMenu),
 		// mainMenu.Row(btnInvoiceMainMenu, btnWebAppMainMenu, btnSendMainMenu, btnHelpMainMenu), // TODO: fix btnSendMainMenu
-		mainMenu.Row(btnInvoiceMainMenu, btnHelpMainMenu),
+		mainMenu.Row(btnInvoiceMainMenu, btnConvertMainMenu, btnHelpMainMenu),
 	)
 }
 
@@ -112,7 +114,7 @@ func (bot *TipBot) mainMenuBalanceButtonUpdate(to int64) {
 		mainMenu.Reply(
 			mainMenu.Row(btnBalanceMainMenu),
 			// mainMenu.Row(btnInvoiceMainMenu, btnWebAppMainMenu, btnSendMainMenu, btnHelpMainMenu), // TODO: fix btnSendMainMenu
-			mainMenu.Row(btnInvoiceMainMenu, btnHelpMainMenu),
+			mainMenu.Row(btnInvoiceMainMenu, btnConvertMainMenu, btnHelpMainMenu),
 		)
 	}
 }

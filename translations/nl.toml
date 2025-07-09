@@ -316,3 +316,8 @@ inlineReceiveCreateWalletMessage = """Chat met %s 👈 om uw wallet te beheren."
 inlineReceiveYourselfMessage     = """📖 Je kunt niet aan jezelf betalen."""
 inlineReceiveFailedMessage       = """🚫 Ontvangst mislukt."""
 inlineReceiveCancelledMessage    = """🚫 Ontvangen geannuleerd."""
+# CONVERT LKR TO SAT
+convertEnterAmountMessage = """Did you enter an amount?"""
+convertInvalidAmountMessage = """Did you enter a valid amount?"""
+convertPriceErrorMessage = """🚫 Couldn't fetch price."""
+convertResultMessage = """%.2f LKR is about %d sat."""
