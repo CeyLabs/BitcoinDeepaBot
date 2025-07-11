@@ -97,10 +97,10 @@ func startApiServer(bot *telegram.TipBot) {
 	s.AppendAuthorizedRoute(`/api/v1/createinvoice`, api.AuthTypeBasic, api.AccessKeyTypeInvoice, bot.DB.Users, apiService.CreateInvoice, http.MethodPost)
 	s.AppendAuthorizedRoute(`/api/v1/balance`, api.AuthTypeBasic, api.AccessKeyTypeInvoice, bot.DB.Users, apiService.Balance, http.MethodGet)
 
-	// Bot pay HTTP API module with internal network restriction (only if enabled)
+	// Bot pay HTTP API module with HMAC security (only if enabled)
 	if internal.IsAPISendEnabled() {
-		s.AppendRoute(`/api/v1/send`, api.InternalNetworkMiddleware(apiService.Send), http.MethodPost)
-		log.Infof("API Send endpoint registered at /api/v1/send")
+		s.AppendRoute(`/api/v1/send`, api.HMACMiddleware(api.InternalNetworkMiddleware(apiService.Send)), http.MethodPost)
+		log.Infof("API Send endpoint registered at /api/v1/send with HMAC security")
 	} else {
 		log.Infof("API Send endpoint disabled in configuration")
 	}
