@@ -2,12 +2,19 @@ package api
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httputil"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/LightningTipBot/LightningTipBot/internal"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
 	"gorm.io/gorm"
@@ -124,4 +131,94 @@ func dump(r *http.Request) string {
 		return ""
 	}
 	return string(x)
+}
+
+// HMACMiddleware validates HMAC signatures for sensitive endpoints
+func HMACMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get HMAC secret from configuration
+		secret := internal.Configuration.API.Send.HMACSecret
+		if secret == "" {
+			log.Error("HMAC secret not configured for API send endpoint")
+			http.Error(w, "Server configuration error", http.StatusInternalServerError)
+			return
+		}
+
+		// Get signature from header
+		signature := r.Header.Get("X-HMAC-Signature")
+		if signature == "" {
+			log.Warn("Missing HMAC signature in payment API request")
+			http.Error(w, "Missing signature", http.StatusUnauthorized)
+			return
+		}
+
+		// Get timestamp from header for replay attack prevention
+		timestampStr := r.Header.Get("X-Timestamp")
+		if timestampStr == "" {
+			log.Warn("Missing timestamp in payment API request")
+			http.Error(w, "Missing timestamp", http.StatusUnauthorized)
+			return
+		}
+
+		// Parse timestamp
+		timestamp, err := strconv.ParseInt(timestampStr, 10, 64)
+		if err != nil {
+			log.Warn("Invalid timestamp format in payment API request")
+			http.Error(w, "Invalid timestamp", http.StatusBadRequest)
+			return
+		}
+
+		// Check if request is not too old (prevent replay attacks)
+		now := time.Now().Unix()
+		tolerance := internal.Configuration.API.Send.TimestampTolerance
+		if tolerance == 0 {
+			tolerance = 300 // Default 5 minutes
+		}
+
+		if now-timestamp > tolerance {
+			log.Warnf("Request timestamp too old (age: %d seconds, tolerance: %d)", now-timestamp, tolerance)
+			http.Error(w, "Request expired", http.StatusUnauthorized)
+			return
+		}
+
+		// Read request body
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.Error("Failed to read request body for HMAC verification: ", err)
+			http.Error(w, "Failed to read request", http.StatusBadRequest)
+			return
+		}
+
+		// Restore body for next handler
+		r.Body = io.NopCloser(strings.NewReader(string(body)))
+
+		// Create message to sign: METHOD + PATH + TIMESTAMP + BODY
+		message := fmt.Sprintf("%s%s%s%s", r.Method, r.URL.Path, timestampStr, string(body))
+
+		// Calculate expected signature
+		expectedSignature := calculateHMAC(message, secret)
+
+		// Compare signatures using constant-time comparison
+		if !hmac.Equal([]byte(signature), []byte(expectedSignature)) {
+			log.Warn("HMAC signature verification failed for payment API")
+			http.Error(w, "Invalid signature", http.StatusUnauthorized)
+			return
+		}
+
+		log.Debug("HMAC signature verified successfully for payment API")
+		next.ServeHTTP(w, r)
+	}
+}
+
+// calculateHMAC calculates HMAC-SHA256 signature
+func calculateHMAC(message, secret string) string {
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write([]byte(message))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// GenerateHMACSignature helper function for clients
+func GenerateHMACSignature(method, path, timestamp, body, secret string) string {
+	message := fmt.Sprintf("%s%s%s%s", method, path, timestamp, body)
+	return calculateHMAC(message, secret)
 }
