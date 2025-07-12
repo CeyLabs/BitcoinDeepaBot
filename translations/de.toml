@@ -365,3 +365,6 @@ convertEnterAmountMessage = """Did you enter an amount?"""
 convertInvalidAmountMessage = """Did you enter a valid amount?"""
 convertPriceErrorMessage = """🚫 Couldn't fetch price."""
 convertResultMessage = """%.2f LKR is about %d sat."""
+
+# CONVERT SAT TO FIAT
+convertSatsResultMessage = """%d sat is about %s USD / %s LKR"""

@@ -352,3 +352,6 @@ convertEnterAmountMessage = """¿Ingresaste una cantidad?"""
 convertInvalidAmountMessage = """¿Ingresaste una cantidad válida?"""
 convertPriceErrorMessage = """🚫 No se pudo obtener el precio."""
 convertResultMessage = """%.2f LKR son aproximadamente %d sat."""
+
+# CONVERT SAT TO FIAT
+convertSatsResultMessage = """%d sat son aproximadamente %s USD / %s LKR"""
