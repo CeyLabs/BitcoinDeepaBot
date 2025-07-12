@@ -108,6 +108,7 @@ jobs:
             # Handle git repository - pull if .git exists, otherwise fresh deployment
             if [ -d ".git" ]; then
               echo "Git repository exists, pulling latest changes..."
+              git config --global --add safe.directory ${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}
               git fetch origin
               git reset --hard origin/main
               git clean -fd
