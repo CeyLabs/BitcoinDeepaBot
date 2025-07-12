@@ -83,7 +83,6 @@ jobs:
 
       
       - name: Copy Files to Server
-        if: steps.set_git_output.outputs.git_exists == 'false'
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
