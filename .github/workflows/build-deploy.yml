@@ -109,6 +109,10 @@ jobs:
             if [ -d ".git" ]; then
               echo "Git repository exists, pulling latest changes..."
               git config --global --add safe.directory ${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}
+              
+              # Set the remote URL to public HTTPS (no authentication needed for public repos)
+              git remote set-url origin https://github.com/${{ github.repository }}.git
+              
               git fetch origin
               git reset --hard origin/main
               git clean -fd
