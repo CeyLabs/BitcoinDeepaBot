@@ -90,9 +90,11 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SERVER_KEY }}
           port: ${{ secrets.SERVER_PORT }}
-          source: "./*"
+          source: "*,**/*,.*"
           target: "${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}"
           rm: true
+          tar_tmp_path: "/tmp"
+          use_insecure_cipher: false
 
       - name: Deploy Application
         uses: appleboy/ssh-action@master
