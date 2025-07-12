@@ -49,3 +49,5 @@ api:
     whitelisted_senders:
       - "BiccoindeepaDSA"
       - "CeycubeBank"
+    hmac_secret: "your-generated-secret"
+    timestamp_tolerance: 300

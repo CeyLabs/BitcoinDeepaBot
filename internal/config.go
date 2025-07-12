@@ -86,6 +86,8 @@ type APISendConfiguration struct {
 	MaxMemoLength          int      `yaml:"max_memo_length"`
 	RateLimit              int      `yaml:"rate_limit"`
 	WhitelistedSenders     []string `yaml:"whitelisted_senders"`
+	HMACSecret             string   `yaml:"hmac_secret"`
+	TimestampTolerance     int64    `yaml:"timestamp_tolerance"` // seconds
 }
 
 func init() {
