@@ -35,26 +35,12 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Go Environment
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Setup Build Environment
-        run: |
-          go mod download
-          go mod verify
-
-      - name: Build Application
-        run: |
-          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o ${{ env.BINARY_NAME }} .
-
       - name: Notify Build Complete
         run: |
           curl -s -X POST https://api.telegram.org/bot${{ secrets.DEV_ACTIONS_BOT_TOKEN }}/sendMessage \
             -d chat_id="${{ secrets.DEV_ACTIONS_GROUP_ID }}" \
             -d text="
-          ${{ env.PROJECT_NAME }} Build Complete 🛠
+          ${{ env.PROJECT_NAME }} Code Checked Out �
           📁 Repository: ${{ github.repository }}
           👤 Initiator: ${{ github.actor }}
           🕒 Timestamp: ${{ github.event.head_commit.timestamp }}
@@ -125,6 +111,12 @@ jobs:
             export GOPATH=$HOME/go
             export GOOS=linux
             export GOARCH=amd64
+
+            # Build the application on the server
+            echo "Building application on server..."
+            go mod download
+            go mod verify
+            CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o ${{ env.BINARY_NAME }} .
 
             # Make binary executable
             chmod +x ${{ env.BINARY_NAME }}
