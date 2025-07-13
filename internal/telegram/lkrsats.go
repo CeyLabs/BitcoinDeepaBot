@@ -33,6 +33,6 @@ func (bot *TipBot) lkrToSatHandler(ctx intercept.Context) (intercept.Context, er
 		return ctx, err
 	}
 	sats := int64(amount / lkrPerSat)
-	bot.trySendMessage(m.Sender, fmt.Sprintf(Translate(ctx, "convertResultMessage"), amount, utils.FormatSats(sats)))
+	bot.trySendMessage(m.Sender, fmt.Sprintf(Translate(ctx, "convertResultMessage"), utils.FormatFloatWithCommas(amount), utils.FormatSats(sats)))
 	return ctx, nil
 }
