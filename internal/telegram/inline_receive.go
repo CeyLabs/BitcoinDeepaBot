@@ -326,7 +326,7 @@ func (bot *TipBot) finishInlineReceiveHandler(ctx context.Context, c *tb.Callbac
 	toUserStrMd := GetUserStrMd(to.Telegram)
 	fromUserStrMd := GetUserStrMd(from.Telegram)
 	toUserStr := GetUserStr(to.Telegram)
-	inlineReceive.MessageText = fmt.Sprintf(i18n.Translate(inlineReceive.LanguageCode, "inlineSendUpdateMessageAccept"), inlineReceive.Amount, fromUserStrMd, toUserStrMd)
+	inlineReceive.MessageText = fmt.Sprintf(i18n.Translate(inlineReceive.LanguageCode, "inlineSendUpdateMessageAccept"), thirdparty.FormatSatsWithLKR(inlineReceive.Amount), fromUserStrMd, toUserStrMd)
 	memo := inlineReceive.Memo
 	if len(memo) > 0 {
 		inlineReceive.MessageText += fmt.Sprintf(i18n.Translate(inlineReceive.LanguageCode, "inlineReceiveAppendMemo"), memo)
@@ -338,8 +338,8 @@ func (bot *TipBot) finishInlineReceiveHandler(ctx context.Context, c *tb.Callbac
 
 	bot.tryEditMessage(inlineReceive.Message, inlineReceive.MessageText, &tb.ReplyMarkup{})
 	// notify users
-	bot.trySendMessage(to.Telegram, fmt.Sprintf(i18n.Translate(to.Telegram.LanguageCode, "sendReceivedMessage"), fromUserStrMd, inlineReceive.Amount))
-	bot.trySendMessage(from.Telegram, fmt.Sprintf(i18n.Translate(from.Telegram.LanguageCode, "sendSentMessage"), inlineReceive.Amount, toUserStrMd))
+	bot.trySendMessage(to.Telegram, fmt.Sprintf(i18n.Translate(to.Telegram.LanguageCode, "sendReceivedMessage"), fromUserStrMd, thirdparty.FormatSatsWithLKR(inlineReceive.Amount)))
+	bot.trySendMessage(from.Telegram, fmt.Sprintf(i18n.Translate(from.Telegram.LanguageCode, "sendSentMessage"), thirdparty.FormatSatsWithLKR(inlineReceive.Amount), toUserStrMd))
 	if err != nil {
 		errmsg := fmt.Errorf("[acceptInlineReceiveHandler] Error: Receive message to %s: %s", toUserStr, err)
 		log.Warnln(errmsg)

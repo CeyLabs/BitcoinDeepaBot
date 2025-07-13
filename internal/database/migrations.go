@@ -13,7 +13,7 @@ func MigrateAnonIdInt32Hash(db *gorm.DB) error {
 	users := []lnbits.User{}
 	_ = db.Find(&users)
 	for _, u := range users {
-		log.Infof("[MigrateAnonIdInt32Hash] %d -> %d", u.ID, str.Int32Hash(u.ID))
+		log.Infof("[MigrateAnonIdInt32Hash] %s -> %d", u.ID, str.Int32Hash(u.ID))
 		u.AnonID = fmt.Sprint(str.Int32Hash(u.ID))
 		tx := db.Save(u)
 		if tx.Error != nil {
