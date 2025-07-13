@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -108,12 +109,11 @@ func (bot TipBot) handleInlineSendQuery(ctx intercept.Context) (intercept.Contex
 
 	// check for memo in command
 	memo := GetMemoFromCommand(q.Text, memo_argn)
-	urls := []string{
-		queryImage,
-	}
-	results := make(tb.Results, len(urls)) // []tb.Result
-	for i, url := range urls {
-		inlineMessage := fmt.Sprintf(Translate(ctx, "inlineSendMessage"), fromUserStr, thirdparty.FormatSatsWithLKR(amount))
+	results := make(tb.Results, 0, 2) // []tb.Result
+
+	// helper function to create a result and store inline send data
+	createResult := func(amountSat int64, title string, description string) {
+		inlineMessage := fmt.Sprintf(Translate(ctx, "inlineSendMessage"), fromUserStr, thirdparty.FormatSatsWithLKR(amountSat))
 
 		// modify message if payment is to specific user
 		if to_SpecificUser {
@@ -124,20 +124,16 @@ func (bot TipBot) handleInlineSendQuery(ctx intercept.Context) (intercept.Contex
 			inlineMessage = inlineMessage + fmt.Sprintf(Translate(ctx, "inlineSendAppendMemo"), memo)
 		}
 		result := &tb.ArticleResult{
-			// URL:         url,
 			Text:        inlineMessage,
-			Title:       fmt.Sprintf(TranslateUser(ctx, "inlineResultSendTitle"), amount),
-			Description: fmt.Sprintf(TranslateUser(ctx, "inlineResultSendDescription"), amount),
-			// required for photos
-			ThumbURL: url,
+			Title:       title,
+			Description: description,
+			ThumbURL:    queryImage,
 		}
-		id := fmt.Sprintf("inl-send-%d-%d-%s", q.Sender.ID, amount, RandStringRunes(5))
+		id := fmt.Sprintf("inl-send-%d-%d-%s", q.Sender.ID, amountSat, RandStringRunes(5))
 		result.ReplyMarkup = &tb.ReplyMarkup{InlineKeyboard: bot.makeSendKeyboard(ctx, id).InlineKeyboard}
-		results[i] = result
-		// needed to set a unique string ID for each result
-		results[i].SetResultID(id)
+		result.SetResultID(id)
+		results = append(results, result)
 
-		// add data to persistent object
 		inlineSend := InlineSend{
 			Base:            storage.New(storage.ID(id)),
 			Message:         inlineMessage,
@@ -145,12 +141,29 @@ func (bot TipBot) handleInlineSendQuery(ctx intercept.Context) (intercept.Contex
 			To:              toUserDb,
 			To_SpecificUser: to_SpecificUser,
 			Memo:            memo,
-			Amount:          amount,
+			Amount:          amountSat,
 			LanguageCode:    ctx.Value("publicLanguageCode").(string),
 		}
-
-		// add result to persistent struct
 		bot.Cache.Set(inlineSend.ID, inlineSend, &store.Options{Expiration: 5 * time.Minute})
+	}
+
+	// result treating the amount as sats
+	if balance >= amount {
+		title := fmt.Sprintf(TranslateUser(ctx, "inlineResultSendTitle"), amount)
+		description := fmt.Sprintf(TranslateUser(ctx, "inlineResultSendDescription"), amount)
+		createResult(amount, title, description)
+	}
+
+	// result treating the amount as LKR
+	amountStr, errArg := getArgumentFromCommand(q.Text, 1)
+	if errArg == nil {
+		if f, err := strconv.ParseFloat(strings.ReplaceAll(amountStr, ",", ""), 64); err == nil {
+			if satFromLKR, err := thirdparty.LKRToSat(f); err == nil && balance >= satFromLKR {
+				title := fmt.Sprintf("💸 Send %.2f LKR (~%d sat)", f, satFromLKR)
+				description := fmt.Sprintf("👉 Click to send %.2f LKR (~%d sat) to this chat.", f, satFromLKR)
+				createResult(satFromLKR, title, description)
+			}
+		}
 	}
 
 	err = bot.Telegram.Answer(q, &tb.QueryResponse{
