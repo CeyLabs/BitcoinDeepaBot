@@ -3,11 +3,11 @@ package telegram
 import (
 	"fmt"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/LightningTipBot/LightningTipBot/internal"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 )
@@ -289,25 +289,7 @@ func (el *ErrorLogger) getUserStrV2(user *tb.User) string {
 
 // formatSats returns a comma separated representation of satoshi amounts
 func formatSats(amount int64) string {
-	s := strconv.FormatInt(amount, 10)
-	if len(s) <= 3 {
-		return s
-	}
-	var b strings.Builder
-	pre := len(s) % 3
-	if pre > 0 {
-		b.WriteString(s[:pre])
-		if len(s) > pre {
-			b.WriteRune(',')
-		}
-	}
-	for i := pre; i < len(s); i += 3 {
-		if i > 0 && i != pre {
-			b.WriteRune(',')
-		}
-		b.WriteString(s[i : i+3])
-	}
-	return b.String()
+	return utils.FormatSats(amount)
 }
 
 // LogPaymentError logs payment-related errors with detailed information

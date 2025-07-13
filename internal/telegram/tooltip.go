@@ -11,6 +11,7 @@ import (
 	"github.com/tidwall/buntdb"
 	"github.com/tidwall/gjson"
 
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	log "github.com/sirupsen/logrus"
 
 	tb "gopkg.in/lightningtipbot/telebot.v3"
@@ -21,7 +22,7 @@ const (
 	tooltipAndOthersMessage    = " ... and others"
 	tooltipMultipleTipsMessage = "%s (%d tips by %s)"
 	tooltipSingleTipMessage    = "%s (by %s)"
-	tooltipTipAmountMessage    = "🏅 %d sat"
+	tooltipTipAmountMessage    = "🏅 %s sat"
 )
 
 type TipTooltip struct {
@@ -70,7 +71,7 @@ func NewTipTooltip(m *tb.Message, opts ...TipTooltipOption) *TipTooltip {
 // getUpdatedTipTooltipMessage will return the full tip tool tip
 func (ttt TipTooltip) getUpdatedTipTooltipMessage(botUserName string, notInitializedWallet bool) string {
 	tippersStr := getTippersString(ttt.Tippers)
-	tipToolTipMessage := fmt.Sprintf(tooltipTipAmountMessage, ttt.TipAmount)
+	tipToolTipMessage := fmt.Sprintf(tooltipTipAmountMessage, utils.FormatSats(ttt.TipAmount))
 	if len(ttt.Tippers) > 1 {
 		tipToolTipMessage = fmt.Sprintf(tooltipMultipleTipsMessage, tipToolTipMessage, ttt.Ntips, tippersStr)
 	} else {
@@ -136,7 +137,7 @@ func tipTooltipHandler(m *tb.Message, bot *TipBot, amount int64, initializedWall
 }
 
 func newToolTip(m *tb.Message, bot *TipBot, amount int64, initializedWallet bool) {
-	tipmsg := fmt.Sprintf(tooltipTipAmountMessage, amount)
+	tipmsg := fmt.Sprintf(tooltipTipAmountMessage, utils.FormatSats(amount))
 	userStr := GetUserStrMd(m.Sender)
 	tipmsg = fmt.Sprintf(tooltipSingleTipMessage, tipmsg, userStr)
 
