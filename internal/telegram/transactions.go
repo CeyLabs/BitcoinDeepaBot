@@ -7,6 +7,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/str"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	"github.com/eko/gocache/store"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
@@ -52,13 +53,13 @@ func (txlist *TransactionsList) printTransactions(ctx intercept.Context) string 
 		}
 		timestr := time.Unix(int64(p.Time), 0).UTC().Format("2 Jan 06 15:04")
 		txstr += fmt.Sprintf("` %s`", timestr)
-		txstr += fmt.Sprintf("` %+d sat`", p.Amount/1000)
+		txstr += fmt.Sprintf("` %s sat`", utils.FormatSats(p.Amount/1000, true))
 		// if p.Fee > 0 {
 		fee := p.Fee
 		if fee < 1000 {
 			fee = 1000
 		}
-		txstr += fmt.Sprintf(" _(fee: %d sat)_", fee/1000)
+		txstr += fmt.Sprintf(" _(fee: %s sat)_", utils.FormatSats(fee/1000))
 		// }
 		memo := p.Memo
 		memo_maxlen := 50

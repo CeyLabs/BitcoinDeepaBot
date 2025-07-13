@@ -13,6 +13,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/runtime"
 	"github.com/LightningTipBot/LightningTipBot/internal/storage"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/skip2/go-qrcode"
 	"github.com/tidwall/buntdb"
@@ -86,7 +87,7 @@ func (bot *TipBot) handleTelegramNewMember(ctx intercept.Context) (intercept.Con
 		Group: group,
 		Base:  storage.New(storage.ID(fmt.Sprintf("ticket-event:%s", id))),
 	}
-	captionText := fmt.Sprintf("⚠️ %s, this group requires you to pay *%d sat* to join. You have 15 minutes to pay or you will be kicked for one day.", GetUserStrMd(ctx.Message().Sender), ticket.Ticket.Price)
+	captionText := fmt.Sprintf("⚠️ %s, this group requires you to pay *%s sat* to join. You have 15 minutes to pay or you will be kicked for one day.", GetUserStrMd(ctx.Message().Sender), utils.FormatSats(ticket.Ticket.Price))
 
 	var balance int64 = 0
 	if user.ID != "" {
