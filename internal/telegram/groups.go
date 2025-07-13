@@ -20,6 +20,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/storage"
 	"github.com/LightningTipBot/LightningTipBot/internal/str"
 	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/skip2/go-qrcode"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
@@ -404,9 +405,9 @@ func (bot *TipBot) groupGetInviteLinkHandler(event Event) {
 			errmsg := fmt.Sprintf("could not get balance of user %s", GetUserStr(ticketEvent.Payer.Telegram))
 			log.Errorln(errmsg)
 		}
-		bot.trySendMessage(ticketEvent.User.Telegram, fmt.Sprintf(i18n.Translate(ticketEvent.LanguageCode, "groupReceiveTicketInvoiceCommission"), ticketSat, commissionSat, ticketEvent.Group.Title, GetUserStrMd(ticketEvent.Payer.Telegram)))
+		bot.trySendMessage(ticketEvent.User.Telegram, fmt.Sprintf(i18n.Translate(ticketEvent.LanguageCode, "groupReceiveTicketInvoiceCommission"), utils.FormatSats(ticketSat), utils.FormatSats(commissionSat), ticketEvent.Group.Title, GetUserStrMd(ticketEvent.Payer.Telegram)))
 	} else {
-		bot.trySendMessage(ticketEvent.User.Telegram, fmt.Sprintf(i18n.Translate(ticketEvent.LanguageCode, "groupReceiveTicketInvoice"), ticketSat, ticketEvent.Group.Title, GetUserStrMd(ticketEvent.Payer.Telegram)))
+		bot.trySendMessage(ticketEvent.User.Telegram, fmt.Sprintf(i18n.Translate(ticketEvent.LanguageCode, "groupReceiveTicketInvoice"), utils.FormatSats(ticketSat), ticketEvent.Group.Title, GetUserStrMd(ticketEvent.Payer.Telegram)))
 	}
 }
 
@@ -576,7 +577,7 @@ func (bot TipBot) addGroupHandler(ctx intercept.Context) (intercept.Context, err
 
 	bot.DB.Groups.Save(group)
 	log.Infof("[group] Ticket of %d sat(s) added to group %s.", group.Ticket.Price, group.Name)
-	bot.trySendMessage(m.Chat, fmt.Sprintf(Translate(ctx, "groupAddedMessagePrivate"), str.MarkdownEscape(m.Chat.Title), group.Name, group.Ticket.Price, GetUserStrMd(bot.Telegram.Me), group.Name))
+	bot.trySendMessage(m.Chat, fmt.Sprintf(Translate(ctx, "groupAddedMessagePrivate"), str.MarkdownEscape(m.Chat.Title), group.Name, utils.FormatSats(group.Ticket.Price), GetUserStrMd(bot.Telegram.Me), group.Name))
 
 	return ctx, nil
 }

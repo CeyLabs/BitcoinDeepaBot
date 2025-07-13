@@ -7,6 +7,7 @@ import (
 
 	"github.com/LightningTipBot/LightningTipBot/internal/api"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 )
@@ -177,7 +178,7 @@ func (s Service) executePendingTransaction(pendingTx *api.PendingTransaction) er
 
 	// Send notifications
 	fromUserStrMd := telegram.GetUserStrMd(fromUser.Telegram)
-	_, err = s.bot.Telegram.Send(toUser.Telegram, fmt.Sprintf("💰 You received %d sat from %s via admin-approved API payment", pendingTx.Amount, fromUserStrMd))
+	_, err = s.bot.Telegram.Send(toUser.Telegram, fmt.Sprintf("💰 You received %s from %s via admin-approved API payment", utils.FormatSats(pendingTx.Amount), fromUserStrMd))
 	if err != nil {
 		log.Warnf("[ADMIN] Could not send notification to recipient: %v", err)
 	}

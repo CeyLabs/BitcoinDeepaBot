@@ -132,7 +132,7 @@ advancedMessage = """%s
 */generate* 🎆 Vytvořit obrázky od DALLE 2: `/generate <prompt>`"""
 
 # GENERIC
-enterAmountRangeMessage        = """💯 Zadej částku mezi %d a %d sats."""
+enterAmountRangeMessage        = """💯 Zadej částku mezi %s a %s."""
 enterAmountMessage             = """💯 Zadej částku."""
 enterUserMessage               = """👤 Zadej uživatele."""
 enterTextMessage               = """⌨️ Zadej text."""
@@ -148,7 +148,7 @@ startNoUsernameMessage    = """☝️ Vypadá to, že na Telegramu nemáš ješt
 
 # BALANCE
 
-balanceMessage      = """👑 *Tvůj zůstatek:* %d sat(s). (%s USD / %s LKR)"""
+balanceMessage      = """👑 *Tvůj zůstatek:* %s. (%s USD / %s LKR)"""
 balanceErrorMessage = """🚫 Nepodařilo se získat info o zůstatku. Zkus to později znovu."""
 
 # TIP
@@ -158,8 +158,8 @@ tipInviteGroupMessage = """ℹ️ Tohoto bota můžeš přizvat do jakékoli sku
 tipEnterAmountMessage = """Zadal jsi částku?"""
 tipValidAmountMessage = """Zadal jsi platnou částku?"""
 tipYourselfMessage    = """📖 Nemůžeš poslat platbu sobě."""
-tipSentMessage        = """💸 %d sats posláno pro %s."""
-tipReceivedMessage    = """🏅 %s ti poslal %d sats."""
+tipSentMessage        = """💸 %s posláno pro %s."""
+tipReceivedMessage    = """🏅 %s ti poslal %s."""
 tipErrorMessage       = """🚫 Platba selhala."""
 tipUndefinedErrorMsg  = """Prosím, zkus to později znovu."""
 tipHelpText           = """📖 Ou, tohle se nezdařilo. %s
@@ -171,11 +171,11 @@ tipHelpText           = """📖 Ou, tohle se nezdařilo. %s
 
 sendValidAmountMessage     = """Zadal jsi platnou částku?"""
 sendUserHasNoWalletMessage = """🚫 Uživatel %s si ještě nevytvořil peněženku."""
-sendSentMessage            = """💸 %d sats posláno uživateli %s."""
-sendPublicSentMessage      = """💸 %d sats posláno od %s uživateli %s."""
-sendReceivedMessage        = """🏅 %s ti poslal %d sats."""
+sendSentMessage            = """💸 %s posláno uživateli %s."""
+sendPublicSentMessage      = """💸 %s posláno od %s uživateli %s."""
+sendReceivedMessage        = """🏅 %s ti poslal %s."""
 sendErrorMessage           = """🚫 Odeslání selhalo."""
-confirmSendMessage         = """Chceš zaplatit uživateli %s?\n\n💸 Částka: %d sats"""
+confirmSendMessage         = """Chceš zaplatit uživateli %s?\n\n💸 Částka: %s"""
 confirmSendAppendMemo      = """\n✉️ %s"""
 sendCancelledMessage       = """🚫 Odeslání zrušeno."""
 errorTryLaterMessage       = """🚫 Chyba. Prosím, zkus to později znovu."""
@@ -188,8 +188,8 @@ sendHelpText               = """📖 Ou, tohle se nezdařilo. %s
 
 # INVOICE
 
-invoiceReceivedMessage    = """⚡️ Obdržel jsi %d sat."""
-invoiceReceivedCurrencyMessage    = """⚡️ Obdržel jsi %d sat (%s %s)."""
+invoiceReceivedMessage    = """⚡️ Obdržel jsi %s."""
+invoiceReceivedCurrencyMessage    = """⚡️ Obdržel jsi %s (%s %s)."""
 invoiceEnterAmountMessage = """Zadal jsi částku?"""
 invoiceValidAmountMessage = """Zadal jsi platnou částku?"""
 invoiceHelpText           = """📖 Ou, tohle se nezdařilo. %s
@@ -205,11 +205,11 @@ invoicePaidMessage          = """⚡️ Platba odeslána."""
 invoicePublicPaidMessage    = """⚡️ Platba od %s odeslána."""
 invalidInvoiceHelpMessage    = """Máš platnou lightning invoice? Zkus příkaz /send k poslání platby uživateli Telegramu nebo na lightning adresu."""
 invoiceNoAmountMessage       = """🚫 Nemůžu zaplatit invoice bez částky."""
-insufficientFundsMessage     = """🚫 Nedostatek prostředků. Máš %d sats, ale potřebuješ alespoň %d sats."""
+insufficientFundsMessage     = """🚫 Nedostatek prostředků. Máš %s, ale potřebuješ alespoň %s."""
 feeReserveMessage            = """⚠️ Odeslání celého zůstatku se nemusí zdařit kvůli poplatkům v síti. Nechej rezervu aspoň 1% na poplatky."""
 invoicePaymentFailedMessage  = """🚫 Platba selhala: %s"""
 invoiceUndefinedErrorMessage = """Nemohl jsem zaplatit invoice."""
-confirmPayInvoiceMessage     = """Chceš poslat tuto platbu?\n\n💸 Částka: %d sats"""
+confirmPayInvoiceMessage     = """Chceš poslat tuto platbu?\n\n💸 Částka: %s"""
 confirmPayAppendMemo         = """\n✉️ %s"""
 payHelpText                  = """📖 Ou, tohle se nezdařilo. %s
 
@@ -242,7 +242,7 @@ lnurlResolvingUrlMessage       = """🧮 Zpracovávám adresu..."""
 lnurlGettingUserMessage        = """🧮 Připravuji platbu..."""
 lnurlPaymentFailed             = """🚫 Platba selhala: %s"""
 lnurlInvalidAmountMessage      = """🚫 Neplatná částka."""
-lnurlInvalidAmountRangeMessage = """🚫 Částka musí být mezi %d a %d sats."""
+lnurlInvalidAmountRangeMessage = """🚫 Částka musí být mezi %s a %s."""
 lnurlNoUsernameMessage         = """🚫 Pro příjem plateb pomocí LNURL potřebuješ na Telegramu uživatelské jméno."""
 lnurlHelpText                  = """📖 Ou, tohle se nezdařilo. %s
 
@@ -258,7 +258,7 @@ loginCancelledMessage           = """🚫 Přihlášení zrušeno."""
 
 # LNURL WITHDRAW
 
-confirmLnurlWithdrawMessage     = """Chceš provést tento výběr?\n\n💸 Částka: %d sats"""
+confirmLnurlWithdrawMessage     = """Chceš provést tento výběr?\n\n💸 Částka: %s"""
 lnurlPreparingWithdraw        = """🧮 Příprava výběru..."""
 lnurlWithdrawFailed             = """🚫 Výběr selhal."""
 lnurlWithdrawCancelled             = """🚫 Výběr zrušen."""
@@ -289,21 +289,21 @@ apiHiddenMessage               = """🔍 Klíče jsou skryty. Abys je znovu vid�
 
 inlineQueryFaucetTitle        = """🚰 Vytvořit faucet."""
 inlineQueryFaucetDescription  = """Použití: @%s faucet <kapacita> <částka_na_uživatele>"""
-inlineResultFaucetTitle       = """🚰 Vytvořit faucet s %d sats."""
+inlineResultFaucetTitle       = """🚰 Vytvořit faucet s %s."""
 inlineResultFaucetDescription = """👉 Klikni zde pro vytvoření faucetu v tomto chatu."""
 
-inlineFaucetMessage                     = """Zmáčkni ✅ pro výběr %d sats z faucetu od %s.
+inlineFaucetMessage                     = """Zmáčkni ✅ pro výběr %s z faucetu od %s.
 
-🚰 Zbývá: %d/%d sats (rozdáno %d/%d uživatelům)
+🚰 Zbývá: %d/%s (rozdáno %d/%d uživatelům)
 %s"""
-inlineFaucetEndedMessage                = """🚰 Faucet je prázdný 🍺\n\n🏅 %d sats rozdáno %d uživatelům."""
+inlineFaucetEndedMessage                = """🚰 Faucet je prázdný 🍺\n\n🏅 %s rozdáno %d uživatelům."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""
 inlineFaucetCreateWalletMessage         = """Komunikuj s %s 👈 pro správu své peněženky."""
 inlineFaucetCancelledMessage            = """🚫 Faucet zrušen."""
 inlineFaucetInvalidPeruserAmountMessage = """🚫 Částka na uživatele musí dělit kapacitu faucetu beze zbytku nebo je příliš malá (min 5 sats)."""
 inlineFaucetInvalidAmountMessage        = """🚫 Neplatná částka."""
-inlineFaucetSentMessage                 = """🚰 %d sats posláno %s."""
-inlineFaucetReceivedMessage             = """🚰 %s ti poslal %d sats."""
+inlineFaucetSentMessage                 = """🚰 %s posláno %s."""
+inlineFaucetReceivedMessage             = """🚰 %s ti poslal %s."""
 inlineFaucetHelpFaucetInGroup           = """Vytvoř faucet ve skupině s botem nebo použij 👉 inline příkaz (napiš /advanced pro víc info)."""
 inlineFaucetAlreadyTookMessage          = """🚫 Z tohoto faucetu už jsi čerpal."""
 inlineFaucetHelpText                    = """📖 Ou, tohle se nezdařilo. %s
@@ -315,12 +315,12 @@ inlineFaucetHelpText                    = """📖 Ou, tohle se nezdařilo. %s
 
 inlineQuerySendTitle            = """💸 Poslat platbu do chatu."""
 inlineQuerySendDescription      = """Použití: @%s send <částka> [<uživatel>] [<zpráva>]"""
-inlineResultSendTitle           = """💸 Poslat %d sats."""
-inlineResultSendDescription     = """👉 Klikni pro poslání %d sats do tohoto chatu."""
+inlineResultSendTitle           = """💸 Poslat %s."""
+inlineResultSendDescription     = """👉 Klikni pro poslání %s do tohoto chatu."""
 
-inlineSendMessage              = """Zmáčkni ✅ pro obdržení platby od %s.\n\n💸 Částka: %d sats"""
+inlineSendMessage              = """Zmáčkni ✅ pro obdržení platby od %s.\n\n💸 Částka: %s"""
 inlineSendAppendMemo           = """\n✉️ %s"""
-inlineSendUpdateMessageAccept  = """💸 %d sats posláno od %s uživateli %s."""
+inlineSendUpdateMessageAccept  = """💸 %s posláno od %s uživateli %s."""
 inlineSendCreateWalletMessage  = """Chatuj s %s 👈 pro správu své peněženky."""
 sendYourselfMessage            = """📖 Nemůžeš platit sám sobě."""
 inlineSendFailedMessage        = """🚫 Platba selhala."""
@@ -331,12 +331,12 @@ inlineSendBalanceLowMessage    = """🚫 Tvůj zůstatek je příliš malý."""
 
 inlineQueryReceiveTitle        = """🏅 Vyžádat platbu v chatu."""
 inlineQueryReceiveDescription  = """Použití: @%s receive <částka> [<uživatel>] [<zpráva>]"""
-inlineResultReceiveTitle       = """🏅 Dostat %d sats."""
-inlineResultReceiveDescription = """👉 Klikni pro vyžádání platby %d sats."""
+inlineResultReceiveTitle       = """🏅 Dostat %s."""
+inlineResultReceiveDescription = """👉 Klikni pro vyžádání platby %s."""
 
-inlineReceiveMessage             = """Zmáčkni 💸 pro zaplacení uživateli %s.\n\n💸 Částka: %d sats"""
+inlineReceiveMessage             = """Zmáčkni 💸 pro zaplacení uživateli %s.\n\n💸 Částka: %s"""
 inlineReceiveAppendMemo          = """\n✉️ %s"""
-inlineReceiveUpdateMessageAccept = """💸 %d sats posláno od %s uživateli %s."""
+inlineReceiveUpdateMessageAccept = """💸 %s posláno od %s uživateli %s."""
 inlineReceiveCreateWalletMessage = """Chatuj s %s 👈 pro správu své peněženky."""
 inlineReceiveYourselfMessage     = """📖 Nemůžeš platit sám sobě."""
 inlineReceiveFailedMessage       = """🚫 Platba selhala."""
@@ -346,20 +346,20 @@ inlineReceiveCancelledMessage    = """🚫 Platba zrušena."""
 
 inlineQueryTipjarTitle        = """🍯 Vytvořit tipjar."""
 inlineQueryTipjarDescription  = """Použití: @%s tipjar <kapacita> <částka_od_uživatele>"""
-inlineResultTipjarTitle       = """🍯 Vytvořit tipjar na %d sats."""
+inlineResultTipjarTitle       = """🍯 Vytvořit tipjar na %s."""
 inlineResultTipjarDescription = """👉 Klikni zde pro vytvoření tipjar v tomto chatu."""
 
-inlineTipjarMessage                     = """Zmáčkni 💸 pro *platbu %d sats* do tohoto tipjar od %s.
+inlineTipjarMessage                     = """Zmáčkni 💸 pro *platbu %s* do tohoto tipjar od %s.
 
-🙏 Věnováno: *%d*/%d sats (od %d uživatelů)
+🙏 Věnováno: *%d*/%s (od %d uživatelů)
 %s"""
-inlineTipjarEndedMessage                = """🍯 Tipjar od %s je plný ⭐️\n\n🏅 Věnováno %d sats od %d uživatelů."""
+inlineTipjarEndedMessage                = """🍯 Tipjar od %s je plný ⭐️\n\n🏅 Věnováno %s od %d uživatelů."""
 inlineTipjarAppendMemo                  = """\n✉️ %s"""
 inlineTipjarCancelledMessage            = """🚫 Tipjar zrušen."""
 inlineTipjarInvalidPeruserAmountMessage = """🚫 Částka od jednoho uživatele musí dělit kapacitu tipjar beze zbytku."""
 inlineTipjarInvalidAmountMessage        = """🚫 Neplatná částka."""
-inlineTipjarSentMessage                 = """🍯 %d sats posláno pro %s."""
-inlineTipjarReceivedMessage             = """🍯 %s ti poslal %d sats."""
+inlineTipjarSentMessage                 = """🍯 %s posláno pro %s."""
+inlineTipjarReceivedMessage             = """🍯 %s ti poslal %s."""
 inlineTipjarHelpTipjarInGroup           = """Vytvoř tipjar ve skupině s botem nebo použij 👉 inline příkaz (/advanced pro víc info)."""
 inlineTipjarHelpText                    = """📖 Ou, tohle se nezdařilo. %s
 
@@ -374,10 +374,10 @@ groupTicketIssuedGroupMessage       = """🎟 Uživatel %s obdržel vstupenku do
 groupPayInvoiceMessage              = """🎟 Pro připojení se ke skupině %s, zaplať výše uvedenou invoice."""
 groupBotIsNotAdminMessage           = """🚫 Ou, tohle se nezdařilo. Musíš mě jmenovat adminem a dát mi práva zvát uživatele."""
 groupNameExists                     = """🚫 Skupina s tímto názvem už existuje. Prosím, vyber jiný název."""
-groupAddedMessage                   = """🎟 Vstupenky pro skupinu `%s` přidány.\nAlias: `%s` Cena: %d sats\n\nPro vyžádání vstupenky do této skupiny začni soukromý chat s %s a napiš `/join %s`."""
+groupAddedMessage                   = """🎟 Vstupenky pro skupinu `%s` přidány.\nAlias: `%s` Cena: %s\n\nPro vyžádání vstupenky do této skupiny začni soukromý chat s %s a napiš `/join %s`."""
 groupNotFoundMessage                = """🚫 Skupinu s tímto názvem se nepodařilo najít."""
-groupReceiveTicketInvoiceCommission = """🎟 Obdržel jsi *%d sats* (bez provize %d sats) za vstupenku do skupiny `%s` od uživatele %s."""
-groupReceiveTicketInvoice           = """🎟 Obdržel jsi *%d sats* za vstupenku do skupiny `%s` od uživatele %s."""
+groupReceiveTicketInvoiceCommission = """🎟 Obdržel jsi *%s* (bez provize %s) za vstupenku do skupiny `%s` od uživatele %s."""
+groupReceiveTicketInvoice           = """🎟 Obdržel jsi *%s* za vstupenku do skupiny `%s` od uživatele %s."""
 commandPrivateMessage               = """Prosím, použij tento příkaz v soukromém chatu s %s."""
 groupHelpMessage                    = """🎟 Vstupenky do soukromých skupin 🎟
 
@@ -407,4 +407,4 @@ generateDalleGeneratingMessage  = """Tvé obrázky se generují. Chvilku strpen�
 convertEnterAmountMessage = """Zadal jsi částku?"""
 convertInvalidAmountMessage = """Zadal jsi platnou částku?"""
 convertPriceErrorMessage = """🚫 Nepodařilo se získat cenu."""
-convertResultMessage = """%.2f LKR je přibližně %d sat."""
+convertResultMessage = """%.2f LKR je přibližně %s."""

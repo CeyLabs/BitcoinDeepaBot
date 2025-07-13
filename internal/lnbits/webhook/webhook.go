@@ -8,6 +8,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 
 	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
@@ -119,7 +120,7 @@ func (w *Server) receive(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	// fallback: send a message to the user if there is no callback for this invoice
-	_, err = w.bot.Send(user.Telegram, fmt.Sprintf(i18n.Translate(user.Telegram.LanguageCode, "invoiceReceivedMessage"), webhookEvent.Amount/1000))
+	_, err = w.bot.Send(user.Telegram, fmt.Sprintf(i18n.Translate(user.Telegram.LanguageCode, "invoiceReceivedMessage"), utils.FormatSats(webhookEvent.Amount/1000)))
 	if err != nil {
 		log.Errorln(err)
 	}

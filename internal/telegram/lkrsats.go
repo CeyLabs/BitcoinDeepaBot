@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
 	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	log "github.com/sirupsen/logrus"
 	"strconv"
 	"strings"
@@ -32,6 +33,6 @@ func (bot *TipBot) lkrToSatHandler(ctx intercept.Context) (intercept.Context, er
 		return ctx, err
 	}
 	sats := int64(amount / lkrPerSat)
-	bot.trySendMessage(m.Sender, fmt.Sprintf(Translate(ctx, "convertResultMessage"), amount, sats))
+	bot.trySendMessage(m.Sender, fmt.Sprintf(Translate(ctx, "convertResultMessage"), utils.FormatFloatWithCommas(amount), utils.FormatSats(sats)))
 	return ctx, nil
 }

@@ -128,7 +128,7 @@ advancedMessage = """%s
 */generate* 🎆 Generate DALLE-2 images: `/generate <prompt>`"""
 
 # GENERIC
-enterAmountRangeMessage        = """💯 Voer een bedrag in tussen %d en %d sat."""
+enterAmountRangeMessage        = """💯 Voer een bedrag in tussen %s en %s."""
 enterAmountMessage             = """💯 Voer een bedrag."""
 enterUserMessage               = """👤 Voer een gebruiker."""
 errorReasonMessage             = """🚫 Fout: %s"""
@@ -143,7 +143,7 @@ startNoUsernameMessage    = """☝️ Het lijkt erop dat je nog geen Telegram @ 
 
 # BALANCE
 
-balanceMessage      = """👑 *Uw saldo:* %d sat(s). (%s USD / %s LKR)"""
+balanceMessage      = """👑 *Uw saldo:* %s. (%s USD / %s LKR)"""
 balanceErrorMessage = """🚫 Kon uw saldo niet ophalen. Probeer het later nog eens."""
 
 # TIP
@@ -153,8 +153,8 @@ tipInviteGroupMessage = """ℹ️ Trouwens, je kan deze bot uitnodigen voor elke
 tipEnterAmountMessage = """Heb je een bedrag ingevoerd?"""
 tipValidAmountMessage = """Heb je een geldig bedrag ingevoerd?"""
 tipYourselfMessage    = """📖 Je kunt jezelf geen tip geven."""
-tipSentMessage        = """💸 %d sat gestuurd naar %s."""
-tipReceivedMessage    = """🏅 %s heeft je getipt %d sat."""
+tipSentMessage        = """💸 %s gestuurd naar %s."""
+tipReceivedMessage    = """🏅 %s heeft je getipt %s."""
 tipErrorMessage       = """🚫 Tip mislukt."""
 tipUndefinedErrorMsg  = """probeer het later nog eens."""
 tipHelpText           = """📖 Oeps, dat werkte niet. %s
@@ -166,11 +166,11 @@ tipHelpText           = """📖 Oeps, dat werkte niet. %s
 
 sendValidAmountMessage     = """Heb je een geldig bedrag ingevoerd?"""
 sendUserHasNoWalletMessage = """🚫 Gebruiker %s heeft nog geen portemonnee aangemaakt."""
-sendSentMessage            = """💸 %d sat verstuurd naar %s."""
-sendPublicSentMessage      = """💸 %d sat verstuurd van %s naar %s."""
-sendReceivedMessage        = """🏅 %s stuurde u %d sat."""
+sendSentMessage            = """💸 %s verstuurd naar %s."""
+sendPublicSentMessage      = """💸 %s verstuurd van %s naar %s."""
+sendReceivedMessage        = """🏅 %s stuurde u %s."""
 sendErrorMessage           = """🚫 Verzenden mislukt."""
-confirmSendMessage         = """Wilt u betalen aan %s? bedrag: %d sat"""
+confirmSendMessage         = """Wilt u betalen aan %s? bedrag: %s"""
 confirmSendAppendMemo      = """\n✉️ %s"""
 sendCancelledMessage       = """🚫 Geannuleerd verzenden."""
 errorTryLaterMessage       = """🚫 Fout. Probeer het later nog eens."""
@@ -183,8 +183,8 @@ sendHelpText               = """📖 Oeps, dat werkte niet. %s
 
 # INVOICE
 
-invoiceReceivedMessage    = """⚡️ Je hebt %d sat ontvangen ."""
-invoiceReceivedCurrencyMessage    = """⚡️ Je hebt %d sat (%s %s) ontvangen."""
+invoiceReceivedMessage    = """⚡️ Je hebt %s ontvangen ."""
+invoiceReceivedCurrencyMessage    = """⚡️ Je hebt %s (%s %s) ontvangen."""
 invoiceEnterAmountMessage = """Heb je een bedrag ingevoerd?"""
 invoiceValidAmountMessage = """Heeft u een geldig bedrag ingevoerd?"""
 invoiceHelpText           = """📖 Oeps, dat werkte niet. %s
@@ -199,11 +199,11 @@ invoicePaidMessage          = """⚡️ Betaling verzonden."""
 invoicePublicPaidMessage    = """⚡️ Betaling verzonden door %s."""
 invalidInvoiceHelpMessage    = """Heeft u een geldige Lightning factuur ingevoerd? Probeer /send als u wilt verzenden naar een Telegram gebruiker of Lightning address."""
 invoiceNoAmountMessage       = """🚫 Kan facturen niet betalen zonder een bedrag."""
-insufficientFundsMessage     = """🚫 Onvoldoende middelen. Je hebt %d sat maar je hebt minstens %d sat nodig."""
+insufficientFundsMessage     = """🚫 Onvoldoende middelen. Je hebt %s maar je hebt minstens %s nodig."""
 feeReserveMessage            = """⚠️ Het versturen van uw volledige saldo kan mislukken vanwege netwerkkosten. Als het mislukt, probeer dan een beetje minder te verzenden."""
 invoicePaymentFailedMessage  = """🚫 Betaling mislukt: %s"""
 invoiceUndefinedErrorMessage = """Kon de factuur niet betalen."""
-confirmPayInvoiceMessage     = """Wilt u deze betaling sturen?\n\n💸 bedrag: %d sat"""
+confirmPayInvoiceMessage     = """Wilt u deze betaling sturen?\n\n💸 bedrag: %s"""
 confirmPayAppendMemo         = """\n✉️ %s"""
 payHelpText                  = """📖 Oeps, dat werkte niet. %s
 
@@ -236,7 +236,7 @@ lnurlResolvingUrlMessage       = """🧮 Opzoeken adres..."""
 lnurlGettingUserMessage        = """🧮 Voorbereiding van betaling..."""
 lnurlPaymentFailed             = """🚫 Betaling mislukt: %s"""
 lnurlInvalidAmountMessage      = """🚫 Ongeldig bedrag."""
-lnurlInvalidAmountRangeMessage = """🚫 Bedrag moet liggen tussen %d en %d sat."""
+lnurlInvalidAmountRangeMessage = """🚫 Bedrag moet liggen tussen %s en %s."""
 lnurlNoUsernameMessage         = """🚫 U moet een Telegram gebruikersnaam instellen om betalingen te ontvangen via LNURL."""
 lnurlHelpText                  = """📖 Oeps, dat werkte niet. %s
 
@@ -245,7 +245,7 @@ lnurlHelpText                  = """📖 Oeps, dat werkte niet. %s
 
 # LNURL WITHDRAW
 
-confirmLnurlWithdrawMessage = """Wilt u deze opname maken?💸 Bedrag: %d sat"""
+confirmLnurlWithdrawMessage = """Wilt u deze opname maken?💸 Bedrag: %s"""
 lnurlPreparingWithdraw = """🧮 Opname aan het voorbereiden..."""
 lnurlWithdrawFailed = """🚫 Opname mislukt."""
 lnurlWithdrawCancelled = """🚫 Opname geannuleerd."""
@@ -265,21 +265,21 @@ couldNotLinkMessage = """🚫 Uw wallet kon niet gelinkt worden. Probeer het lat
 
 inlineQueryFaucetTitle        = """🚰 Maak een kraan."""
 inlineQueryFaucetDescription  = """Gebruik: @%s faucet <capacity> <per_user>"""
-inlineResultFaucetTitle       = """🚰 Maak een %d sat kraan."""
+inlineResultFaucetTitle       = """🚰 Maak een %s kraan."""
 inlineResultFaucetDescription = """👉 Klik hier om een kraan in deze chat te maken.."""
 
-inlineFaucetMessage                     = """Druk op ✅ om %d sat te verzamelen van deze kraan van %s.
+inlineFaucetMessage                     = """Druk op ✅ om %s te verzamelen van deze kraan van %s.
 
-🚰 Remaining: %d/%d sat (given to %d/%d users)
+🚰 Remaining: %d/%s (given to %d/%d users)
 %s"""
-inlineFaucetEndedMessage                = """🚰 kraan leeg 🍺🏅 %d sat gegeven aan %d gebruikers."""
+inlineFaucetEndedMessage                = """🚰 kraan leeg 🍺🏅 %s gegeven aan %d gebruikers."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""
 inlineFaucetCreateWalletMessage         = """Chat met %s 👈 om uw wallet te beheren."""
 inlineFaucetCancelledMessage            = """🚫 kraan geannuleerd."""
 inlineFaucetInvalidPeruserAmountMessage = """🚫 Per gebruiker bedrag niet deelbaar van capaciteit."""
 inlineFaucetInvalidAmountMessage        = """🚫 Ongeldig bedrag."""
-inlineFaucetSentMessage                 = """🚰 %d sat gestuurd naar %s."""
-inlineFaucetReceivedMessage             = """🚰 %s stuurde je %d sat."""
+inlineFaucetSentMessage                 = """🚰 %s gestuurd naar %s."""
+inlineFaucetReceivedMessage             = """🚰 %s stuurde je %s."""
 inlineFaucetHelpFaucetInGroup           = """Maak een kraan in een groep met de bot erin of gebruik 👉 inline commando (/advanced voor meer)."""
 inlineFaucetHelpText                    = """📖 Oeps, dat werkte niet. %s
 
@@ -290,10 +290,10 @@ inlineFaucetHelpText                    = """📖 Oeps, dat werkte niet. %s
 
 inlineQuerySendTitle            = """💸 Stuur betaling naar een chat."""
 inlineQuerySendDescription      = """Gebruik: @%s send <bedrag> [<user>] [<memo>]"""
-inlineResultSendTitle           = """💸 Stuur %d sat."""
-inlineResultSendDescription     = """👉 Klik om %d sat naar deze chat te sturen."""
+inlineResultSendTitle           = """💸 Stuur %s."""
+inlineResultSendDescription     = """👉 Klik om %s naar deze chat te sturen."""
 
-inlineSendMessage              = """Druk op ✅ om de betaling van %s te ontvangen.\n💸 Bedrag: %d sat"""
+inlineSendMessage              = """Druk op ✅ om de betaling van %s te ontvangen.\n💸 Bedrag: %s"""
 inlineSendAppendMemo           = """\n✉️ %s"""
 inlineSendUpdateMessageAccept  = """💸 %d verzonden van %s naar %s."""
 inlineSendCreateWalletMessage  = """Chat met %s 👈 om uw wallet te beheren."""
@@ -306,12 +306,12 @@ inlineSendBalanceLowMessage    = """🚫 Uw saldo is te laag."""
 
 inlineQueryReceiveTitle        = """🏅 Vraag een betaling in een chat."""
 inlineQueryReceiveDescription  = """Gebruik: @%s receive <bedrag> [<user>] [<memo>]"""
-inlineResultReceiveTitle       = """🏅 Ontvang %d sat."""
-inlineResultReceiveDescription = """👉 Klik om een betaling van %d sat aan te vragen."""
+inlineResultReceiveTitle       = """🏅 Ontvang %s."""
+inlineResultReceiveDescription = """👉 Klik om een betaling van %s aan te vragen."""
 
-inlineReceiveMessage             = """Druk op 💸 om te betalen aan %s.\n💸 Bedrag: %d sat"""
+inlineReceiveMessage             = """Druk op 💸 om te betalen aan %s.\n💸 Bedrag: %s"""
 inlineReceiveAppendMemo          = """\n✉️ %s"""
-inlineReceiveUpdateMessageAccept = """💸 %d sat verstuurd van %s naar %s."""
+inlineReceiveUpdateMessageAccept = """💸 %s verstuurd van %s naar %s."""
 inlineReceiveCreateWalletMessage = """Chat met %s 👈 om uw wallet te beheren."""
 inlineReceiveYourselfMessage     = """📖 Je kunt niet aan jezelf betalen."""
 inlineReceiveFailedMessage       = """🚫 Ontvangst mislukt."""
@@ -320,7 +320,7 @@ inlineReceiveCancelledMessage    = """🚫 Ontvangen geannuleerd."""
 convertEnterAmountMessage = """Did you enter an amount?"""
 convertInvalidAmountMessage = """Did you enter a valid amount?"""
 convertPriceErrorMessage = """🚫 Couldn't fetch price."""
-convertResultMessage = """%.2f LKR is about %d sat."""
+convertResultMessage = """%.2f LKR is about %s."""
 
 # CONVERT SAT TO FIAT
-convertSatsResultMessage = """%d sat is about %s USD / %s LKR"""
+convertSatsResultMessage = """%s is about %s USD / %s LKR"""

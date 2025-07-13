@@ -128,7 +128,7 @@ advancedMessage = """%s
 */generate* 🎆 Generate DALLE-2 images: `/generate <prompt>`"""
 
 # GENERIC
-enterAmountRangeMessage        = """💯 Choisissez un montant entre %d et %d sat."""
+enterAmountRangeMessage        = """💯 Choisissez un montant entre %s et %s."""
 enterAmountMessage             = """💯 Choisissez un montant."""
 enterUserMessage               = """👤 Choisissez un utilisateur."""
 errorReasonMessage             = """🚫 Erreur: %s"""
@@ -143,7 +143,7 @@ startNoUsernameMessage    = """☝️ Vous n'avez pas encore de nom d'utilisateu
 
 # BALANCE
 
-balanceMessage      = """👑 *Votre solde:* %d sat(s). (%s USD / %s LKR)"""
+balanceMessage      = """👑 *Votre solde:* %s. (%s USD / %s LKR)"""
 balanceErrorMessage = """🚫 Impossible de récupérer votre solde. Essayez à nouveau."""
 
 # TIP
@@ -153,8 +153,8 @@ tipInviteGroupMessage = """ℹ️ Vous pouvez ajouter ce bot à n'importe quel g
 tipEnterAmountMessage = """Avez-vous choisi un montant ?"""
 tipValidAmountMessage = """Avez-vous choisi un montant correct ?"""
 tipYourselfMessage    = """📖 Vous ne pouvez pas vous envoyer de pourboire."""
-tipSentMessage        = """💸 %d sat envoyé à %s."""
-tipReceivedMessage    = """🏅 %s vous a envoyé un pourboire de %d sat."""
+tipSentMessage        = """💸 %s envoyé à %s."""
+tipReceivedMessage    = """🏅 %s vous a envoyé un pourboire de %s."""
 tipErrorMessage       = """🚫 Erreur lors de l'envoi."""
 tipUndefinedErrorMsg  = """réessayez s'il vous plaît."""
 tipHelpText           = """📖 Oops, cela n'a pas fonctionné. %s
@@ -166,11 +166,11 @@ tipHelpText           = """📖 Oops, cela n'a pas fonctionné. %s
 
 sendValidAmountMessage     = """Avez-vous choisi un montant correct ?"""
 sendUserHasNoWalletMessage = """🚫 L'utilisateur %s n'a pas encore crée de wallet."""
-sendSentMessage            = """💸 %d sat envoyé à %s."""
-sendPublicSentMessage      = """💸 %d sat envoyé de %s à %s."""
-sendReceivedMessage        = """🏅 %s vous a envoyé %d sat."""
+sendSentMessage            = """💸 %s envoyé à %s."""
+sendPublicSentMessage      = """💸 %s envoyé de %s à %s."""
+sendReceivedMessage        = """🏅 %s vous a envoyé %s."""
 sendErrorMessage           = """🚫 Erreur lors de l'envoi."""
-confirmSendMessage         = """Voulez-vous envoyer à %s?\n\n💸 Montant : %d sat"""
+confirmSendMessage         = """Voulez-vous envoyer à %s?\n\n💸 Montant : %s"""
 confirmSendAppendMemo      = """\n✉️ %s"""
 sendCancelledMessage       = """🚫 Envoi annulé."""
 errorTryLaterMessage       = """🚫 Erreur. Merci de réésayer."""
@@ -183,8 +183,8 @@ sendHelpText               = """📖 Oops, cela n'a pas fonctionné. %s
 
 # INVOICE
 
-invoiceReceivedMessage    = """⚡️ Vous avez reçu %d sat."""
-invoiceReceivedCurrencyMessage    = """⚡️ Vous avez reçu %d sat (%s %s)."""
+invoiceReceivedMessage    = """⚡️ Vous avez reçu %s."""
+invoiceReceivedCurrencyMessage    = """⚡️ Vous avez reçu %s (%s %s)."""
 invoiceEnterAmountMessage = """Avez-vous choisi un montant ?"""
 invoiceValidAmountMessage = """Avez-vous choisi un montant correct ?"""
 invoiceHelpText           = """📖 Oops, cela n'a pas fonctionné. %s
@@ -199,11 +199,11 @@ invoicePaidMessage          = """⚡️ Paiement envoyé."""
 invoicePublicPaidMessage    = """⚡️ Paiement envoyé par %s."""
 invalidInvoiceHelpMessage    = """Avez-vous ajouté un Lightning invoice valide ? Essayez /send pour envoyer à un utilisateur Telegram ou à une adresse Lightning."""
 invoiceNoAmountMessage       = """🚫 Vous ne pouvez pas payer une facture sans montant."""
-insufficientFundsMessage     = """🚫 Fonds insuffisants. Vous avez %d sat et vous avez besoin d'un minimum de %d sat."""
+insufficientFundsMessage     = """🚫 Fonds insuffisants. Vous avez %s et vous avez besoin d'un minimum de %s."""
 feeReserveMessage            = """⚠️ Envoyer tous vos fonds peut ne pas fonctionner en raison de la nécessité de payer des frais de réseau. Si cela échoue, essayez d'envoyer un peu moins."""
 invoicePaymentFailedMessage  = """🚫 Le paiement a échoué : %s"""
 invoiceUndefinedErrorMessage = """Impossible de payer la facture."""
-confirmPayInvoiceMessage     = """Voulez-vous envoyer ce paiement ?\n\n💸 Montant: %d sat"""
+confirmPayInvoiceMessage     = """Voulez-vous envoyer ce paiement ?\n\n💸 Montant: %s"""
 confirmPayAppendMemo         = """\n✉️ %s"""
 payHelpText                  = """📖 Oops, cela n'a pas fonctionné. %s
 
@@ -236,7 +236,7 @@ lnurlResolvingUrlMessage       = """🧮 Recherche de l'adresse..."""
 lnurlGettingUserMessage        = """🧮 Préparation du paiement..."""
 lnurlPaymentFailed             = """🚫 Echec du paiement : %s"""
 lnurlInvalidAmountMessage      = """🚫 Montant incorrect."""
-lnurlInvalidAmountRangeMessage = """🚫 Le montant doit être entre %d et %d sat."""
+lnurlInvalidAmountRangeMessage = """🚫 Le montant doit être entre %s et %s."""
 lnurlNoUsernameMessage         = """🚫 Vous devez avoir un nom d'utilisateur Telegram pour recevoir un paiement via LNURL."""
 lnurlHelpText                  = """📖 Oops, cela n'a pas fonctionné. %s
 
@@ -257,21 +257,21 @@ couldNotLinkMessage = """🚫 Impossible de lier votre wallet. Merci de réésay
 
 inlineQueryFaucetTitle        = """🚰 Création d'un faucet."""
 inlineQueryFaucetDescription  = """Usage: @%s faucet <capacité> <par_utilisateur>"""
-inlineResultFaucetTitle       = """🚰 Création d'un %d sat faucet."""
+inlineResultFaucetTitle       = """🚰 Création d'un %s faucet."""
 inlineResultFaucetDescription = """👉 Appuyez ici pour créer un faucet dans ce chat."""
 
-inlineFaucetMessage                     = """Appuyez sur ✅ pour collecter %d sat de ce faucet de %s.
+inlineFaucetMessage                     = """Appuyez sur ✅ pour collecter %s de ce faucet de %s.
 
-🚰 Restant: %d/%d sat (envoyé à %d/%d utilisateurs)
+🚰 Restant: %d/%s (envoyé à %d/%d utilisateurs)
 %s"""
-inlineFaucetEndedMessage                = """🚰 Faucet vide 🍺\n\n🏅 %d sat envoyé à %d utilisateurs."""
+inlineFaucetEndedMessage                = """🚰 Faucet vide 🍺\n\n🏅 %s envoyé à %d utilisateurs."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""
 inlineFaucetCreateWalletMessage         = """Chat avec %s 👈 pour gérer votre wallet."""
 inlineFaucetCancelledMessage            = """🚫 Faucet annulé."""
 inlineFaucetInvalidPeruserAmountMessage = """🚫 Le montant de l'utilisateur n'est pas suffisament divisdable."""
 inlineFaucetInvalidAmountMessage        = """🚫 Montant incorrect."""
-inlineFaucetSentMessage                 = """🚰 %d sat envoyé à %s."""
-inlineFaucetReceivedMessage             = """🚰 %s vous a envoyé %d sat."""
+inlineFaucetSentMessage                 = """🚰 %s envoyé à %s."""
+inlineFaucetReceivedMessage             = """🚰 %s vous a envoyé %s."""
 inlineFaucetHelpFaucetInGroup           = """Créez un faucet dans un groupe avec le bot ou utilisez 👉 les commandes (/advanced pour plus)."""
 inlineFaucetHelpText                    = """📖 Oops, cela n'a pas fonctionné. %s
 
@@ -282,12 +282,12 @@ inlineFaucetHelpText                    = """📖 Oops, cela n'a pas fonctionné
 
 inlineQuerySendTitle            = """💸 Envoyez des paiements dans un chat."""
 inlineQuerySendDescription      = """Usage: @%s send <montant> [<utilisateur>] [<memo>]"""
-inlineResultSendTitle           = """💸 Envoyé %d sat."""
-inlineResultSendDescription     = """👉 Clique pour envoyer %d sat sur ce chat."""
+inlineResultSendTitle           = """💸 Envoyé %s."""
+inlineResultSendDescription     = """👉 Clique pour envoyer %s sur ce chat."""
 
-inlineSendMessage              = """Appuyez sur ✅ pour recevoir le paiement de %s.\n\n💸 Montant: %d sat"""
+inlineSendMessage              = """Appuyez sur ✅ pour recevoir le paiement de %s.\n\n💸 Montant: %s"""
 inlineSendAppendMemo           = """\n✉️ %s"""
-inlineSendUpdateMessageAccept  = """💸 %d sat sent from %s to %s."""
+inlineSendUpdateMessageAccept  = """💸 %s sent from %s to %s."""
 inlineSendCreateWalletMessage  = """Chat avec %s 👈 pour gérer votre wallet."""
 sendYourselfMessage            = """📖 Vous ne pouvez pas vous envoyer de pourboires."""
 inlineSendFailedMessage        = """🚫 Echec de l'envoi."""
@@ -298,12 +298,12 @@ inlineSendBalanceLowMessage    = """🚫 Votre solde est trop bas."""
 
 inlineQueryReceiveTitle        = """🏅 Demander un paiement dans un chat."""
 inlineQueryReceiveDescription  = """Usage: @%s receive <montant> [<utilisateur>] [<memo>]"""
-inlineResultReceiveTitle       = """🏅 Recevoir %d sat."""
-inlineResultReceiveDescription = """👉 Cliquez ici pour recevoir un paiement de %d sat."""
+inlineResultReceiveTitle       = """🏅 Recevoir %s."""
+inlineResultReceiveDescription = """👉 Cliquez ici pour recevoir un paiement de %s."""
 
-inlineReceiveMessage             = """Appuyez sur 💸 pour payer %s.\n\n💸 Montant: %d sat"""
+inlineReceiveMessage             = """Appuyez sur 💸 pour payer %s.\n\n💸 Montant: %s"""
 inlineReceiveAppendMemo          = """\n✉️ %s"""
-inlineReceiveUpdateMessageAccept = """💸 %d sat envoyé de %s à %s."""
+inlineReceiveUpdateMessageAccept = """💸 %s envoyé de %s à %s."""
 inlineReceiveCreateWalletMessage = """Chat avec %s 👈 pour gérer votre wallet."""
 inlineReceiveYourselfMessage     = """📖 Vous ne pouvez pas vous envoyer de pourboires."""
 inlineReceiveFailedMessage       = """🚫 La réception a échoué."""
@@ -312,4 +312,4 @@ inlineReceiveCancelledMessage    = """🚫 Réception annulée."""
 convertEnterAmountMessage = """Avez-vous saisi un montant ?"""
 convertInvalidAmountMessage = """Avez-vous saisi un montant valide ?"""
 convertPriceErrorMessage = """🚫 Impossible de récupérer le prix."""
-convertResultMessage = """%.2f LKR équivaut à environ %d sat."""
+convertResultMessage = """%.2f LKR équivaut à environ %s."""
