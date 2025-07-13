@@ -133,7 +133,7 @@ advancedMessage = """%s
 */generate* 🎆 Generuj obrazy przy użyciu DALLE-2: `/generate <podpowiedź>`"""
 
 # GENERIC
-enterAmountRangeMessage        = """💯 Wprowadź kwotę między %d a %s."""
+enterAmountRangeMessage        = """💯 Wprowadź kwotę między %s a %s."""
 enterAmountMessage             = """💯 Wprowadź kwotę."""
 enterUserMessage               = """👤 Podaj użytkownika."""
 enterTextMessage               = """⌨️ Wprowadź tekst."""

@@ -130,7 +130,7 @@ advancedMessage = """%s
 */chat* 💬 Chatte mit GPT: `/chat <nachricht>`"""
 
 # GENERIC
-enterAmountRangeMessage        = """💯 Gebe Betrag zwuschen %d und %s ein."""
+enterAmountRangeMessage        = """💯 Gebe Betrag zwuschen %s und %s ein."""
 enterAmountMessage             = """💯 Gebe Betrag ein."""
 enterUserMessage               = """👤 Gebe Benutzernamen ein."""
 errorReasonMessage             = """🚫 Fehler: %s"""

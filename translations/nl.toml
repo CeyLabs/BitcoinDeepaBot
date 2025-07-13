@@ -128,7 +128,7 @@ advancedMessage = """%s
 */generate* 🎆 Generate DALLE-2 images: `/generate <prompt>`"""
 
 # GENERIC
-enterAmountRangeMessage        = """💯 Voer een bedrag in tussen %d en %s."""
+enterAmountRangeMessage        = """💯 Voer een bedrag in tussen %s en %s."""
 enterAmountMessage             = """💯 Voer een bedrag."""
 enterUserMessage               = """👤 Voer een gebruiker."""
 errorReasonMessage             = """🚫 Fout: %s"""

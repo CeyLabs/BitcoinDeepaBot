@@ -127,7 +127,7 @@ advancedMessage = """%s
 */shop* 🛍 Browse shops: `/shop` or `/shop <user/shop_id>`"""
 
 # GENERIC
-enterAmountRangeMessage        = """💯 %d ve %s arasında bir miktar gir."""
+enterAmountRangeMessage        = """💯 %s ve %s arasında bir miktar gir."""
 enterAmountMessage             = """💯 Bir miktar gir."""
 enterUserMessage               = """👤 Bir kullanıcı gir."""
 errorReasonMessage             = """🚫 Hata: %s"""

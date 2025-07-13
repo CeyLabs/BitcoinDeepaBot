@@ -131,7 +131,7 @@ advancedMessage = """%s
 */shop* 🛍 Browse shops: `/shop` or `/shop <user/shop_id>`"""
 
 # GENERIC
-enterAmountRangeMessage        = """💯 Введите количество между %d и %s."""
+enterAmountRangeMessage        = """💯 Введите количество между %s и %s."""
 enterAmountMessage             = """💯 Введите количество."""
 enterUserMessage               = """👤 введите пользователя."""
 errorReasonMessage             = """🚫 Ошибка: %s"""

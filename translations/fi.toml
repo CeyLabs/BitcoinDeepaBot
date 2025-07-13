@@ -132,7 +132,7 @@ advancedMessage = """%s
 */generate* 🎆 Luo DALLE-2 kuvia: `/generate <prompt>`"""
 
 # GENERIC
-enterAmountRangeMessage        = """💯 Syötä määrä %d ja %s väliltä."""
+enterAmountRangeMessage        = """💯 Syötä määrä %s ja %s väliltä."""
 enterAmountMessage             = """💯 Syötä määrä."""
 enterUserMessage               = """👤 Syötä käyttäjä."""
 enterTextMessage               = """⌨️ Syötä teksti."""
