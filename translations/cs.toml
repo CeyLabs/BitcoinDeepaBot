@@ -242,7 +242,7 @@ lnurlResolvingUrlMessage       = """🧮 Zpracovávám adresu..."""
 lnurlGettingUserMessage        = """🧮 Připravuji platbu..."""
 lnurlPaymentFailed             = """🚫 Platba selhala: %s"""
 lnurlInvalidAmountMessage      = """🚫 Neplatná částka."""
-lnurlInvalidAmountRangeMessage = """🚫 Částka musí být mezi %d a %s."""
+lnurlInvalidAmountRangeMessage = """🚫 Částka musí být mezi %s a %s."""
 lnurlNoUsernameMessage         = """🚫 Pro příjem plateb pomocí LNURL potřebuješ na Telegramu uživatelské jméno."""
 lnurlHelpText                  = """📖 Ou, tohle se nezdařilo. %s
 

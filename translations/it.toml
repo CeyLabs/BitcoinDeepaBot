@@ -236,7 +236,7 @@ lnurlResolvingUrlMessage       = """🧮 Recupero indirizzo..."""
 lnurlGettingUserMessage        = """🧮 Preparazione pagamento..."""
 lnurlPaymentFailed             = """🚫 Pagamento non riuscito: %s"""
 lnurlInvalidAmountMessage      = """🚫 Ammontare non valido."""
-lnurlInvalidAmountRangeMessage = """🚫 L'ammontare deve essere compreso tra %d e %s."""
+lnurlInvalidAmountRangeMessage = """🚫 L'ammontare deve essere compreso tra %s e %s."""
 lnurlNoUsernameMessage         = """🚫 Devi impostare un nome utente Telegram per ricevere pagamenti tramite un LNURL."""
 lnurlHelpText                  = """📖 Ops, non ha funzionato. %s
 

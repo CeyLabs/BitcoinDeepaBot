@@ -242,7 +242,7 @@ lnurlResolvingUrlMessage       = """🧮 Selvitetään osoitetta..."""
 lnurlGettingUserMessage        = """🧮 Valmistellaan maksua..."""
 lnurlPaymentFailed             = """🚫 Maksu epäonnistui: %s"""
 lnurlInvalidAmountMessage      = """🚫 Virheellinen määrä."""
-lnurlInvalidAmountRangeMessage = """🚫 Määrän tulee olla %d ja %s väliltä."""
+lnurlInvalidAmountRangeMessage = """🚫 Määrän tulee olla %s ja %s väliltä."""
 lnurlNoUsernameMessage         = """🚫 LNURL:in avulla maksujen vastaanotto edellyttää että, sinulla on Telegram-käyttäjätunnus määriteltynä."""
 lnurlHelpText                  = """📖 Hups, sepä ei toiminutkaan. %s
 
