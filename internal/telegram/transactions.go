@@ -53,7 +53,7 @@ func (txlist *TransactionsList) printTransactions(ctx intercept.Context) string 
 		}
 		timestr := time.Unix(int64(p.Time), 0).UTC().Format("2 Jan 06 15:04")
 		txstr += fmt.Sprintf("` %s`", timestr)
-		txstr += fmt.Sprintf("` %s sat`", utils.FormatSats(p.Amount/1000))
+		txstr += fmt.Sprintf("` %s sat`", utils.FormatSats(p.Amount/1000, true))
 		// if p.Fee > 0 {
 		fee := p.Fee
 		if fee < 1000 {

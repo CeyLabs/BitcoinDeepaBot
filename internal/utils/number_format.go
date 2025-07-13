@@ -33,18 +33,25 @@ func FormatFloatWithCommas(value float64) string {
 }
 
 // FormatSats formats an integer satoshi value with thousands separators.
-func FormatSats(amount int64) string {
-	negative := amount < 0
-	if negative {
-		amount = -amount
+// If withPlus is true, a "+" sign is added for positive amounts.
+func FormatSats(amount int64, withPlus ...bool) string {
+	showPlus := false
+	if len(withPlus) > 0 {
+		showPlus = withPlus[0]
 	}
+
+	sign := ""
+	if amount < 0 {
+		sign = "-"
+		amount = -amount
+	} else if showPlus && amount > 0 {
+		sign = "+"
+	}
+
 	s := strconv.FormatInt(amount, 10)
 	n := len(s)
 	for i := n - 3; i > 0; i -= 3 {
 		s = s[:i] + "," + s[i:]
 	}
-	if negative {
-		s = "-" + s
-	}
-	return s
+	return sign + s
 }
