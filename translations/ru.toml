@@ -131,7 +131,7 @@ advancedMessage = """%s
 */shop* 🛍 Browse shops: `/shop` or `/shop <user/shop_id>`"""
 
 # GENERIC
-enterAmountRangeMessage        = """💯 Введите количество между %d и %d sat."""
+enterAmountRangeMessage        = """💯 Введите количество между %d и %s."""
 enterAmountMessage             = """💯 Введите количество."""
 enterUserMessage               = """👤 введите пользователя."""
 errorReasonMessage             = """🚫 Ошибка: %s"""
@@ -146,7 +146,7 @@ startNoUsernameMessage    = """☝️ Похоже, что у вас еще не
 
 # BALANCE
 
-balanceMessage      = """👑 *Ваш баланс:* %d sat(s). (%s USD / %s LKR)"""
+balanceMessage      = """👑 *Ваш баланс:* %s. (%s USD / %s LKR)"""
 balanceErrorMessage = """🚫 Не удалось получить ваш баланс. Пожалуйста, повторите попытку позже."""
 
 # TIP
@@ -156,8 +156,8 @@ tipInviteGroupMessage = """ℹ️ Кстати, вы можете приглас
 tipEnterAmountMessage = """Ввели ли вы сумму?"""
 tipValidAmountMessage = """Ввели ли вы правильную сумму?"""
 tipYourselfMessage    = """📖 Вы не можете отправлять самому себе."""
-tipSentMessage        = """💸 %d sat отправлено %s."""
-tipReceivedMessage    = """🏅 %s отправил(а) вам %d sat."""
+tipSentMessage        = """💸 %s отправлено %s."""
+tipReceivedMessage    = """🏅 %s отправил(а) вам %s."""
 tipErrorMessage       = """🚫 Отправка не удалась."""
 tipUndefinedErrorMsg  = """пожалуйста попробуйте позжа."""
 tipHelpText           = """📖 Упс, это не сработало. %s
@@ -169,11 +169,11 @@ tipHelpText           = """📖 Упс, это не сработало. %s
 
 sendValidAmountMessage     = """Ввели ли вы правильную сумму?"""
 sendUserHasNoWalletMessage = """🚫 Пользователь %s не создал кошелёк."""
-sendSentMessage            = """💸 %d sat отправлено %s."""
-sendPublicSentMessage      = """💸 %d sat отправил(а) %s для %s."""
-sendReceivedMessage        = """🏅 %s отправил(а) вам %d sat."""
+sendSentMessage            = """💸 %s отправлено %s."""
+sendPublicSentMessage      = """💸 %s отправил(а) %s для %s."""
+sendReceivedMessage        = """🏅 %s отправил(а) вам %s."""
 sendErrorMessage           = """🚫 Неуспешная отправка."""
-confirmSendMessage         = """Вы хотите отправить Сатоши %s?\n\n💸 Amount: %d sat"""
+confirmSendMessage         = """Вы хотите отправить Сатоши %s?\n\n💸 Amount: %s"""
 confirmSendAppendMemo      = """\n✉️ %s"""
 sendCancelledMessage       = """🚫 Отправка отменена."""
 errorTryLaterMessage       = """🚫 Ошибка. Пожалуйста попробуйте позже."""
@@ -186,8 +186,8 @@ sendHelpText               = """📖 Упс, это не сработало. %s
 
 # INVOICE
 
-invoiceReceivedMessage    = """⚡️ Вы получили %d sat."""
-invoiceReceivedCurrencyMessage    = """⚡️ Вы получили %d sat (%s %s)."""
+invoiceReceivedMessage    = """⚡️ Вы получили %s."""
+invoiceReceivedCurrencyMessage    = """⚡️ Вы получили %s (%s %s)."""
 invoiceEnterAmountMessage = """Ввели ли вы сумму?"""
 invoiceValidAmountMessage = """Ввели ли вы правильную сумму?"""
 invoiceHelpText           = """📖 Упс, это не сработало. %s
@@ -202,11 +202,11 @@ invoicePaidMessage          = """⚡️ Платёж отправлен."""
 invoicePublicPaidMessage    = """⚡️ %s отправил(а) платёж."""
 invalidInvoiceHelpMessage    = """Вы ввели существующий счет в Lightning? Попробуйте /send, если вы хотите отправить пользователю Telegram или по адресу Lightning."""
 invoiceNoAmountMessage       = """🚫 Невозможно оплатить инвойс без указания суммы."""
-insufficientFundsMessage     = """🚫 Недостаточно средств. У вас есть %d sat, но вам нужно не менее %d sat."""
+insufficientFundsMessage     = """🚫 Недостаточно средств. У вас есть %s, но вам нужно не менее %s."""
 feeReserveMessage            = """⚠️ Отправка всего вашего баланса может провалиться из-за сетевых сборов. Если это не удается, попробуйте отправить немного меньше."""
 invoicePaymentFailedMessage  = """🚫 Платёж не прошёл: %s"""
 invoiceUndefinedErrorMessage = """Невозможно оплатить счёт."""
-confirmPayInvoiceMessage     = """Хотите ли вы отправить этот платеж?\n\n💸 Amount: %d sat"""
+confirmPayInvoiceMessage     = """Хотите ли вы отправить этот платеж?\n\n💸 Amount: %s"""
 confirmPayAppendMemo         = """\n✉️ %s"""
 payHelpText                  = """📖 Упс, это не сработало. %s
 
@@ -239,7 +239,7 @@ lnurlResolvingUrlMessage       = """🧮 Уточнение адреса..."""
 lnurlGettingUserMessage        = """🧮 Подготовка платежа..."""
 lnurlPaymentFailed             = """🚫 Платеж не прошел: %s"""
 lnurlInvalidAmountMessage      = """🚫 Неверная сумма."""
-lnurlInvalidAmountRangeMessage = """🚫 Сумма должна быть от %d до %d sat."""
+lnurlInvalidAmountRangeMessage = """🚫 Сумма должна быть от %d до %s."""
 lnurlNoUsernameMessage         = """🚫 Вам нужно установить имя пользователя Telegram для получения платежей через LNURL."""
 lnurlHelpText                  = """📖 Упс, это не сработало. %s
 
@@ -268,21 +268,21 @@ couldNotLinkMessage = """🚫 Не удалось связать ваш коше
 
 inlineQueryFaucetTitle        = """🚰 Создать криптораздачу."""
 inlineQueryFaucetDescription  = """Использование: @%s faucet <capacity> <per_user>"""
-inlineResultFaucetTitle       = """🚰 Создать %d sat криптораздачу."""
+inlineResultFaucetTitle       = """🚰 Создать %s криптораздачу."""
 inlineResultFaucetDescription = """👉 Нажмите здесь, чтобы создать криптораздачу в этом чате."""
 
-inlineFaucetMessage                     = """Нажмите ✅, чтобы забрать %d sat из этой криптораздачи от %s.
+inlineFaucetMessage                     = """Нажмите ✅, чтобы забрать %s из этой криптораздачи от %s.
 
-🚰 Осталось: %d/%d sat (отдано %d/%d пользователям)
+🚰 Осталось: %d/%s (отдано %d/%d пользователям)
 %s"""
-inlineFaucetEndedMessage                = """🚰 Криптораздача завершена 🍺\n\n🏅 %d sat отдано %d пользователям."""
+inlineFaucetEndedMessage                = """🚰 Криптораздача завершена 🍺\n\n🏅 %s отдано %d пользователям."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""
 inlineFaucetCreateWalletMessage         = """Напишите %s 👈 чтобы управлять своим кошельком."""
 inlineFaucetCancelledMessage            = """🚫 Криптораздача отменена."""
 inlineFaucetInvalidPeruserAmountMessage = """🚫 Количество пользователей не является делителем емкости."""
 inlineFaucetInvalidAmountMessage        = """🚫 Неверное количество."""
-inlineFaucetSentMessage                 = """🚰 %d sat отправлено %s."""
-inlineFaucetReceivedMessage             = """🚰 %s отправил вам %d sat."""
+inlineFaucetSentMessage                 = """🚰 %s отправлено %s."""
+inlineFaucetReceivedMessage             = """🚰 %s отправил вам %s."""
 inlineFaucetHelpFaucetInGroup           = """Создайте криптораздачу в группе с ботом внутри или используйте 👉 команду (/advanced для справки)."""
 inlineFaucetHelpText                    = """📖 Упс, это не сработало. %s
 
@@ -293,12 +293,12 @@ inlineFaucetHelpText                    = """📖 Упс, это не срабо
 
 inlineQuerySendTitle            = """💸  Отправьте платеж в чат."""
 inlineQuerySendDescription      = """Использование: @%s send <количество> [<пользователь>] [<memo>]"""
-inlineResultSendTitle           = """💸 Отправить %d sat."""
+inlineResultSendTitle           = """💸 Отправить %s."""
 inlineResultSendDescription     = """👉 Нажмите, чтобы отправить %d сат в этот чат."""
 
-inlineSendMessage              = """Нажмите ✅ для получения платежа от %s.\n\n💸 Сумма: %d sat"""
+inlineSendMessage              = """Нажмите ✅ для получения платежа от %s.\n\n💸 Сумма: %s"""
 inlineSendAppendMemo           = """\n✉️ %s"""
-inlineSendUpdateMessageAccept  = """💸 %d sat отправлено с %s на %s."""
+inlineSendUpdateMessageAccept  = """💸 %s отправлено с %s на %s."""
 inlineSendCreateWalletMessage  = """Напишите %s 👈 чтобы управлять своим кошельком."""
 sendYourselfMessage            = """📖 Вы не можете платить себе."""
 inlineSendFailedMessage        = """🚫 Отправка не удалась."""
@@ -309,12 +309,12 @@ inlineSendBalanceLowMessage    = """🚫 Ваш баланс слишком ни
 
 inlineQueryReceiveTitle        = """🏅 Запросить платёж в чате."""
 inlineQueryReceiveDescription  = """Использование: @%s receive <количество> [<пользователь>] [<memo>]"""
-inlineResultReceiveTitle       = """🏅 Получить %d sat."""
-inlineResultReceiveDescription = """👉 Нажмите, чтобы запросить выплату в размере %d sat."""
+inlineResultReceiveTitle       = """🏅 Получить %s."""
+inlineResultReceiveDescription = """👉 Нажмите, чтобы запросить выплату в размере %s."""
 
-inlineReceiveMessage             = """Нажмите 💸 чтобы отправить Сатоши %s.\n\n💸 Количество: %d sat"""
+inlineReceiveMessage             = """Нажмите 💸 чтобы отправить Сатоши %s.\n\n💸 Количество: %s"""
 inlineReceiveAppendMemo          = """\n✉️ %s"""
-inlineReceiveUpdateMessageAccept = """💸 %d sat отправлено от %s, получатель - %s."""
+inlineReceiveUpdateMessageAccept = """💸 %s отправлено от %s, получатель - %s."""
 inlineReceiveCreateWalletMessage = """Напишите %s 👈 чтобы управлять своим кошельком."""
 inlineReceiveYourselfMessage     = """📖 Вы не можете платить себе."""
 inlineReceiveFailedMessage       = """🚫 Получение не удалось."""
@@ -324,20 +324,20 @@ inlineReceiveCancelledMessage    = """🚫 Получение отменено."
 
 inlineQueryTipjarTitle        = """🍯 Создать копилку."""
 inlineQueryTipjarDescription  = """Использование: @%s tipjar <ёмкость> <на_пользователя>"""
-inlineResultTipjarTitle       = """🍯 Создать копилку на %d sat ."""
+inlineResultTipjarTitle       = """🍯 Создать копилку на %s ."""
 inlineResultTipjarDescription = """👉 Нажмите здесь, чтобы создать копилку в этом чате."""
 
-inlineTipjarMessage                     = """Нажмите 💸 чтобы *отправить %d sat* в эту копилку, созданную %s.
+inlineTipjarMessage                     = """Нажмите 💸 чтобы *отправить %s* в эту копилку, созданную %s.
 
-🙏 Накоплено: *%d*/%d sat (от %d пользователей)
+🙏 Накоплено: *%d*/%s (от %d пользователей)
 %s"""
-inlineTipjarEndedMessage                = """🍯 %s's копилка заполнена ⭐️\n\n🏅 %d sat отправи(л/ли) %d пользовате(ль/ли)."""
+inlineTipjarEndedMessage                = """🍯 %s's копилка заполнена ⭐️\n\n🏅 %s отправи(л/ли) %d пользовате(ль/ли)."""
 inlineTipjarAppendMemo                  = """\n✉️ %s"""
 inlineTipjarCancelledMessage            = """🚫 Копилка отозвана."""
 inlineTipjarInvalidPeruserAmountMessage = """🚫 Количество пользователей не является делителем емкости."""
 inlineTipjarInvalidAmountMessage        = """🚫 Отправка не удалась."""
-inlineTipjarSentMessage                 = """🍯 %d sat отправлено в пользу %s."""
-inlineTipjarReceivedMessage             = """🍯 %s отправил вам %d sat."""
+inlineTipjarSentMessage                 = """🍯 %s отправлено в пользу %s."""
+inlineTipjarReceivedMessage             = """🍯 %s отправил вам %s."""
 inlineTipjarHelpTipjarInGroup           = """Создайте копилку в группе с ботом внутри или используйте 👉 команду (/advanced для справки)."""
 inlineTipjarHelpText                    = """📖 Oops, that didn't work. %s
 
@@ -347,4 +347,4 @@ inlineTipjarHelpText                    = """📖 Oops, that didn't work. %s
 convertEnterAmountMessage = """Did you enter an amount?"""
 convertInvalidAmountMessage = """Did you enter a valid amount?"""
 convertPriceErrorMessage = """🚫 Couldn't fetch price."""
-convertResultMessage = """%.2f LKR is about %d sat."""
+convertResultMessage = """%.2f LKR is about %s."""

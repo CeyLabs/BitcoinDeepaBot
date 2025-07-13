@@ -32,7 +32,7 @@ func FormatFloatWithCommas(value float64) string {
 	return intPart
 }
 
-// FormatSats formats an integer satoshi value with thousands separators.
+// FormatSats formats an integer satoshi value with thousands separators and includes "sat" or "sats".
 // If withPlus is true, a "+" sign is added for positive amounts.
 func FormatSats(amount int64, withPlus ...bool) string {
 	showPlus := false
@@ -53,5 +53,12 @@ func FormatSats(amount int64, withPlus ...bool) string {
 	for i := n - 3; i > 0; i -= 3 {
 		s = s[:i] + "," + s[i:]
 	}
-	return sign + s
+
+	// Add "sat" or "sats" based on the absolute value
+	unit := " sat"
+	if amount != 1 {
+		unit = " sats"
+	}
+
+	return sign + s + unit
 }

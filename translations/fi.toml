@@ -132,7 +132,7 @@ advancedMessage = """%s
 */generate* 🎆 Luo DALLE-2 kuvia: `/generate <prompt>`"""
 
 # GENERIC
-enterAmountRangeMessage        = """💯 Syötä määrä %d ja %d sat väliltä."""
+enterAmountRangeMessage        = """💯 Syötä määrä %d ja %s väliltä."""
 enterAmountMessage             = """💯 Syötä määrä."""
 enterUserMessage               = """👤 Syötä käyttäjä."""
 enterTextMessage               = """⌨️ Syötä teksti."""
@@ -148,7 +148,7 @@ startNoUsernameMessage    = """☝️ Näyttäisi että sinulla ei ole vielä Te
 
 # BALANCE
 
-balanceMessage      = """👑 *Saldosi on:* %d sat(s). (%s USD / %s LKR)"""
+balanceMessage      = """👑 *Saldosi on:* %s. (%s USD / %s LKR)"""
 balanceErrorMessage = """🚫 Saldosi hakeminen epäonnistui. Yritä myöhemmin uudelleen."""
 
 # TIP
@@ -158,8 +158,8 @@ tipInviteGroupMessage = """ℹ️ Muuten, voit kutsua tämän botin mihin tahans
 tipEnterAmountMessage = """Syötithän määrän?"""
 tipValidAmountMessage = """Syötithän määrän oikein?"""
 tipYourselfMessage    = """📖 Et voi lähettää tippiä itsellesi."""
-tipSentMessage        = """💸 %d sat läheteettiin %s:lle."""
-tipReceivedMessage    = """🏅 %s lähetti sinulle %d sat tipin."""
+tipSentMessage        = """💸 %s läheteettiin %s:lle."""
+tipReceivedMessage    = """🏅 %s lähetti sinulle %s tipin."""
 tipErrorMessage       = """🚫 Tippi epäonnistui."""
 tipUndefinedErrorMsg  = """yritä myöhemmin uudelleen."""
 tipHelpText           = """📖 Hups, sepä ei toiminutkaan. %s
@@ -171,11 +171,11 @@ tipHelpText           = """📖 Hups, sepä ei toiminutkaan. %s
 
 sendValidAmountMessage     = """Syötithän määrän oikein?"""
 sendUserHasNoWalletMessage = """🚫 Käyttäjällä %s ei ole lompakkoa."""
-sendSentMessage            = """💸 %d sat lähetettiin %s:lle."""
-sendPublicSentMessage      = """💸 %d sat lähetettiin %s:ltä to %s:lle."""
-sendReceivedMessage        = """🏅 %s lähetti sinulle %d sat."""
+sendSentMessage            = """💸 %s lähetettiin %s:lle."""
+sendPublicSentMessage      = """💸 %s lähetettiin %s:ltä to %s:lle."""
+sendReceivedMessage        = """🏅 %s lähetti sinulle %s."""
 sendErrorMessage           = """🚫 Lähetys epäonnistu."""
-confirmSendMessage         = """Haluatko lähettää vastaanottajalle %s?\n\n💸 Määrä: %d sat"""
+confirmSendMessage         = """Haluatko lähettää vastaanottajalle %s?\n\n💸 Määrä: %s"""
 confirmSendAppendMemo      = """\n✉️ %s"""
 sendCancelledMessage       = """🚫 Lähetys peruutettu."""
 errorTryLaterMessage       = """🚫 Virhe. Yritä myöhemmin uudelleen."""
@@ -188,8 +188,8 @@ sendHelpText               = """📖 Hups, sepä ei toiminutkaan. %s
 
 # INVOICE
 
-invoiceReceivedMessage    = """⚡️ Vastaanotit %d sat."""
-invoiceReceivedCurrencyMessage    = """⚡️ Vastaanotit %d sat (%s %s)."""
+invoiceReceivedMessage    = """⚡️ Vastaanotit %s."""
+invoiceReceivedCurrencyMessage    = """⚡️ Vastaanotit %s (%s %s)."""
 invoiceEnterAmountMessage = """Syötithän määrän?"""
 invoiceValidAmountMessage = """Syötithän määrän oikein?"""
 invoiceHelpText           = """📖 Hups, sepä ei toiminutkaan. %s
@@ -205,11 +205,11 @@ invoicePaidMessage          = """⚡️ Maksu lähetettiin."""
 invoicePublicPaidMessage    = """⚡️ Maksun lähetti %s."""
 invalidInvoiceHelpMessage    = """Syötithän Lightning-laskun oikein? Käytä /send -komentoa jos haluat lähettää Telegram-käyttäjälle tai Lightning Address -osoitteeseen."""
 invoiceNoAmountMessage       = """🚫 Laskua ei voi maksaa ilman määrää."""
-insufficientFundsMessage     = """🚫 Varat eivät riitä. Sinulla on %d sat mutta tarvitset vähintään %d sat."""
+insufficientFundsMessage     = """🚫 Varat eivät riitä. Sinulla on %s mutta tarvitset vähintään %s."""
 feeReserveMessage            = """⚠️ Koko saldosi lähettäminen ei todennäköisesti onnistu, koska maksun käsittelystä menee kuluja. Varaa vähintään 1% kuluihin."""
 invoicePaymentFailedMessage  = """🚫 Maksu epäonnistui: %s"""
 invoiceUndefinedErrorMessage = """Laskun maksu epäonnistui."""
-confirmPayInvoiceMessage     = """Vahvista maksun lähetys?\n\n💸 Määrä: %d sat"""
+confirmPayInvoiceMessage     = """Vahvista maksun lähetys?\n\n💸 Määrä: %s"""
 confirmPayAppendMemo         = """\n✉️ %s"""
 payHelpText                  = """📖 Hups, sepä ei toiminutkaan. %s
 
@@ -242,7 +242,7 @@ lnurlResolvingUrlMessage       = """🧮 Selvitetään osoitetta..."""
 lnurlGettingUserMessage        = """🧮 Valmistellaan maksua..."""
 lnurlPaymentFailed             = """🚫 Maksu epäonnistui: %s"""
 lnurlInvalidAmountMessage      = """🚫 Virheellinen määrä."""
-lnurlInvalidAmountRangeMessage = """🚫 Määrän tulee olla %d ja %d sat väliltä."""
+lnurlInvalidAmountRangeMessage = """🚫 Määrän tulee olla %d ja %s väliltä."""
 lnurlNoUsernameMessage         = """🚫 LNURL:in avulla maksujen vastaanotto edellyttää että, sinulla on Telegram-käyttäjätunnus määriteltynä."""
 lnurlHelpText                  = """📖 Hups, sepä ei toiminutkaan. %s
 
@@ -258,7 +258,7 @@ loginCancelledMessage           = """🚫 Kirjautuminen peruutettiin."""
 
 # LNURL WITHDRAW
 
-confirmLnurlWithdrawMessage     = """Haluatko toteuttaa noston?\n\n💸 Määrä: %d sat"""
+confirmLnurlWithdrawMessage     = """Haluatko toteuttaa noston?\n\n💸 Määrä: %s"""
 lnurlPreparingWithdraw        = """🧮 Valmistellaan nostoa..."""
 lnurlWithdrawFailed             = """🚫 Nosto epäonnistui."""
 lnurlWithdrawCancelled             = """🚫 Nosto peruutettiin."""
@@ -289,21 +289,21 @@ apiHiddenMessage               = """🔍 Avaimet on piilotettu. Käytä /api -ko
 
 inlineQueryFaucetTitle        = """🚰 Luo hana."""
 inlineQueryFaucetDescription  = """Muoto: @%s faucet <capacity> <per_user>"""
-inlineResultFaucetTitle       = """🚰 Luo hana %d sat kapasiteetilla."""
+inlineResultFaucetTitle       = """🚰 Luo hana %s kapasiteetilla."""
 inlineResultFaucetDescription = """👉 Paina tästä luodaksesi hanan tähän keskusteluun."""
 
-inlineFaucetMessage                     = """Painamalla ✅ nostat %d sat %s:n tekemästä hanasta.
+inlineFaucetMessage                     = """Painamalla ✅ nostat %s %s:n tekemästä hanasta.
 
-🚰 Jäljellä: %d/%d sat (nostettu %d/%d käyttäjälle)
+🚰 Jäljellä: %d/%s (nostettu %d/%d käyttäjälle)
 %s"""
-inlineFaucetEndedMessage                = """🚰 Hana on tyhjä 🍺\n\n🏅 %d sat annettiin %d käyttäjälle."""
+inlineFaucetEndedMessage                = """🚰 Hana on tyhjä 🍺\n\n🏅 %s annettiin %d käyttäjälle."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""
 inlineFaucetCreateWalletMessage         = """Hallinnoi lompakkoasti viestillä %s:lle 👈 ."""
 inlineFaucetCancelledMessage            = """🚫 Hana suljettu."""
 inlineFaucetInvalidPeruserAmountMessage = """🚫 Hanan käyttäjäkohtainen kapasiteetti ei jakaudu tasan tai se on liian pieni (min 5 sat)."""
 inlineFaucetInvalidAmountMessage        = """🚫 Virheellinen määrä."""
-inlineFaucetSentMessage                 = """🚰 %d sat lähetetty %s."""
-inlineFaucetReceivedMessage             = """🚰 %s lähetti sinulle %d sat."""
+inlineFaucetSentMessage                 = """🚰 %s lähetetty %s."""
+inlineFaucetReceivedMessage             = """🚰 %s lähetti sinulle %s."""
 inlineFaucetHelpFaucetInGroup           = """Luo botin avulla ryhmäkeskusteluun hana tai käytä 👉 keskustelun komentoja (/advanced lisätoimintoja)."""
 inlineFaucetAlreadyTookMessage          = """🚫 Olet jo nostanut varoja tästä hanasta."""
 inlineFaucetHelpText                    = """📖 Hups, sepä ei toiminutkaan. %s
@@ -315,12 +315,12 @@ inlineFaucetHelpText                    = """📖 Hups, sepä ei toiminutkaan. %
 
 inlineQuerySendTitle            = """💸 Lähetä maksu keskusteluun."""
 inlineQuerySendDescription      = """Muoto: @%s send <amount> [<user>] [<memo>]"""
-inlineResultSendTitle           = """💸 Lähetä %d sat."""
-inlineResultSendDescription     = """👉 Paina tästä lähettääksesi %d sat tähän keskusteluun."""
+inlineResultSendTitle           = """💸 Lähetä %s."""
+inlineResultSendDescription     = """👉 Paina tästä lähettääksesi %s tähän keskusteluun."""
 
-inlineSendMessage              = """Paina ✅ vastaanottaaksesi maksun %s:ltä.\n\n💸 Määrä: %d sat"""
+inlineSendMessage              = """Paina ✅ vastaanottaaksesi maksun %s:ltä.\n\n💸 Määrä: %s"""
 inlineSendAppendMemo           = """\n✉️ %s"""
-inlineSendUpdateMessageAccept  = """💸 %d sat lähetty %s:ltä %s:lle."""
+inlineSendUpdateMessageAccept  = """💸 %s lähetty %s:ltä %s:lle."""
 inlineSendCreateWalletMessage  = """Avaa keskustelu %s :lle 👈 ja hallinnoi lompakkoasi."""
 sendYourselfMessage            = """📖 Et voi maksaa itsellesi."""
 inlineSendFailedMessage        = """🚫 Lähetys epäonnistui."""
@@ -331,12 +331,12 @@ inlineSendBalanceLowMessage    = """🚫 Saldosi on liian pieni."""
 
 inlineQueryReceiveTitle        = """🏅 Pyydä maksua keskustelussa."""
 inlineQueryReceiveDescription  = """Muoto: @%s receive <amount> [<user>] [<memo>]"""
-inlineResultReceiveTitle       = """🏅 Vastaanota %d sat."""
-inlineResultReceiveDescription = """👉 Paina tästä vastaanottaaksesi %d sat."""
+inlineResultReceiveTitle       = """🏅 Vastaanota %s."""
+inlineResultReceiveDescription = """👉 Paina tästä vastaanottaaksesi %s."""
 
-inlineReceiveMessage             = """Paina 💸 maksaaksesi %s:lle.\n\n💸 Määrä: %d sat"""
+inlineReceiveMessage             = """Paina 💸 maksaaksesi %s:lle.\n\n💸 Määrä: %s"""
 inlineReceiveAppendMemo          = """\n✉️ %s"""
-inlineReceiveUpdateMessageAccept = """💸 %d sat lähetetty %s:ltä %s:lle."""
+inlineReceiveUpdateMessageAccept = """💸 %s lähetetty %s:ltä %s:lle."""
 inlineReceiveCreateWalletMessage = """Avaa keskustelu %s :lle 👈 ja hallinnoi lompakkoasi."""
 inlineReceiveYourselfMessage     = """📖 Et voi maksaa itsellesi."""
 inlineReceiveFailedMessage       = """🚫 Vastaanotto epäonnistui."""
@@ -346,20 +346,20 @@ inlineReceiveCancelledMessage    = """🚫 Vastaanotto peruutettu."""
 
 inlineQueryTipjarTitle        = """🍯 Luo tippikulho."""
 inlineQueryTipjarDescription  = """Muoto: @%s tipjar <capacity> <per_user>"""
-inlineResultTipjarTitle       = """🍯 Luo %d sat tippikulho."""
+inlineResultTipjarTitle       = """🍯 Luo %s tippikulho."""
 inlineResultTipjarDescription = """👉 Paina tästä luodaksesi tippikulhon tähän keskusteluun."""
 
-inlineTipjarMessage                     = """Paina 💸 *maksaaksesi %d sat* %s:n luomaan tippikulhoon.
+inlineTipjarMessage                     = """Paina 💸 *maksaaksesi %s* %s:n luomaan tippikulhoon.
 
-🙏 Tippikulhossa: *%d*/%d sat (%d käyttäjältä)
+🙏 Tippikulhossa: *%d*/%s (%d käyttäjältä)
 %s"""
-inlineTipjarEndedMessage                = """🍯 %s:n tippikulho on täynnä⭐️\n\n🏅 %d sat saatin %d käyttäjältä."""
+inlineTipjarEndedMessage                = """🍯 %s:n tippikulho on täynnä⭐️\n\n🏅 %s saatin %d käyttäjältä."""
 inlineTipjarAppendMemo                  = """\n✉️ %s"""
 inlineTipjarCancelledMessage            = """🚫 Tippikulho poistettu."""
 inlineTipjarInvalidPeruserAmountMessage = """🚫 Käyttäjäkohtainen määrä ei ole jaollinen kapasiteetilla."""
 inlineTipjarInvalidAmountMessage        = """🚫 Virheellinen määrä."""
-inlineTipjarSentMessage                 = """🍯 %d sat lähetty %s:lle."""
-inlineTipjarReceivedMessage             = """🍯 %s lähetti sinulle %d sat."""
+inlineTipjarSentMessage                 = """🍯 %s lähetty %s:lle."""
+inlineTipjarReceivedMessage             = """🍯 %s lähetti sinulle %s."""
 inlineTipjarHelpTipjarInGroup           = """Luo tippikulho ryhmään, jossa botti on jäsenenä tai käytä 👉 keskustelun komentoa (/advanced lisätoimintoja)."""
 inlineTipjarHelpText                    = """📖 Hups, sepä ei toiminutkaan. %s
 
@@ -374,11 +374,11 @@ groupTicketIssuedGroupMessage       = """🎟 Käyttäjä %s on saanut pääsyn 
 groupPayInvoiceMessage              = """🎟 Maksa yllä oleva lasku, jotta voit liittyä ryhmään %s."""
 groupBotIsNotAdminMessage           = """🚫 Hups, sepä ei toiminutkaan. Sinun pitää lisätä minut ryhmän pääkäyttäjäksi ja antaa minulle oikeudet lisätä ja bannata käyttäjiä."""
 groupNameExists                     = """🚫 Tämän niminen ryhmä on jo olemassa. Valitse ryhmälle uusi nimi."""
-groupAddedMessagePrivate            = """🎟 Ryhmään `%s` on lisätty pääsymaksut.\n\nAlias: `%s` Hinta: %d sat\n\nKun haluat pääsyn tähän ryhmään, aloita keskustelu %s:n kanssa ja anna komento `/join %s`."""
+groupAddedMessagePrivate            = """🎟 Ryhmään `%s` on lisätty pääsymaksut.\n\nAlias: `%s` Hinta: %s\n\nKun haluat pääsyn tähän ryhmään, aloita keskustelu %s:n kanssa ja anna komento `/join %s`."""
 groupAddedMessagePublic             = """🎟 Pääsymaksut otettu käyttöön."""
 groupNotFoundMessage                = """🚫 Tämän nimistä ryhmää ei löydy."""
-groupReceiveTicketInvoiceCommission = """🎟 Vastaanotit *%d sat* (mistä on vähennetty %d sat komissio) käyttäjän %s pääsymaksuna ryhmään `%s` ."""
-groupReceiveTicketInvoice           = """🎟 Vastaanotit *%d sat* käyttäjän %s pääsymaksuna ryhmään `%s`."""
+groupReceiveTicketInvoiceCommission = """🎟 Vastaanotit *%s* (mistä on vähennetty %s komissio) käyttäjän %s pääsymaksuna ryhmään `%s` ."""
+groupReceiveTicketInvoice           = """🎟 Vastaanotit *%s* käyttäjän %s pääsymaksuna ryhmään `%s`."""
 commandPrivateMessage               = """Käytä tätä komentoa %s:n kanssa kahdenkeskisessä keskustelussa."""
 groupHelpMessage                    = """👥 *Ryhmäkomennot*
 
@@ -413,4 +413,4 @@ generateDalleGeneratingMessage  = """Kuvia luodaan. Odota hetkinen..."""# CONVER
 convertEnterAmountMessage   = """Syötithän määrän?"""
 convertInvalidAmountMessage = """Syötithän määrän oikein?"""
 convertPriceErrorMessage    = """🚫 Hintaa ei saatu haettua."""
-convertResultMessage        = """%.2f LKR on noin %d sat."""
+convertResultMessage        = """%.2f LKR on noin %s."""

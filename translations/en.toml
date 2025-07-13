@@ -132,7 +132,7 @@ advancedMessage = """%s
 */generate* 🎆 Generate DALLE-2 images: `/generate <prompt>`"""
 
 # GENERIC
-enterAmountRangeMessage        = """💯 Enter an amount between %d and %d sat."""
+enterAmountRangeMessage        = """💯 Enter an amount between %s and %s."""
 enterAmountMessage             = """💯 Enter an amount."""
 enterUserMessage               = """👤 Enter a user."""
 enterTextMessage               = """⌨️ Enter text."""
@@ -148,7 +148,7 @@ startNoUsernameMessage    = """☝️ It looks like you don't have a Telegram @u
 
 # BALANCE
 
-balanceMessage      = """👑 *Your balance:* %d sat(s). (%s USD / රු. %s)"""
+balanceMessage      = """👑 *Your balance:* %s. (%s USD / රු. %s)"""
 balanceErrorMessage = """🚫 Could not fetch your balance. Please try again later."""
 
 # TIP
@@ -242,7 +242,7 @@ lnurlResolvingUrlMessage       = """🧮 Resolving address..."""
 lnurlGettingUserMessage        = """🧮 Preparing payment..."""
 lnurlPaymentFailed             = """🚫 Payment failed: %s"""
 lnurlInvalidAmountMessage      = """🚫 Invalid amount."""
-lnurlInvalidAmountRangeMessage = """🚫 Amount must be between %d and %d sat."""
+lnurlInvalidAmountRangeMessage = """🚫 Amount must be between %s and %s."""
 lnurlNoUsernameMessage         = """🚫 You need to set a Telegram username to receive payments via LNURL."""
 lnurlHelpText                  = """📖 Oops, that didn't work. %s
 
@@ -414,7 +414,7 @@ generateDalleGeneratingMessage  = """Your images are being generated. Please wai
 convertEnterAmountMessage = """Did you enter an amount?"""
 convertInvalidAmountMessage = """Did you enter a valid amount?"""
 convertPriceErrorMessage = """🚫 Couldn't fetch price."""
-convertResultMessage = """%.2f LKR is about %d sat."""
+convertResultMessage = """%.2f LKR is about %s."""
 
 # CONVERT SAT TO FIAT
-convertSatsResultMessage = """%d sat is about %s USD / රු. %s"""
+convertSatsResultMessage = """%s is about %s USD / රු. %s"""

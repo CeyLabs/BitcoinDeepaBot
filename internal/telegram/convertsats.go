@@ -38,6 +38,6 @@ func (bot *TipBot) satToFiatHandler(ctx intercept.Context) (intercept.Context, e
 	usd := usdPerSat * float64(sats)
 	lkr := lkrPerSat * float64(sats)
 
-	bot.trySendMessage(m.Sender, fmt.Sprintf(Translate(ctx, "convertSatsResultMessage"), sats, utils.FormatFloatWithCommas(usd), utils.FormatFloatWithCommas(lkr)))
+	bot.trySendMessage(m.Sender, fmt.Sprintf(Translate(ctx, "convertSatsResultMessage"), utils.FormatSats(sats), utils.FormatFloatWithCommas(usd), utils.FormatFloatWithCommas(lkr)))
 	return ctx, nil
 }

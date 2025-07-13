@@ -127,7 +127,7 @@ advancedMessage = """%s
 */shop* 🛍 Browse shops: `/shop` or `/shop <user/shop_id>`"""
 
 # GENERIC
-enterAmountRangeMessage        = """💯 %d ve %d sat arasında bir miktar gir."""
+enterAmountRangeMessage        = """💯 %d ve %s arasında bir miktar gir."""
 enterAmountMessage             = """💯 Bir miktar gir."""
 enterUserMessage               = """👤 Bir kullanıcı gir."""
 errorReasonMessage             = """🚫 Hata: %s"""
@@ -142,7 +142,7 @@ startNoUsernameMessage = """☝️ Henüz bir Telegram kullanıcı @adın yok gi
 
 # BALANCE
 
-balanceMessage      = """👑 *Kredin:* %d sat(s). (%s USD / %s LKR)"""
+balanceMessage      = """👑 *Kredin:* %s. (%s USD / %s LKR)"""
 balanceErrorMessage = """🚫 Şu an kredini okuyamıyorum. Lütfen daha sonra tekrar dene."""
 
 # TIP
@@ -152,8 +152,8 @@ tipInviteGroupMessage = """ℹ️ Bu arada, bu botu herhangi bir grup sohbetine 
 tipEnterAmountMessage = """Miktar girdin mi?"""
 tipValidAmountMessage = """Geçerli bir miktar girdin mi?"""
 tipYourselfMessage = """📖 Kendi kendine bahşiş gönderemezsin."""
-tipSentMessage = """💸 %d sat %s a gönderildi."""
-tipReceivedMessage = """🏅 %s sana %d sat bahşiş gönderdi."""
+tipSentMessage = """💸 %s %s a gönderildi."""
+tipReceivedMessage = """🏅 %s sana %s bahşiş gönderdi."""
 tipErrorMessage = """🚫 Bahşiş gönderilemedi."""
 tipUndefinedErrorMsg = """lütfen daha sonra tekrar dene."""
 tipHelpText = """📖 Hoppalaa… olmadı. %s
@@ -165,11 +165,11 @@ tipHelpText = """📖 Hoppalaa… olmadı. %s
 
 sendValidAmountMessage = """Geçerli bir miktar girdin mi?"""
 sendUserHasNoWalletMessage = """🚫 %s henüz bir cüzdan oluşturmadı."""
-sendSentMessage = """💸 %d sat %s a gönderildi."""
-sendPublicSentMessage = """💸 %d sat %s dan %s a gönderildi."""
-sendReceivedMessage = """🏅 %s sana %d sat gönderdi."""
+sendSentMessage = """💸 %s %s a gönderildi."""
+sendPublicSentMessage = """💸 %s %s dan %s a gönderildi."""
+sendReceivedMessage = """🏅 %s sana %s gönderdi."""
 sendErrorMessage = """🚫 Gönderim başarılı olmadı."""
-confirmSendMessage = """%s a ödeme göndermek istiyor musun?\n\n💸 Miktar: %d sat"""
+confirmSendMessage = """%s a ödeme göndermek istiyor musun?\n\n💸 Miktar: %s"""
 confirmSendAppendMemo = """\n✉️ %s"""
 sendCancelledMessage = """🚫 Gönderim iptal edildi."""
 errorTryLaterMessage = """🚫 Hata. Lütfen daha sonra tekrar dene."""
@@ -182,8 +182,8 @@ sendHelpText = """📖 Hoppalaa… olmadı. %s
 
 # INVOICE
 
-invoiceReceivedMessage    = """⚡️ %d sat sana geldi."""
-invoiceReceivedCurrencyMessage    = """⚡️ %d sat (%s %s) sana geldi."""
+invoiceReceivedMessage    = """⚡️ %s sana geldi."""
+invoiceReceivedCurrencyMessage    = """⚡️ %s (%s %s) sana geldi."""
 invoiceEnterAmountMessage = """Miktar girdin mi?"""
 invoiceValidAmountMessage = """Geçerli bir miktar girdin mi?"""
 invoiceHelpText           = """📖 Hoppalaa… olmadı. %s
@@ -198,11 +198,11 @@ invoicePaidMessage = """⚡️ Ödeme gönderildi."""
 invoicePublicPaidMessage = """⚡️ %s ödeme gönderdi."""
 invalidInvoiceHelpMessage = """Geçerli bir Lightning Invoice girdin mi? Telegram kullanıcısına veya Lightning adrese ödeme yapmak için /send komutunu kullan."""
 invoiceNoAmountMessage = """🚫 Miktar belirtilmemiş Invoice ödenemez."""
-insufficientFundsMessage = """🚫 Kredin yetersiz. Şu an cüzdanında %d sat var. Ancak en az %d sat gerekiyor."""
+insufficientFundsMessage = """🚫 Kredin yetersiz. Şu an cüzdanında %s var. Ancak en az %s gerekiyor."""
 feeReserveMessage = """⚠️ Cüzdanındaki tüm miktarı göndermek istiyorsun. Ancak Lightning ücreti ödenemeyeceği için gönderim başarısız olabilir. Bu durumda daha az bir miktar dene."""
 invoicePaymentFailedMessage = """🚫 Ödeme başarısız: %s"""
 invoiceUndefinedErrorMessage = """Invoice ödenemedi."""
-confirmPayInvoiceMessage = """Bu ödemeyi göndermek istiyor musun?\n\n💸 Miktar: %d sat"""
+confirmPayInvoiceMessage = """Bu ödemeyi göndermek istiyor musun?\n\n💸 Miktar: %s"""
 confirmPayAppendMemo = """\n✉️ %s"""
 payHelpText = """📖 Hoppalaa… olmadı. %s
 
@@ -235,7 +235,7 @@ lnurlResolvingUrlMessage = """🧮 Adres çözümleniyor…"""
 lnurlGettingUserMessage = """🧮 Ödeme hazırlanıyor..."""
 lnurlPaymentFailed = """🚫 Ödeme başarısız: %s"""
 lnurlInvalidAmountMessage = """🚫 Geçersiz miktar."""
-lnurlInvalidAmountRangeMessage = """🚫 Miktar %d ve %d sat arasında olmalı."""
+lnurlInvalidAmountRangeMessage = """🚫 Miktar %d ve %s arasında olmalı."""
 lnurlNoUsernameMessage = """🚫 LNURL ödemesi almak için bir Telegram kullanıcı ismi seçmelisin."""
 lnurlHelpText = """📖 Hoppalaa… olmadı. %s
 
@@ -256,21 +256,21 @@ couldNotLinkMessage = """🚫 Cüzdanın bağlanamadı. Lütfen daha sonra tekra
 
 inlineQueryFaucetTitle = """🚰 Bir Fıçı oluştur."""
 inlineQueryFaucetDescription = """Komut: @%s faucet <toplam> <kullanıcı_başına>"""
-inlineResultFaucetTitle = """🚰 Bir %d sat Fıçı oluştur."""
+inlineResultFaucetTitle = """🚰 Bir %s Fıçı oluştur."""
 inlineResultFaucetDescription = """👉 Fıçı’yı bu sohbete göndermek için tıkla."""
 
-inlineFaucetMessage = """✅ butonuna basarak %s'in Fıçıdan %d sat çek.
+inlineFaucetMessage = """✅ butonuna basarak %s'in Fıçıdan %s çek.
 
-🚰 Kalan: %d/%d sat (%d/%d çekildi)
+🚰 Kalan: %d/%s (%d/%d çekildi)
 %s"""
-inlineFaucetEndedMessage = """🚰 Fıçı boşaldı 🍺\n\n🏅 %d sat %d kullanıcıya dağıtıldı."""
+inlineFaucetEndedMessage = """🚰 Fıçı boşaldı 🍺\n\n🏅 %s %d kullanıcıya dağıtıldı."""
 inlineFaucetAppendMemo = """\n✉️ %s"""
 inlineFaucetCreateWalletMessage = """%s 👈 ile cüzdanı kullanmak için sohbete başla."""
 inlineFaucetCancelledMessage = """🚫 Fıçı iptal edildi."""
 inlineFaucetInvalidPeruserAmountMessage = """🚫 Toplam miktar bölü kullanıcı başına miktar tam sayı olmalı. Bu sayı küsuratlı olmaz."""
 inlineFaucetInvalidAmountMessage = """🚫 Geçersiz miktar."""
-inlineFaucetSentMessage = """🚰 %d sat %s a gönderildi."""
-inlineFaucetReceivedMessage = """🚰 %s sana %d sat gönderdi."""
+inlineFaucetSentMessage = """🚰 %s %s a gönderildi."""
+inlineFaucetReceivedMessage = """🚰 %s sana %s gönderdi."""
 inlineFaucetHelpFaucetInGroup = """Fıçıyı İçinde bot olan bir grupta oluştur veya 👉 Inline komutunu kullan (/advanced daha fazla bilgi)."""
 inlineFaucetHelpText = """📖 Hoppalaa… olmadı. %s
 
@@ -281,12 +281,12 @@ inlineFaucetHelpText = """📖 Hoppalaa… olmadı. %s
 
 inlineQuerySendTitle = """💸 Sohbete ödeme gönder."""
 inlineQuerySendDescription = """Komut: @%s send <miktar> [<kullanıcı>] [<bildirim>]"""
-inlineResultSendTitle = """💸 %d sat gönder."""
-inlineResultSendDescription = """👉 Sohbete %d sat göndermek için tıkla."""
+inlineResultSendTitle = """💸 %s gönder."""
+inlineResultSendDescription = """👉 Sohbete %s göndermek için tıkla."""
 
-inlineSendMessage = """✅ Butona basarak %s dan ödeme al.\n\n💸 Miktar: %d sat"""
+inlineSendMessage = """✅ Butona basarak %s dan ödeme al.\n\n💸 Miktar: %s"""
 inlineSendAppendMemo = """\n✉️ %s"""
-inlineSendUpdateMessageAccept = """💸 %d sat %s dan %s ye gönderildi."""
+inlineSendUpdateMessageAccept = """💸 %s %s dan %s ye gönderildi."""
 inlineSendCreateWalletMessage = """%s 👈 ile cüzdanı kullanmak için sohbete başla."""
 sendYourselfMessage = """📖 Kendi kendine ödeme yapamazsın."""
 inlineSendFailedMessage = """🚫 Gönderim başarısız."""
@@ -297,12 +297,12 @@ inlineSendBalanceLowMessage = """🚫 Kredin yetersiz."""
 
 inlineQueryReceiveTitle = """🏅 Sohbetten ödeme iste."""
 inlineQueryReceiveDescription = """Komut: @%s receive <miktar> [<kullanıcı>] [<bildirim>]"""
-inlineResultReceiveTitle = """🏅 %d sat iste."""
-inlineResultReceiveDescription = """👉%d sat istemek için tıkla."""
+inlineResultReceiveTitle = """🏅 %s iste."""
+inlineResultReceiveDescription = """👉%s istemek için tıkla."""
 
-inlineReceiveMessage = """💸 butonuna basarak %s a öde.\n\n💸 Miktar: %d sat"""
+inlineReceiveMessage = """💸 butonuna basarak %s a öde.\n\n💸 Miktar: %s"""
 inlineReceiveAppendMemo = """\n✉️ %s"""
-inlineReceiveUpdateMessageAccept = """💸 %d sat %s dan %s ye gönderildi."""
+inlineReceiveUpdateMessageAccept = """💸 %s %s dan %s ye gönderildi."""
 inlineReceiveCreateWalletMessage = """%s 👈 ile cüzdanı kullanmak için sohbete başla."""
 inlineReceiveYourselfMessage = """📖 Kendi kendine ödeme yapamazsın."""
 inlineReceiveFailedMessage = """🚫 İstek başarısız."""
@@ -311,4 +311,4 @@ inlineReceiveCancelledMessage = """🚫 İstek iptal edildi."""
 convertEnterAmountMessage = """Bir miktar girdiniz mi?"""
 convertInvalidAmountMessage = """Geçerli bir miktar girdiniz mi?"""
 convertPriceErrorMessage = """🚫 Fiyat alınamadı."""
-convertResultMessage = """%.2f LKR yaklaşık %d sat."""
+convertResultMessage = """%.2f LKR yaklaşık %s."""

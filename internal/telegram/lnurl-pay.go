@@ -18,6 +18,7 @@ import (
 
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/runtime"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 
 	lnurl "github.com/fiatjaf/go-lnurl"
 	log "github.com/sirupsen/logrus"
@@ -76,7 +77,7 @@ func (bot *TipBot) lnurlPayHandler(ctx intercept.Context, payParams *LnurlPaySta
 		(payParams.LNURLPayParams.MaxSendable != 0 && payParams.LNURLPayParams.MinSendable != 0) { // only if max and min are set
 		err := fmt.Errorf("amount not in range")
 		log.Warnf("[lnurlPayHandler] Error: %s", err.Error())
-		bot.trySendMessage(m.Sender, fmt.Sprintf(Translate(ctx, "lnurlInvalidAmountRangeMessage"), payParams.LNURLPayParams.MinSendable/1000, payParams.LNURLPayParams.MaxSendable/1000))
+		bot.trySendMessage(m.Sender, fmt.Sprintf(Translate(ctx, "lnurlInvalidAmountRangeMessage"), utils.FormatSats(payParams.LNURLPayParams.MinSendable/1000), utils.FormatSats(payParams.LNURLPayParams.MaxSendable/1000)))
 		ResetUserState(user, bot)
 		return ctx, err
 	}

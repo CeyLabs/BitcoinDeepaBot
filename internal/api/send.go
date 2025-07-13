@@ -10,6 +10,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/str"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	"github.com/LightningTipBot/LightningTipBot/pkg/lightning"
 	log "github.com/sirupsen/logrus"
 )
@@ -119,11 +120,11 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Amount <= GetMinAPITransactionAmount() {
-		RespondError(w, fmt.Sprintf("Amount must be greater than %d satoshis", GetMinAPITransactionAmount()))
+		RespondError(w, fmt.Sprintf("Amount must be greater than %s", utils.FormatSats(GetMinAPITransactionAmount())))
 		return
 	}
 	if req.Amount > GetMaxAPITransactionAmount() {
-		RespondError(w, fmt.Sprintf("Amount cannot exceed %d satoshis", GetMaxAPITransactionAmount()))
+		RespondError(w, fmt.Sprintf("Amount cannot exceed %s", utils.FormatSats(GetMaxAPITransactionAmount())))
 		return
 	}
 
@@ -163,7 +164,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 
 	if balance < req.Amount {
 		log.Warnf("[api/send] Insufficient balance for %s: %d < %d", fromUsername, balance, req.Amount)
-		RespondError(w, fmt.Sprintf("Insufficient balance: %d sat(s) available, %d sat(s) required", balance, req.Amount))
+		RespondError(w, fmt.Sprintf("Insufficient balance: %s available, %s required", utils.FormatSats(balance), utils.FormatSats(req.Amount)))
 		return
 	}
 
@@ -230,8 +231,8 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 
 		response := SendResponse{
 			Success: false,
-			Message: fmt.Sprintf("Transaction requires admin approval (amount: %d sat(s) > threshold: %d sat(s)). Approval request sent to you via Telegram. Transaction ID: %s",
-				req.Amount, GetAdminApprovalThreshold(), pendingTx.ID),
+			Message: fmt.Sprintf("Transaction requires admin approval (amount: %s > threshold: %s). Approval request sent to you via Telegram. Transaction ID: %s",
+				utils.FormatSats(req.Amount), utils.FormatSats(GetAdminApprovalThreshold()), pendingTx.ID),
 			FromUser: fromUsername,
 			ToUser:   toIdentifier,
 			Amount:   req.Amount,
@@ -270,7 +271,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 
 	// Send notification to recipient with memo included in same message
 	fromUserStrMd := telegram.GetUserStrMd(fromUser.Telegram)
-	notificationMsg := fmt.Sprintf("💰 You received %d sat(s) from %s via Automated API", req.Amount, fromUserStrMd)
+	notificationMsg := fmt.Sprintf("💰 You received %s from %s via Automated API", utils.FormatSats(req.Amount), fromUserStrMd)
 	if req.Memo != "" {
 		notificationMsg += fmt.Sprintf("\n✉️ Memo: %s", str.MarkdownEscape(req.Memo))
 	}
@@ -282,7 +283,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 
 	// Send confirmation to sender (from user) - same format as /send command
 	toUserStrMd := telegram.GetUserStrMd(toUser.Telegram)
-	senderConfirmationMsg := fmt.Sprintf("✅ Payment sent successfully!\n\n💸 Amount: %d sat(s)\n👤 To: %s", req.Amount, toUserStrMd)
+	senderConfirmationMsg := fmt.Sprintf("✅ Payment sent successfully!\n\n💸 Amount: %s\n👤 To: %s", utils.FormatSats(req.Amount), toUserStrMd)
 	if req.Memo != "" {
 		senderConfirmationMsg += fmt.Sprintf("\n✉️ Memo: %s", str.MarkdownEscape(req.Memo))
 	}

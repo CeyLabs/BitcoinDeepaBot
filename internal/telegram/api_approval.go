@@ -79,7 +79,7 @@ func (bot *TipBot) approveAPITransactionHandler(ctx intercept.Context) (intercep
 
 	if balance < approvalData.Amount {
 		log.Warnf("[approveAPITransactionHandler] Insufficient balance: %d < %d", balance, approvalData.Amount)
-		bot.tryEditMessage(ctx.Callback().Message, fmt.Sprintf("❌ Insufficient balance: %s sat(s) available, %s sat(s) required", utils.FormatSats(balance), utils.FormatSats(approvalData.Amount)), &tb.ReplyMarkup{})
+		bot.tryEditMessage(ctx.Callback().Message, fmt.Sprintf("❌ Insufficient balance: %s available, %s required", utils.FormatSats(balance), utils.FormatSats(approvalData.Amount)), &tb.ReplyMarkup{})
 		return ctx, errors.Create(errors.UnknownError)
 	}
 
@@ -111,7 +111,7 @@ func (bot *TipBot) approveAPITransactionHandler(ctx intercept.Context) (intercep
 
 	// Notify recipient (same format as API send)
 	fromUserStrMd := GetUserStrMd(from.Telegram)
-	notificationMsg := fmt.Sprintf("💰 You received %s sat(s) from %s via Automated API", utils.FormatSats(approvalData.Amount), fromUserStrMd)
+	notificationMsg := fmt.Sprintf("💰 You received %s from %s via Automated API", utils.FormatSats(approvalData.Amount), fromUserStrMd)
 	if approvalData.Memo != "" {
 		notificationMsg += fmt.Sprintf("\n✉️ Memo: %s", str.MarkdownEscape(approvalData.Memo))
 	}
@@ -120,14 +120,14 @@ func (bot *TipBot) approveAPITransactionHandler(ctx intercept.Context) (intercep
 	// Update approval message to show success
 	if ctx.Callback().Message.Private() {
 		bot.tryDeleteMessage(ctx.Callback().Message)
-		successMsg := fmt.Sprintf("✅ Payment approved and sent successfully!\n\n💸 Amount: %s sat(s)\n👤 To: @%s", utils.FormatSats(approvalData.Amount), approvalData.ToUsername)
+		successMsg := fmt.Sprintf("✅ Payment approved and sent successfully!\n\n💸 Amount: %s\n👤 To: @%s", utils.FormatSats(approvalData.Amount), approvalData.ToUsername)
 		if approvalData.Memo != "" {
 			successMsg += fmt.Sprintf("\n✉️ Memo: %s", str.MarkdownEscape(approvalData.Memo))
 		}
 		bot.trySendMessage(ctx.Callback().Sender, successMsg)
 	} else {
 		toUserStrMd := GetUserStrMd(toUser.Telegram)
-		bot.tryEditMessage(ctx.Callback().Message, fmt.Sprintf("✅ API payment approved and sent!\n\n💸 %s sat(s) → %s", utils.FormatSats(approvalData.Amount), toUserStrMd), &tb.ReplyMarkup{})
+		bot.tryEditMessage(ctx.Callback().Message, fmt.Sprintf("✅ API payment approved and sent!\n\n💸 %s → %s", utils.FormatSats(approvalData.Amount), toUserStrMd), &tb.ReplyMarkup{})
 	}
 
 	return ctx, nil
@@ -168,14 +168,14 @@ func (bot *TipBot) cancelAPITransactionHandler(ctx intercept.Context) (intercept
 func CreateAPIApprovalRequest(bot *TipBot, fromUser *lnbits.User, toUsername string, amount int64, memo string, transactionID string, clientIP string) error {
 	// Create confirmation text (same format as /send command)
 	toUserStrMention := fmt.Sprintf("@%s", toUsername)
-	confirmText := fmt.Sprintf("Do you want to pay to %s?\n\n💸 Amount: %s sat(s)", toUserStrMention, utils.FormatSats(amount))
+	confirmText := fmt.Sprintf("Do you want to pay to %s?\n\n💸 Amount: %s", toUserStrMention, utils.FormatSats(amount))
 	if memo != "" {
 		confirmText += fmt.Sprintf("\n✉️ %s", str.MarkdownEscape(memo))
 	}
 
 	// Add approval context
 	confirmText += "\n\n🔔 *Admin Approval Required*\n"
-	confirmText += fmt.Sprintf("This transaction requires approval because the amount (%s sat(s)) exceeds the threshold.", utils.FormatSats(amount))
+	confirmText += fmt.Sprintf("This transaction requires approval because the amount (%s) exceeds the threshold.", utils.FormatSats(amount))
 
 	// Create unique ID for this approval request (same pattern as send command)
 	id := fmt.Sprintf("api-%d-%d-%s", fromUser.Telegram.ID, amount, RandStringRunes(5))
