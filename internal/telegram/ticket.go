@@ -87,7 +87,7 @@ func (bot *TipBot) handleTelegramNewMember(ctx intercept.Context) (intercept.Con
 		Group: group,
 		Base:  storage.New(storage.ID(fmt.Sprintf("ticket-event:%s", id))),
 	}
-	captionText := fmt.Sprintf("⚠️ %s, this group requires you to pay *%s sat* to join. You have 15 minutes to pay or you will be kicked for one day.", GetUserStrMd(ctx.Message().Sender), utils.FormatSats(ticket.Ticket.Price))
+	captionText := fmt.Sprintf("⚠️ %s, this group requires you to pay *%s* to join. You have 15 minutes to pay or you will be kicked for one day.", GetUserStrMd(ctx.Message().Sender), utils.FormatSats(ticket.Ticket.Price))
 
 	var balance int64 = 0
 	if user.ID != "" {

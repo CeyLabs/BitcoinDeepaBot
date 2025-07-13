@@ -370,7 +370,7 @@ func (bot *TipBot) cancelInlineTipjarHandler(ctx intercept.Context) (intercept.C
 
 func listTipjarGivers(inlineTipjar *InlineTipjar) string {
 	var from_str string
-	from_str = fmt.Sprintf("🍯 *Tipjar summary*\n\nMemo: %s\nCapacity: %s sat\nGivers: %d\nCollected: %s sat\n\n*Givers:*\n\n", inlineTipjar.Memo, utils.FormatSats(inlineTipjar.Amount), inlineTipjar.NGiven, utils.FormatSats(inlineTipjar.GivenAmount))
+	from_str = fmt.Sprintf("🍯 *Tipjar summary*\n\nMemo: %s\nCapacity: %s\nGivers: %d\nCollected: %s\n\n*Givers:*\n\n", inlineTipjar.Memo, utils.FormatSats(inlineTipjar.Amount), inlineTipjar.NGiven, utils.FormatSats(inlineTipjar.GivenAmount))
 	from_str += "```\n"
 	for _, from := range inlineTipjar.From {
 		from_str += fmt.Sprintf("%s\n", GetUserStr(from.Telegram))

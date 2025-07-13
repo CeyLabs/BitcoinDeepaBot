@@ -22,7 +22,7 @@ const (
 	tooltipAndOthersMessage    = " ... and others"
 	tooltipMultipleTipsMessage = "%s (%d tips by %s)"
 	tooltipSingleTipMessage    = "%s (by %s)"
-	tooltipTipAmountMessage    = "🏅 %s sat"
+	tooltipTipAmountMessage    = "🏅 %s"
 )
 
 type TipTooltip struct {

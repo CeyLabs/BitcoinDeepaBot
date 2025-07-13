@@ -406,7 +406,7 @@ func (bot *TipBot) finishFaucet(ctx context.Context, c *tb.Callback, inlineFauce
 
 func listFaucetTakers(inlineFaucet *InlineFaucet) string {
 	var to_str string
-	to_str = fmt.Sprintf("🚰 *Faucet summary*\n\nMemo: %s\nCapacity: %s sat\nTakers: %d\nRemaining: %s sat\n\n*Takers:*\n\n", inlineFaucet.Memo, utils.FormatSats(inlineFaucet.Amount), inlineFaucet.NTaken, utils.FormatSats(inlineFaucet.RemainingAmount))
+	to_str = fmt.Sprintf("🚰 *Faucet summary*\n\nMemo: %s\nCapacity: %s\nTakers: %d\nRemaining: %s\n\n*Takers:*\n\n", inlineFaucet.Memo, utils.FormatSats(inlineFaucet.Amount), inlineFaucet.NTaken, utils.FormatSats(inlineFaucet.RemainingAmount))
 	to_str += "```\n"
 	for _, to := range inlineFaucet.To {
 		to_str += fmt.Sprintf("%s\n", GetUserStr(to.Telegram))

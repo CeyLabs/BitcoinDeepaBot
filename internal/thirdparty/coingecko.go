@@ -77,10 +77,10 @@ func FormatSatsWithLKR(amount int64) string {
 	lkrPerSat, _, err := GetSatPrice()
 	if err != nil {
 		// Fallback to sats only if LKR price is unavailable
-		return fmt.Sprintf("%s sats", utils.FormatSats(amount))
+		return utils.FormatSats(amount)
 	}
 
 	lkrValue := lkrPerSat * float64(amount)
-	return fmt.Sprintf("%s sats (රු. %s)", utils.FormatSats(amount), utils.FormatFloatWithCommas(lkrValue))
+	return fmt.Sprintf("%s (රු. %s)", utils.FormatSats(amount), utils.FormatFloatWithCommas(lkrValue))
 
 }

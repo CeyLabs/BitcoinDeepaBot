@@ -107,7 +107,7 @@ func (bot *TipBot) approveAPITransactionHandler(ctx intercept.Context) (intercep
 
 	approvalData.Inactivate(approvalData, bot.Bunt)
 
-	log.Infof("[💸 api_send_approved] Send from %s to %s (%s sat(s)).", fromUserStr, toUserStr, utils.FormatSats(approvalData.Amount))
+	log.Infof("[💸 api_send_approved] Send from %s to %s (%s).", fromUserStr, toUserStr, utils.FormatSats(approvalData.Amount))
 
 	// Notify recipient (same format as API send)
 	fromUserStrMd := GetUserStrMd(from.Telegram)

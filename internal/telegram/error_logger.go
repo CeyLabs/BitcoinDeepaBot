@@ -303,7 +303,7 @@ func (el *ErrorLogger) LogPaymentError(err error, amount int64, memo, invoice st
 	timestamp := time.Now().Format("2006-01-02 15:04:05 UTC")
 
 	msg := fmt.Sprintf("🚫 Payment Error for %s (ID: %d)\n\n", el.getUserStrV2(user), user.ID)
-	msg += fmt.Sprintf("💰 Amount: %s sats\n", el.escapeMarkdownV2(utils.FormatSats(amount)))
+	msg += fmt.Sprintf("💰 Amount: %s\n", el.escapeMarkdownV2(utils.FormatSats(amount)))
 	msg += fmt.Sprintf("📝 Memo: %s\n", el.escapeMarkdownV2(memo))
 	msg += fmt.Sprintf("📄 Invoice: %s\n", el.escapeMarkdownV2(invoice))
 	msg += fmt.Sprintf("❗ Error: %s\n\n", el.escapeMarkdownV2(err.Error()))
