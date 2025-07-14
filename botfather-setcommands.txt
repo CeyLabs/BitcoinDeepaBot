@@ -16,3 +16,4 @@ donate - Donate: /donate 1000
 faucet - Create a faucet: /faucet 2100 21
 advanced - Advanced help
 lkrsats - Convert LKR to satoshis
+convert - Convert sats to fiat values

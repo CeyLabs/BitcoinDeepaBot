@@ -17,6 +17,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/price"
 	"github.com/LightningTipBot/LightningTipBot/internal/runtime"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 )
@@ -136,7 +137,7 @@ func (bot *TipBot) askForAmount(ctx context.Context, id string, eventType string
 	SetUserState(user, bot, lnbits.UserEnterAmount, string(stateDataJson))
 	askAmountText := Translate(ctx, "enterAmountMessage")
 	if amountMin > 0 && amountMax >= amountMin {
-		askAmountText = fmt.Sprintf(Translate(ctx, "enterAmountRangeMessage"), enterAmountStateData.AmountMin/1000, enterAmountStateData.AmountMax/1000)
+		askAmountText = fmt.Sprintf(Translate(ctx, "enterAmountRangeMessage"), utils.FormatSats(enterAmountStateData.AmountMin/1000), utils.FormatSats(enterAmountStateData.AmountMax/1000))
 	}
 	// Let the user enter an amount and return
 	bot.trySendMessage(user.Telegram, askAmountText, tb.ForceReply)
@@ -177,7 +178,7 @@ func (bot *TipBot) enterAmountHandler(ctx intercept.Context) (intercept.Context,
 		(amount > int64(EnterAmountStateData.AmountMax/1000) || amount < int64(EnterAmountStateData.AmountMin/1000)) { // this line then checks whether the amount is in the range
 		err = fmt.Errorf("amount not in range")
 		log.Warnf("[enterAmountHandler] %s", err.Error())
-		bot.trySendMessage(ctx.Sender(), fmt.Sprintf(Translate(ctx, "lnurlInvalidAmountRangeMessage"), EnterAmountStateData.AmountMin/1000, EnterAmountStateData.AmountMax/1000))
+		bot.trySendMessage(ctx.Sender(), fmt.Sprintf(Translate(ctx, "lnurlInvalidAmountRangeMessage"), utils.FormatSats(EnterAmountStateData.AmountMin/1000), utils.FormatSats(EnterAmountStateData.AmountMax/1000)))
 		ResetUserState(user, bot)
 		return ctx, errors.Create(errors.InvalidSyntaxError)
 	}

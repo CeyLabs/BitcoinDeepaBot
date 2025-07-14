@@ -2,15 +2,17 @@ package telegram
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
 	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	log "github.com/sirupsen/logrus"
-	"strconv"
-	"strings"
 )
 
-func (bot *TipBot) lkrToSatHandler(ctx intercept.Context) (intercept.Context, error) {
+// satToFiatHandler converts satoshis to USD and LKR values
+func (bot *TipBot) satToFiatHandler(ctx intercept.Context) (intercept.Context, error) {
 	m := ctx.Message()
 	bot.anyTextHandler(ctx)
 
@@ -20,19 +22,22 @@ func (bot *TipBot) lkrToSatHandler(ctx intercept.Context) (intercept.Context, er
 		return ctx, nil
 	}
 	amountStr := strings.ReplaceAll(args[1], ",", "")
-	amount, err := strconv.ParseFloat(amountStr, 64)
-	if err != nil || amount <= 0 {
+	sats, err := strconv.ParseInt(amountStr, 10, 64)
+	if err != nil || sats <= 0 {
 		bot.trySendMessage(m.Sender, Translate(ctx, "convertInvalidAmountMessage"))
 		return ctx, nil
 	}
 
-	lkrPerSat, _, err := thirdparty.GetSatPrice()
-	if err != nil || lkrPerSat == 0 {
-		log.Errorf("[lkrToSat] error fetching price: %v", err)
+	lkrPerSat, usdPerSat, err := thirdparty.GetSatPrice()
+	if err != nil || lkrPerSat == 0 || usdPerSat == 0 {
+		log.Errorf("[satToFiat] error fetching price: %v", err)
 		bot.trySendMessage(m.Sender, Translate(ctx, "convertPriceErrorMessage"))
 		return ctx, err
 	}
-	sats := int64(amount / lkrPerSat)
-	bot.trySendMessage(m.Sender, fmt.Sprintf(Translate(ctx, "convertResultMessage"), utils.FormatFloatWithCommas(amount), utils.FormatSats(sats)))
+
+	usd := usdPerSat * float64(sats)
+	lkr := lkrPerSat * float64(sats)
+
+	bot.trySendMessage(m.Sender, fmt.Sprintf(Translate(ctx, "convertSatsResultMessage"), utils.FormatSats(sats), utils.FormatFloatWithCommas(usd), utils.FormatFloatWithCommas(lkr)))
 	return ctx, nil
 }

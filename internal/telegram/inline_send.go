@@ -238,7 +238,7 @@ func (bot *TipBot) acceptInlineSendHandler(ctx intercept.Context) (intercept.Con
 
 	log.Infof("[💸 sendInline] Send from %s to %s (%d sat).", fromUserStr, toUserStr, amount)
 
-	inlineSend.Message = fmt.Sprintf("%s", fmt.Sprintf(i18n.Translate(inlineSend.LanguageCode, "inlineSendUpdateMessageAccept"), amount, fromUserStrMd, toUserStrMd))
+	inlineSend.Message = fmt.Sprintf("%s", fmt.Sprintf(i18n.Translate(inlineSend.LanguageCode, "inlineSendUpdateMessageAccept"), thirdparty.FormatSatsWithLKR(amount), fromUserStrMd, toUserStrMd))
 	memo := inlineSend.Memo
 	if len(memo) > 0 {
 		inlineSend.Message = inlineSend.Message + fmt.Sprintf(i18n.Translate(inlineSend.LanguageCode, "inlineSendAppendMemo"), memo)
@@ -248,8 +248,8 @@ func (bot *TipBot) acceptInlineSendHandler(ctx intercept.Context) (intercept.Con
 	}
 	bot.tryEditMessage(c, inlineSend.Message, &tb.ReplyMarkup{})
 	// notify users
-	bot.trySendMessage(to.Telegram, fmt.Sprintf(i18n.Translate(to.Telegram.LanguageCode, "sendReceivedMessage"), fromUserStrMd, amount))
-	bot.trySendMessage(fromUser.Telegram, fmt.Sprintf(i18n.Translate(fromUser.Telegram.LanguageCode, "sendSentMessage"), amount, toUserStrMd))
+	bot.trySendMessage(to.Telegram, fmt.Sprintf(i18n.Translate(to.Telegram.LanguageCode, "sendReceivedMessage"), fromUserStrMd, thirdparty.FormatSatsWithLKR(amount)))
+	bot.trySendMessage(fromUser.Telegram, fmt.Sprintf(i18n.Translate(fromUser.Telegram.LanguageCode, "sendSentMessage"), thirdparty.FormatSatsWithLKR(amount), toUserStrMd))
 	if err != nil {
 		errmsg := fmt.Errorf("[sendInline] Error: Send message to %s: %s", toUserStr, err)
 		log.Warnln(errmsg)

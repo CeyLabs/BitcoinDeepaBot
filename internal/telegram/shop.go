@@ -10,6 +10,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/errors"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
@@ -418,7 +419,7 @@ func (bot *TipBot) getItemTitle(ctx context.Context, item *ShopItem) string {
 		caption += fmt.Sprintf("(%d Files)", len(item.FileIDs))
 	}
 	if item.Price > 0 {
-		caption += fmt.Sprintf("\n\n💸 Price: %d sat", item.Price)
+		caption += fmt.Sprintf("\n\n💸 Price: %s", utils.FormatSats(item.Price))
 	}
 	// item.TbPhoto.Caption = caption
 	return caption
@@ -876,9 +877,9 @@ func (bot *TipBot) shopConfirmBuyHandler(ctx intercept.Context) (intercept.Conte
 		shopItemTitle = fmt.Sprintf("%s", item.Title)
 	}
 	ctx.Context = context.WithValue(ctx, "callback_response", "🛍 Purchase successful.")
-	bot.trySendMessage(to.Telegram, fmt.Sprintf("🛍 Someone bought `%s` from your shop `%s` for `%d sat`.", str.MarkdownEscape(shopItemTitle), str.MarkdownEscape(shop.Title), amount))
-	bot.trySendMessage(from.Telegram, fmt.Sprintf("🛍 You bought `%s` from %s's shop `%s` for `%d sat`.", str.MarkdownEscape(shopItemTitle), toUserStrMd, str.MarkdownEscape(shop.Title), amount))
-	log.Infof("[🛍 shop] %s bought from %s shop: %s item: %s  for %d sat.", toUserStr, GetUserStr(to.Telegram), shop.Title, shopItemTitle, amount)
+	bot.trySendMessage(to.Telegram, fmt.Sprintf("🛍 Someone bought `%s` from your shop `%s` for `%s`.", str.MarkdownEscape(shopItemTitle), str.MarkdownEscape(shop.Title), utils.FormatSats(amount)))
+	bot.trySendMessage(from.Telegram, fmt.Sprintf("🛍 You bought `%s` from %s's shop `%s` for `%s`.", str.MarkdownEscape(shopItemTitle), toUserStrMd, str.MarkdownEscape(shop.Title), utils.FormatSats(amount)))
+	log.Infof("[🛍 shop] %s bought from %s shop: %s item: %s for %s.", toUserStr, GetUserStr(to.Telegram), shop.Title, shopItemTitle, utils.FormatSats(amount))
 	bot.shopSendItemFilesToUser(ctx, user, itemID)
 	return ctx, nil
 }

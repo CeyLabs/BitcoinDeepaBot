@@ -128,7 +128,7 @@ advancedMessage = """%s
 */generate* 🎆 Generate DALLE-2 images: `/generate <prompt>`"""
 
 # GENERIC
-enterAmountRangeMessage        = """💯 Masukkan jumlah diantara %d dan %d sat."""
+enterAmountRangeMessage        = """💯 Masukkan jumlah diantara %s dan %s."""
 enterAmountMessage             = """💯 Masukkan jumlah."""
 enterUserMessage               = """👤 Masukkan user."""
 errorReasonMessage             = """🚫 Error: %s"""
@@ -143,7 +143,7 @@ startNoUsernameMessage    = """☝️ Kelihatannya kamu belum memiliki sebuah @u
 
 # BALANCE
 
-balanceMessage      = """👑 *Saldo mu:* %d sat(s). (%s USD / %s LKR)"""
+balanceMessage      = """👑 *Saldo mu:* %s. (%s USD / %s LKR)"""
 balanceErrorMessage = """🚫 Tidak dapat memeriksa saldo mu. Tolong coba lagi nanti."""
 
 # TIP
@@ -153,8 +153,8 @@ tipInviteGroupMessage = """ℹ️ Ngomong-ngomong, kamu bisa mengundang bot ini 
 tipEnterAmountMessage = """Apakah kamu sudah memasukkan jumlah?"""
 tipValidAmountMessage = """Apakah kamu memasukkan jumlah yang benar?"""
 tipYourselfMessage    = """📖 Kamu tidak dapat memberi tip ke diri sendiri."""
-tipSentMessage        = """💸 %d sat terkirim ke %s."""
-tipReceivedMessage    = """🏅 %s telah memberi tip sebanyak %d sat."""
+tipSentMessage        = """💸 %s terkirim ke %s."""
+tipReceivedMessage    = """🏅 %s telah memberi tip sebanyak %s."""
 tipErrorMessage       = """🚫 Pengiriman tip gagal."""
 tipUndefinedErrorMsg  = """Silakan coba lagi nanti."""
 tipHelpText           = """📖 Waduh, itu tidak berhasil. %s
@@ -166,11 +166,11 @@ tipHelpText           = """📖 Waduh, itu tidak berhasil. %s
 
 sendValidAmountMessage     = """Apakah kamu memasukkan jumlah yang benar?"""
 sendUserHasNoWalletMessage = """🚫 Pengguna %s belum membuat dompet."""
-sendSentMessage            = """💸 %d sat terkirim ke %s."""
-sendPublicSentMessage      = """💸 %d sat terkirim dari %s ke %s."""
-sendReceivedMessage        = """🏅 %s mengirimkan kamu %d sat."""
+sendSentMessage            = """💸 %s terkirim ke %s."""
+sendPublicSentMessage      = """💸 %s terkirim dari %s ke %s."""
+sendReceivedMessage        = """🏅 %s mengirimkan kamu %s."""
 sendErrorMessage           = """🚫 Pengiriman gagal."""
-confirmSendMessage         = """Apakah kamu ingin membayar ke %s?\n\n💸 Jumlah: %d sat"""
+confirmSendMessage         = """Apakah kamu ingin membayar ke %s?\n\n💸 Jumlah: %s"""
 confirmSendAppendMemo      = """\n✉️ %s"""
 sendCancelledMessage       = """🚫 Pengiriman dibatalkan."""
 errorTryLaterMessage       = """🚫 Error. Silakan coba lagi nanti."""
@@ -183,8 +183,8 @@ sendHelpText               = """📖 Waduh, itu tidak berhasil. %s
 
 # INVOICE
 
-invoiceReceivedMessage    = """⚡️ Kamu menerima %d sat."""
-invoiceReceivedCurrencyMessage    = """⚡️ Kamu menerima %d sat (%s %s)."""
+invoiceReceivedMessage    = """⚡️ Kamu menerima %s."""
+invoiceReceivedCurrencyMessage    = """⚡️ Kamu menerima %s (%s %s)."""
 invoiceEnterAmountMessage = """Apakah kamu sudah memasukkan jumlah?"""
 invoiceValidAmountMessage = """Apakah kamu memasukkan jumlah yang benar?"""
 invoiceHelpText           = """📖 Waduh, itu tidak berhasil. %s
@@ -199,11 +199,11 @@ invoicePaidMessage          = """⚡️ Pembayaran terkirim."""
 invoicePublicPaidMessage    = """⚡️ Pembayaran dikirim oleh %s."""
 invalidInvoiceHelpMessage    = """Apakah kamu memasukan invoice Lightning yang benar? Coba /send jika kamu mau mengirimkan ke pengguna Telegram atau alamat Lightning."""
 invoiceNoAmountMessage       = """🚫 Tidak dapat membayar invoice tanpa jumlah."""
-insufficientFundsMessage     = """🚫 Kekurangan dana. Kamu memiliki %d sat namun kamu memerlukan setidaknya %d sat."""
+insufficientFundsMessage     = """🚫 Kekurangan dana. Kamu memiliki %s namun kamu memerlukan setidaknya %s."""
 feeReserveMessage            = """⚠️ Mengirimkan seluruh saldo bisa gagal karena adanya biaya jaringan. Jika gagal, coba jumlah kirimnya dikurangi sedikit."""
 invoicePaymentFailedMessage  = """🚫 Pembayaran gagal: %s"""
 invoiceUndefinedErrorMessage = """Tidak dapat membayar invoice."""
-confirmPayInvoiceMessage     = """Apakah kamu mau mengirimkan pembayaran ini?\n\n💸 Jumlah: %d sat"""
+confirmPayInvoiceMessage     = """Apakah kamu mau mengirimkan pembayaran ini?\n\n💸 Jumlah: %s"""
 confirmPayAppendMemo         = """\n✉️ %s"""
 payHelpText                  = """📖 Waduh, itu tidak berhasil. %s
 
@@ -236,7 +236,7 @@ lnurlResolvingUrlMessage       = """🧮 Menyelesaikan alamat..."""
 lnurlGettingUserMessage        = """🧮 Mempersiapkan pembayaran..."""
 lnurlPaymentFailed             = """🚫 Pembayaran gagal: %s"""
 lnurlInvalidAmountMessage      = """🚫 Jumlah tidak benar."""
-lnurlInvalidAmountRangeMessage = """🚫 Jumlah harus diantara %d dan %d sat."""
+lnurlInvalidAmountRangeMessage = """🚫 Jumlah harus diantara %s dan %s."""
 lnurlNoUsernameMessage         = """🚫 Kamu harus mengatur nama pengguna Telegram untuk menerima pembayaran melalui LNURL."""
 lnurlHelpText                  = """📖 Waduh, itu tidak berhasil. %s
 
@@ -245,7 +245,7 @@ lnurlHelpText                  = """📖 Waduh, itu tidak berhasil. %s
 
 # LNURL PENARIKAN
 
-confirmLnurlWithdrawMessage     = """Apakah anda ingin melakukan penarikan ini?\n\n💸 Jumlah: %d sat"""
+confirmLnurlWithdrawMessage     = """Apakah anda ingin melakukan penarikan ini?\n\n💸 Jumlah: %s"""
 lnurlPreparingWithdraw        = """🧮 Mempersiapkan penarikan..."""
 lnurlWithdrawFailed             = """🚫 Penarikan gagal."""
 lnurlWithdrawCancelled             = """🚫 Penarikan dibatalkan."""
@@ -265,21 +265,21 @@ couldNotLinkMessage = """🚫 Tidak dapat menghubungkan dompet mu. Silakan coba 
 
 inlineQueryFaucetTitle        = """🚰 Membuat sebuah keran."""
 inlineQueryFaucetDescription  = """Penggunaan: @%s faucet <kapasitas> <per_pengguna>"""
-inlineResultFaucetTitle       = """🚰 Buat sebuah keran %d sat."""
+inlineResultFaucetTitle       = """🚰 Buat sebuah keran %s."""
 inlineResultFaucetDescription = """👉 Pencet disini untuk membuat sebuah keran di percakapan ini."""
 
-inlineFaucetMessage                     = """Tekan ✅ untuk mengambil %d sat dari keran ini %s.
+inlineFaucetMessage                     = """Tekan ✅ untuk mengambil %s dari keran ini %s.
 
-🚰 Tersisa: %d/%d sat (diberikan kepada %d/%d pengguna)
+🚰 Tersisa: %d/%s (diberikan kepada %d/%d pengguna)
 %s"""
-inlineFaucetEndedMessage                = """🚰 Keran kosong 🍺\n\n🏅 %d sat diberikan kepada %d pengguna."""
+inlineFaucetEndedMessage                = """🚰 Keran kosong 🍺\n\n🏅 %s diberikan kepada %d pengguna."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""
 inlineFaucetCreateWalletMessage         = """Bercakap dengan %s 👈 untuk mengelola dompet mu."""
 inlineFaucetCancelledMessage            = """🚫 Keran dibatalkan."""
 inlineFaucetInvalidPeruserAmountMessage = """🚫 Jumlah untuk tiap pengguna tidak terbagi dari kapasitas."""
 inlineFaucetInvalidAmountMessage        = """🚫 Jumlah tidak benar."""
-inlineFaucetSentMessage                 = """🚰 %d sat terkirim ke %s."""
-inlineFaucetReceivedMessage             = """🚰 %s mengirimkan kamu %d sat."""
+inlineFaucetSentMessage                 = """🚰 %s terkirim ke %s."""
+inlineFaucetReceivedMessage             = """🚰 %s mengirimkan kamu %s."""
 inlineFaucetHelpFaucetInGroup           = """Buat sebuah keran dalam sebuah grup dengan bot nya didalam atau gunakan 👉 perintah sebaris (/advanced untuk lebih lagi)."""
 inlineFaucetHelpText                    = """📖 Waduh, itu tidak berhasil. %s
 
@@ -290,12 +290,12 @@ inlineFaucetHelpText                    = """📖 Waduh, itu tidak berhasil. %s
 
 inlineQuerySendTitle            = """💸 Kirimkan pembayaran ke sebuah  percakapan."""
 inlineQuerySendDescription      = """Penggunaan: @%s send <jumlah> [<pengguna>] [<berita>]"""
-inlineResultSendTitle           = """💸 Kirim %d sat."""
-inlineResultSendDescription     = """👉 Pencet untuk mengirim %d sat ke percakapan ini."""
+inlineResultSendTitle           = """💸 Kirim %s."""
+inlineResultSendDescription     = """👉 Pencet untuk mengirim %s ke percakapan ini."""
 
-inlineSendMessage              = """Tekan ✅ untuk menerima pembayaran dari %s.\n\n💸 Jumlah: %d sat"""
+inlineSendMessage              = """Tekan ✅ untuk menerima pembayaran dari %s.\n\n💸 Jumlah: %s"""
 inlineSendAppendMemo           = """\n✉️ %s"""
-inlineSendUpdateMessageAccept  = """💸 %d sat terkirim dari %s ke %s."""
+inlineSendUpdateMessageAccept  = """💸 %s terkirim dari %s ke %s."""
 inlineSendCreateWalletMessage  = """Bercakap dengan %s 👈 untuk mengelola dompet mu."""
 sendYourselfMessage            = """📖 Kamu tidak dapat membayar diri mu sendiri."""
 inlineSendFailedMessage        = """🚫 Pengiriman tidak berhasil."""
@@ -306,12 +306,12 @@ inlineSendBalanceLowMessage    = """🚫 Saldo mu terlalu rendah."""
 
 inlineQueryReceiveTitle        = """🏅 Meminta pembayaran dalam sebuah percakapan."""
 inlineQueryReceiveDescription  = """Penggunaan: @%s receive <jumlah> [<pengguna>] [<berita>]"""
-inlineResultReceiveTitle       = """🏅 Menerima %d sat."""
-inlineResultReceiveDescription = """👉 Pencet untuk permintaan pembayaran sebesar %d sat."""
+inlineResultReceiveTitle       = """🏅 Menerima %s."""
+inlineResultReceiveDescription = """👉 Pencet untuk permintaan pembayaran sebesar %s."""
 
-inlineReceiveMessage             = """Tekan 💸 untuk membayar ke %s.\n\n💸 Jumlah: %d sat"""
+inlineReceiveMessage             = """Tekan 💸 untuk membayar ke %s.\n\n💸 Jumlah: %s"""
 inlineReceiveAppendMemo          = """\n✉️ %s"""
-inlineReceiveUpdateMessageAccept = """💸 %d sat terkirim oleh %s ke %s."""
+inlineReceiveUpdateMessageAccept = """💸 %s terkirim oleh %s ke %s."""
 inlineReceiveCreateWalletMessage = """Bercakap dengan %s 👈 untuk mengelola dompet mu."""
 inlineReceiveYourselfMessage     = """📖 Kamu tidak dapat membayar diri mu sendiri."""
 inlineReceiveFailedMessage       = """🚫 Penerimaan gagal."""
@@ -320,4 +320,4 @@ inlineReceiveCancelledMessage    = """🚫 Penerimaan dibatalkan."""
 convertEnterAmountMessage = """Apakah kamu sudah memasukkan jumlah?"""
 convertInvalidAmountMessage = """Apakah kamu memasukkan jumlah yang benar?"""
 convertPriceErrorMessage = """🚫 Tidak dapat mengambil harga."""
-convertResultMessage = """%.2f LKR sekitar %d sat."""
+convertResultMessage = """%.2f LKR sekitar %s."""

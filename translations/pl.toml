@@ -133,7 +133,7 @@ advancedMessage = """%s
 */generate* 🎆 Generuj obrazy przy użyciu DALLE-2: `/generate <podpowiedź>`"""
 
 # GENERIC
-enterAmountRangeMessage        = """💯 Wprowadź kwotę między %d a %d sat."""
+enterAmountRangeMessage        = """💯 Wprowadź kwotę między %s a %s."""
 enterAmountMessage             = """💯 Wprowadź kwotę."""
 enterUserMessage               = """👤 Podaj użytkownika."""
 enterTextMessage               = """⌨️ Wprowadź tekst."""
@@ -149,7 +149,7 @@ startNoUsernameMessage    = """☝️ Wygląda na to, że nie masz jeszcze nazwy
 
 # BALANCE
 
-balanceMessage      = """👑 *Twoje saldo:* %d sat(s). (%s USD / %s LKR)"""
+balanceMessage      = """👑 *Twoje saldo:* %s. (%s USD / %s LKR)"""
 balanceErrorMessage = """🚫 Pobranie Twojego salda nie powiodło się. Spróbuj ponownie później."""
 
 # TIP
@@ -159,8 +159,8 @@ tipInviteGroupMessage = """ℹ️ Przy okazji, możesz zaprosić tego bota do do
 tipEnterAmountMessage = """Czy wprowadzono kwotę?"""
 tipValidAmountMessage = """Czy wprowadzono poprawną kwotę?"""
 tipYourselfMessage    = """📖 Nie możesz dać sobie napiwku."""
-tipSentMessage        = """💸 %d sat wysłano do %s."""
-tipReceivedMessage    = """🏅 %s daje Ci napiwek w wysokości %d sat."""
+tipSentMessage        = """💸 %s wysłano do %s."""
+tipReceivedMessage    = """🏅 %s daje Ci napiwek w wysokości %s."""
 tipErrorMessage       = """🚫 Napiwek się nie powiódł."""
 tipUndefinedErrorMsg  = """spróbuj proszę później."""
 tipHelpText           = """📖 Ojej, to nie zadziałało. %s
@@ -172,11 +172,11 @@ tipHelpText           = """📖 Ojej, to nie zadziałało. %s
 
 sendValidAmountMessage     = """Czy podano poprawną kwotę?"""
 sendUserHasNoWalletMessage = """🚫 Użytkownik %s jeszcze nie utworzył portfela."""
-sendSentMessage            = """💸 %d sat wysłano do %s."""
-sendPublicSentMessage      = """💸 %d sat wysłano od %s do %s."""
-sendReceivedMessage        = """🏅 %s przysyła Ci %d sat."""
+sendSentMessage            = """💸 %s wysłano do %s."""
+sendPublicSentMessage      = """💸 %s wysłano od %s do %s."""
+sendReceivedMessage        = """🏅 %s przysyła Ci %s."""
 sendErrorMessage           = """🚫 Wysłanie nie powiodło się."""
-confirmSendMessage         = """Czy chcesz zapłacić %s?\n\n💸 Kwota: %d sat"""
+confirmSendMessage         = """Czy chcesz zapłacić %s?\n\n💸 Kwota: %s"""
 confirmSendAppendMemo      = """\n✉️ %s"""
 sendCancelledMessage       = """🚫 Wysłanie anulowane."""
 errorTryLaterMessage       = """🚫 Błąd. Spróbuj ponownie później."""
@@ -189,8 +189,8 @@ sendHelpText               = """📖 Ojej, to nie zadziałało. %s
 
 # INVOICE
 
-invoiceReceivedMessage    = """⚡️ Otrzymujesz %d sat."""
-invoiceReceivedCurrencyMessage    = """⚡️ Otrzymujesz %d sat (%s %s)."""
+invoiceReceivedMessage    = """⚡️ Otrzymujesz %s."""
+invoiceReceivedCurrencyMessage    = """⚡️ Otrzymujesz %s (%s %s)."""
 invoiceEnterAmountMessage = """Czy wprowadzono kwotę?"""
 invoiceValidAmountMessage = """Czy wprowadzono poprawną kwotę?"""
 invoiceHelpText           = """📖 Ojej, to nie zadziałało. %s
@@ -206,11 +206,11 @@ invoicePaidMessage          = """⚡️ Płatność wysłana."""
 invoicePublicPaidMessage    = """⚡️ Płatność wysłana przez %s."""
 invalidInvoiceHelpMessage    = """Czy podajesz poprawną fakturę Lightning? Spróbuj /send jeśli chcesz wysłać do użytkownika na Telegramie lub pod adres Lightning."""
 invoiceNoAmountMessage       = """🚫 Nie można opłacić faktury bez kwoty."""
-insufficientFundsMessage     = """🚫 Niewystarczające środki. Masz %d sat a potrzebujesz conajmniej %d sat."""
+insufficientFundsMessage     = """🚫 Niewystarczające środki. Masz %s a potrzebujesz conajmniej %s."""
 feeReserveMessage            = """⚠️ Wysyłanie swojego całkowitego salda może się nie powieść z powodu opłat sieciowych. Zarezerwuj conajmniej 1% na opłaty."""
 invoicePaymentFailedMessage  = """🚫 Płatność nie powiodła się: %s"""
 invoiceUndefinedErrorMessage = """Nie można było zapłacić faktury."""
-confirmPayInvoiceMessage     = """Czy chcesz wysłać tę płatność?\n\n💸 Kwota: %d sat"""
+confirmPayInvoiceMessage     = """Czy chcesz wysłać tę płatność?\n\n💸 Kwota: %s"""
 confirmPayAppendMemo         = """\n✉️ %s"""
 payHelpText                  = """📖 Ojej, to nie zadziałało. %s
 
@@ -243,7 +243,7 @@ lnurlResolvingUrlMessage       = """🧮 Rozwiązuje adres..."""
 lnurlGettingUserMessage        = """🧮 Przygotowuję płatność..."""
 lnurlPaymentFailed             = """🚫 Płatność się nie powiodła: %s"""
 lnurlInvalidAmountMessage      = """🚫 Nieprawidłowa kwota."""
-lnurlInvalidAmountRangeMessage = """🚫 Kwota musi być między %d a %d sat."""
+lnurlInvalidAmountRangeMessage = """🚫 Kwota musi być między %s a %s."""
 lnurlNoUsernameMessage         = """🚫 Musisz ustawić nazwę użytkownika na Telegramie aby otrzymywać płatności poprzez LNURL."""
 lnurlHelpText                  = """📖 Ojej, to nie zadziałało. %s
 
@@ -259,7 +259,7 @@ loginCancelledMessage           = """🚫 Logowanie anulowane."""
 
 # LNURL WITHDRAW
 
-confirmLnurlWithdrawMessage     = """Czy chcesz dokonąć tej wypłaty?\n\n💸 Kwota: %d sat"""
+confirmLnurlWithdrawMessage     = """Czy chcesz dokonąć tej wypłaty?\n\n💸 Kwota: %s"""
 lnurlPreparingWithdraw        = """🧮 Przygotowywanie wypłaty..."""
 lnurlWithdrawFailed             = """🚫 Wypłata nie powiodła się."""
 lnurlWithdrawCancelled             = """🚫 Wypłata anulowana."""
@@ -290,21 +290,21 @@ apiHiddenMessage               = """🔍 Klucze ukryte. Napisz /api aby zobaczy�
 
 inlineQueryFaucetTitle        = """🚰 Utwórz kranik (_faucet_)."""
 inlineQueryFaucetDescription  = """Użycie: @%s faucet <pojemność> <na_użytkownika>"""
-inlineResultFaucetTitle       = """🚰 Tworzenie kranika o pojemności %d sat."""
+inlineResultFaucetTitle       = """🚰 Tworzenie kranika o pojemności %s."""
 inlineResultFaucetDescription = """👉 Kliknij tu aby utworzyć kranik w tym chacie."""
 
-inlineFaucetMessage                     = """Naciśnij ✅ aby zebrać %d sat z kranika %s.
+inlineFaucetMessage                     = """Naciśnij ✅ aby zebrać %s z kranika %s.
 
-🚰 Pozostało: %d/%d sat (rozdanych %d użytkownikom z %d)
+🚰 Pozostało: %d/%s (rozdanych %d użytkownikom z %d)
 %s"""
-inlineFaucetEndedMessage                = """🚰 Kranik pusty 🍺\n\n🏅 %d sat rozdano do %d użytkowników."""
+inlineFaucetEndedMessage                = """🚰 Kranik pusty 🍺\n\n🏅 %s rozdano do %d użytkowników."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""
 inlineFaucetCreateWalletMessage         = """Chatuj z %s 👈 aby zarządzać swoim portfelem."""
 inlineFaucetCancelledMessage            = """🚫 Kranik anulowany."""
 inlineFaucetInvalidPeruserAmountMessage = """🚫 Wartość na_użytkownika nie jest dzielnikiem pojemności lub jest za mała (min 5 sat)."""
 inlineFaucetInvalidAmountMessage        = """🚫 Nieprawidłowa kwota."""
-inlineFaucetSentMessage                 = """🚰 %d sat wysłano do %s."""
-inlineFaucetReceivedMessage             = """🚰 %s wysyła Ci %d sat."""
+inlineFaucetSentMessage                 = """🚰 %s wysłano do %s."""
+inlineFaucetReceivedMessage             = """🚰 %s wysyła Ci %s."""
 inlineFaucetHelpFaucetInGroup           = """Utwórz w grupie z botem kranik (_facuet_) lub użyj 👉 komendy inline (zobacz /advanced aby uzyskać więcej informacji)."""
 inlineFaucetAlreadyTookMessage          = """🚫 Już brałeś z tego kranika."""
 inlineFaucetHelpText                    = """📖 Ojej, to nie zadziałało. %s
@@ -316,12 +316,12 @@ inlineFaucetHelpText                    = """📖 Ojej, to nie zadziałało. %s
 
 inlineQuerySendTitle            = """💸 Wyślij płatność do tego chatu."""
 inlineQuerySendDescription      = """Użycie: @%s send <kwota> [<użytkownik>] [<notatka>]"""
-inlineResultSendTitle           = """💸 Wysłano %d sat."""
-inlineResultSendDescription     = """👉 Kliknij aby wysłać %d sat do tego chatu."""
+inlineResultSendTitle           = """💸 Wysłano %s."""
+inlineResultSendDescription     = """👉 Kliknij aby wysłać %s do tego chatu."""
 
-inlineSendMessage              = """Naciśnij ✅ aby otrzymać płatność od %s.\n\n💸 Kwota: %d sat"""
+inlineSendMessage              = """Naciśnij ✅ aby otrzymać płatność od %s.\n\n💸 Kwota: %s"""
 inlineSendAppendMemo           = """\n✉️ %s"""
-inlineSendUpdateMessageAccept  = """💸 %d sat wysłano od %s do %s."""
+inlineSendUpdateMessageAccept  = """💸 %s wysłano od %s do %s."""
 inlineSendCreateWalletMessage  = """Chatuj z %s 👈 aby zarządzać swoim portfelem."""
 sendYourselfMessage            = """📖 Nie możesz zapłacić sobie."""
 inlineSendFailedMessage        = """🚫 Wysłanie nie powiodło się."""
@@ -332,12 +332,12 @@ inlineSendBalanceLowMessage    = """🚫 Twoje saldo jest za niskie."""
 
 inlineQueryReceiveTitle        = """🏅 Poproś o płatność na chacie."""
 inlineQueryReceiveDescription  = """Użycie: @%s receive <kwota> [<użytkownik>] [<notatka>]"""
-inlineResultReceiveTitle       = """🏅 Otrzymaj %d sat."""
-inlineResultReceiveDescription = """👉 Kliknij aby poprosić o płatność %d sat."""
+inlineResultReceiveTitle       = """🏅 Otrzymaj %s."""
+inlineResultReceiveDescription = """👉 Kliknij aby poprosić o płatność %s."""
 
-inlineReceiveMessage             = """Naciśnij 💸 aby zapłacić %s.\n\n💸 Kwota: %d sat"""
+inlineReceiveMessage             = """Naciśnij 💸 aby zapłacić %s.\n\n💸 Kwota: %s"""
 inlineReceiveAppendMemo          = """\n✉️ %s"""
-inlineReceiveUpdateMessageAccept = """💸 %d sat wysłano od %s do %s."""
+inlineReceiveUpdateMessageAccept = """💸 %s wysłano od %s do %s."""
 inlineReceiveCreateWalletMessage = """Chatuj z %s 👈 aby zarządzać swoim portfelem."""
 inlineReceiveYourselfMessage     = """📖 Nie możesz zapłacić sobie."""
 inlineReceiveFailedMessage       = """🚫 Przyjmowanie środków nie powiodło się."""
@@ -347,20 +347,20 @@ inlineReceiveCancelledMessage    = """🚫 Przyjmowanie środków anulowane."""
 
 inlineQueryTipjarTitle        = """🍯 Utwórz słoik na napiwki (_tipjar_)."""
 inlineQueryTipjarDescription  = """Użycie: @%s tipjar <pojemność> <na_użytkownika>"""
-inlineResultTipjarTitle       = """🍯 Tworzenie słoika na napiwki (_tipjar_) o pojemności %d sat."""
+inlineResultTipjarTitle       = """🍯 Tworzenie słoika na napiwki (_tipjar_) o pojemności %s."""
 inlineResultTipjarDescription = """👉 Kliknij tu aby utworzyć w tym chacie słoik na napiwki (_tipjar_)."""
 
-inlineTipjarMessage                     = """Naciśnij 💸 aby *wpłacić %d sat* do tego słoika na napiwki (_tipjar_) przez %s.
+inlineTipjarMessage                     = """Naciśnij 💸 aby *wpłacić %s* do tego słoika na napiwki (_tipjar_) przez %s.
 
-🙏 Przekazano: *%d*/%d sat (przez %d użytkowników)
+🙏 Przekazano: *%d*/%s (przez %d użytkowników)
 %s"""
-inlineTipjarEndedMessage                = """🍯 Słoik na napiwki %s jest pełen ⭐️\n\n🏅 %d sat przekazanych przez %d użytkowników."""
+inlineTipjarEndedMessage                = """🍯 Słoik na napiwki %s jest pełen ⭐️\n\n🏅 %s przekazanych przez %d użytkowników."""
 inlineTipjarAppendMemo                  = """\n✉️ %s"""
 inlineTipjarCancelledMessage            = """🚫 Słoik na napiwki anulowany."""
 inlineTipjarInvalidPeruserAmountMessage = """🚫 Kwota na_użytkownika nie jest dzielnikiem pojemności."""
 inlineTipjarInvalidAmountMessage        = """🚫 Nieprawidłowa kwota."""
-inlineTipjarSentMessage                 = """🍯 %d sat wysłano do %s."""
-inlineTipjarReceivedMessage             = """🍯 %s wysyła Ci %d sat."""
+inlineTipjarSentMessage                 = """🍯 %s wysłano do %s."""
+inlineTipjarReceivedMessage             = """🍯 %s wysyła Ci %s."""
 inlineTipjarHelpTipjarInGroup           = """Stwórz w grupie z tym botem słoik na napiwki (_tipjar_) lub użyj 👉 komendy inline (zobacz /advanced aby uzyskać więcej informacji)."""
 inlineTipjarHelpText                    = """📖 Ojej, to nie zadziałało. %s
 
@@ -375,10 +375,10 @@ groupTicketIssuedGroupMessage       = """🎟 Użytkownik %s otrzymuje bilet do 
 groupPayInvoiceMessage              = """🎟 Aby dołączyć do grupy %s, opłać powyższą fakturę."""
 groupBotIsNotAdminMessage           = """🚫 Ojej, to nie zadziałało. Musisz uczynić mnie administratorem i nadać prawo do zapraszania użytkowników."""
 groupNameExists                     = """🚫 Grupa o tej nazwie już istnieje. Wybierz inną nazwę."""
-groupAddedMessage                   = """🎟 Bilety dla grupy `%s` dodane.\nAlias: `%s` Cena: %d sat\n\nAby poprosić o bilet na tę grupę, rozpocznij prywatny czat z %s i napisz `/join %s`."""
+groupAddedMessage                   = """🎟 Bilety dla grupy `%s` dodane.\nAlias: `%s` Cena: %s\n\nAby poprosić o bilet na tę grupę, rozpocznij prywatny czat z %s i napisz `/join %s`."""
 groupNotFoundMessage                = """🚫 Nie znaleziono grupy o tej nazwie."""
-groupReceiveTicketInvoiceCommission = """🎟 Otrzymujesz *%d sat* (wyłączając. %d sat prowizji) za bilet na grupę `%s` zapłacony przez %s."""
-groupReceiveTicketInvoice           = """🎟 Otrzymujesz *%d sat* za bilet na grupę `%s` zapłacony przez %s."""
+groupReceiveTicketInvoiceCommission = """🎟 Otrzymujesz *%s* (wyłączając. %s prowizji) za bilet na grupę `%s` zapłacony przez %s."""
+groupReceiveTicketInvoice           = """🎟 Otrzymujesz *%s* za bilet na grupę `%s` zapłacony przez %s."""
 commandPrivateMessage               = """Użyj proszę tej komendy na czacie prywatnym z %s."""
 groupHelpMessage                    = """🎟 Bilety na prywatne grupy 🎟
 
@@ -408,4 +408,4 @@ generateDalleGeneratingMessage  = """Twoje obrazy są generowane. Proszę czekaj
 convertEnterAmountMessage   = """Czy wprowadzono kwotę?"""
 convertInvalidAmountMessage = """Czy wprowadzono poprawną kwotę?"""
 convertPriceErrorMessage    = """🚫 Nie udało się pobrać ceny."""
-convertResultMessage        = """%.2f LKR to około %d sat."""
+convertResultMessage        = """%.2f LKR to około %s."""

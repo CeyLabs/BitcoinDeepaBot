@@ -3,11 +3,11 @@ package telegram
 import (
 	"fmt"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/LightningTipBot/LightningTipBot/internal"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 )
@@ -287,29 +287,6 @@ func (el *ErrorLogger) getUserStrV2(user *tb.User) string {
 	return fmt.Sprintf("%s %s", el.escapeMarkdownV2(user.FirstName), el.escapeMarkdownV2(user.LastName))
 }
 
-// formatSats returns a comma separated representation of satoshi amounts
-func formatSats(amount int64) string {
-	s := strconv.FormatInt(amount, 10)
-	if len(s) <= 3 {
-		return s
-	}
-	var b strings.Builder
-	pre := len(s) % 3
-	if pre > 0 {
-		b.WriteString(s[:pre])
-		if len(s) > pre {
-			b.WriteRune(',')
-		}
-	}
-	for i := pre; i < len(s); i += 3 {
-		if i > 0 && i != pre {
-			b.WriteRune(',')
-		}
-		b.WriteString(s[i : i+3])
-	}
-	return b.String()
-}
-
 // LogPaymentError logs payment-related errors with detailed information
 func (el *ErrorLogger) LogPaymentError(err error, amount int64, memo, invoice string, user *tb.User) {
 	if !el.enabled || err == nil {
@@ -326,7 +303,7 @@ func (el *ErrorLogger) LogPaymentError(err error, amount int64, memo, invoice st
 	timestamp := time.Now().Format("2006-01-02 15:04:05 UTC")
 
 	msg := fmt.Sprintf("🚫 Payment Error for %s (ID: %d)\n\n", el.getUserStrV2(user), user.ID)
-	msg += fmt.Sprintf("💰 Amount: %s sats\n", el.escapeMarkdownV2(formatSats(amount)))
+	msg += fmt.Sprintf("💰 Amount: %s\n", el.escapeMarkdownV2(utils.FormatSats(amount)))
 	msg += fmt.Sprintf("📝 Memo: %s\n", el.escapeMarkdownV2(memo))
 	msg += fmt.Sprintf("📄 Invoice: %s\n", el.escapeMarkdownV2(invoice))
 	msg += fmt.Sprintf("❗ Error: %s\n\n", el.escapeMarkdownV2(err.Error()))
@@ -351,7 +328,7 @@ func (el *ErrorLogger) LogPaymentError(err error, amount int64, memo, invoice st
 
 // LogTransactionError logs transaction-related errors with sender/receiver info
 func (el *ErrorLogger) LogTransactionError(err error, transactionType string, amount int64, fromUser, toUser *tb.User) {
-	context := fmt.Sprintf("Transaction Error - Type: %s, Amount: %d sat(s)", transactionType, amount)
+	context := fmt.Sprintf("Transaction Error - Type: %s, Amount: %s", transactionType, utils.FormatSats(amount))
 
 	var userDetails []string
 	if fromUser != nil {
@@ -361,8 +338,8 @@ func (el *ErrorLogger) LogTransactionError(err error, transactionType string, am
 		userDetails = append(userDetails, fmt.Sprintf("> *To:* %s \\(ID: %d\\)", el.getUserStrV2(toUser), toUser.ID))
 	}
 
-	transactionDetails := fmt.Sprintf("*Transaction Details:*\n%s\n> *Amount:* `%d sat(s)`\n> *Transaction Error:* `%s`",
-		strings.Join(userDetails, "\n"), amount, el.escapeMarkdownV2(err.Error()))
+	transactionDetails := fmt.Sprintf("*Transaction Details:*\n%s\n> *Amount:* `%s`\n> *Transaction Error:* `%s`",
+		strings.Join(userDetails, "\n"), utils.FormatSats(amount), el.escapeMarkdownV2(err.Error()))
 
 	var logUsers []interface{}
 	if fromUser != nil {

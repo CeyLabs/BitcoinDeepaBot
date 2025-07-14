@@ -107,6 +107,7 @@ python test_api_send.py --test-suite
 /basics 📚 More info.
 /donate ❤️ Donate to the project: /donate <amount>
 /lkrsats 💱 Convert LKR to sats: /lkrsats <amount>
+/convert 💱 Convert sats to fiat: /convert <sats>
 ```
 
 #### Advanced commands

@@ -17,6 +17,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
@@ -369,7 +370,7 @@ func (bot *TipBot) cancelInlineTipjarHandler(ctx intercept.Context) (intercept.C
 
 func listTipjarGivers(inlineTipjar *InlineTipjar) string {
 	var from_str string
-	from_str = fmt.Sprintf("🍯 *Tipjar summary*\n\nMemo: %s\nCapacity: %d sat\nGivers: %d\nCollected: %d sat\n\n*Givers:*\n\n", inlineTipjar.Memo, inlineTipjar.Amount, inlineTipjar.NGiven, inlineTipjar.GivenAmount)
+	from_str = fmt.Sprintf("🍯 *Tipjar summary*\n\nMemo: %s\nCapacity: %s\nGivers: %d\nCollected: %s\n\n*Givers:*\n\n", inlineTipjar.Memo, utils.FormatSats(inlineTipjar.Amount), inlineTipjar.NGiven, utils.FormatSats(inlineTipjar.GivenAmount))
 	from_str += "```\n"
 	for _, from := range inlineTipjar.From {
 		from_str += fmt.Sprintf("%s\n", GetUserStr(from.Telegram))

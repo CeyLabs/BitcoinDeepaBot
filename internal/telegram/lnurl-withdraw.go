@@ -21,6 +21,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/runtime"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/str"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	lnurl "github.com/fiatjaf/go-lnurl"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
@@ -98,7 +99,7 @@ func (bot *TipBot) lnurlWithdrawHandler(ctx intercept.Context, withdrawParams *L
 		(withdrawParams.LNURLWithdrawResponse.MaxWithdrawable != 0 && withdrawParams.LNURLWithdrawResponse.MinWithdrawable != 0) { // only if max and min are set
 		err := fmt.Errorf("amount not in range")
 		log.Warnf("[lnurlWithdrawHandler] Error: %s", err.Error())
-		bot.trySendMessage(m.Sender, fmt.Sprintf(Translate(ctx, "lnurlInvalidAmountRangeMessage"), withdrawParams.LNURLWithdrawResponse.MinWithdrawable/1000, withdrawParams.LNURLWithdrawResponse.MaxWithdrawable/1000))
+		bot.trySendMessage(m.Sender, fmt.Sprintf(Translate(ctx, "lnurlInvalidAmountRangeMessage"), utils.FormatSats(withdrawParams.LNURLWithdrawResponse.MinWithdrawable/1000), utils.FormatSats(withdrawParams.LNURLWithdrawResponse.MaxWithdrawable/1000)))
 		ResetUserState(user, bot)
 		return
 	}

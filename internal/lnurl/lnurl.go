@@ -23,6 +23,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/runtime"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	"github.com/fiatjaf/go-lnurl"
 	"github.com/gorilla/mux"
 	"github.com/nbd-wtf/go-nostr"
@@ -301,7 +302,7 @@ func (w Lnurl) serveLNURLpSecond(username string, amount_msat int64, comment str
 		return &lnurl.LNURLPayValues{
 			LNURLResponse: lnurl.LNURLResponse{
 				Status: api.StatusError,
-				Reason: fmt.Sprintf("Amount out of bounds (min: %d sat, max: %d sat).", MinSendable/1000, MaxSendable/1000)},
+				Reason: fmt.Sprintf("Amount out of bounds (min: %s, max: %s).", utils.FormatSats(MinSendable/1000), utils.FormatSats(MaxSendable/1000))},
 		}, fmt.Errorf("amount out of bounds")
 	}
 	// check comment length
