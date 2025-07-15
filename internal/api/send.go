@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
@@ -18,7 +20,7 @@ import (
 // SendRequest represents the JSON request for the send API
 type SendRequest struct {
 	From   string `json:"from"`   // Telegram username (without @) - must be whitelisted
-	To     string `json:"to"`     // Telegram username (without @) or wallet ID
+	To     string `json:"to"`     // Telegram username (without @), Telegram ID, or wallet ID
 	Amount int64  `json:"amount"` // Amount in satoshis
 	Memo   string `json:"memo"`   // Optional memo
 }
@@ -98,6 +100,15 @@ func isWhitelistedAccount(username string) bool {
 		}
 	}
 	return false
+}
+
+// isTelegramID checks if the given string is a valid Telegram ID (numeric)
+func isTelegramID(identifier string) bool {
+	// Remove @ prefix if present
+	identifier = strings.TrimPrefix(identifier, "@")
+	// Check if it's all digits and has reasonable length for Telegram ID
+	match, _ := regexp.MatchString(`^[0-9]{5,15}$`, identifier)
+	return match
 }
 
 // Send handles the /api/send endpoint for programmatic Bitcoin Lightning payments
@@ -193,12 +204,32 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Try to find recipient by Telegram username
-	toUser, err := telegram.GetUserByTelegramUsername(toIdentifier, *s.Bot)
-	if err != nil {
-		log.Errorf("[api/send] Could not find recipient user %s: %v", toIdentifier, err)
-		RespondError(w, fmt.Sprintf("Recipient '@%s' not found or has no wallet", toIdentifier))
-		return
+	// Try to find recipient by Telegram username or ID
+	var toUser *lnbits.User
+	if isTelegramID(toIdentifier) {
+		// It's a Telegram ID
+		telegramID, err := strconv.ParseInt(toIdentifier, 10, 64)
+		if err != nil {
+			log.Errorf("[api/send] Invalid Telegram ID %s: %v", toIdentifier, err)
+			RespondError(w, fmt.Sprintf("Invalid Telegram ID '%s'", toIdentifier))
+			return
+		}
+		toUser, err = telegram.GetUserByTelegramID(telegramID, *s.Bot)
+		if err != nil {
+			log.Errorf("[api/send] Could not find recipient user with ID %d: %v", telegramID, err)
+			RespondError(w, fmt.Sprintf("Recipient '%s' not found or has no wallet", toIdentifier))
+			return
+		}
+		log.Infof("[api/send] Found recipient by Telegram ID: %d", telegramID)
+	} else {
+		// It's a Telegram username
+		toUser, err = telegram.GetUserByTelegramUsername(toIdentifier, *s.Bot)
+		if err != nil {
+			log.Errorf("[api/send] Could not find recipient user %s: %v", toIdentifier, err)
+			RespondError(w, fmt.Sprintf("Recipient '@%s' not found or has no wallet", toIdentifier))
+			return
+		}
+		log.Infof("[api/send] Found recipient by username: %s", toIdentifier)
 	}
 
 	// Check if trying to send to self
