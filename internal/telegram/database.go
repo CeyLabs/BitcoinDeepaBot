@@ -159,6 +159,21 @@ func GetUserByTelegramUsername(toUserStrWithoutAt string, bot TipBot) (*lnbits.U
 	}
 	return toUserDb, nil
 }
+
+// GetUserByTelegramID retrieves a user by their Telegram ID
+func GetUserByTelegramID(telegramID int64, bot TipBot) (*lnbits.User, error) {
+	toUserDb := &lnbits.User{}
+	tx := bot.DB.Users.Where("telegram_id = ?", telegramID).First(toUserDb)
+	if tx.Error != nil || toUserDb.Wallet == nil {
+		err := tx.Error
+		if toUserDb.Wallet == nil {
+			err = fmt.Errorf("%s | user with ID %d has no wallet", tx.Error, telegramID)
+		}
+		return nil, err
+	}
+	return toUserDb, nil
+}
+
 func getCachedUser(u *tb.User, bot TipBot) (*lnbits.User, error) {
 	user := &lnbits.User{Name: strconv.FormatInt(u.ID, 10)}
 	if us, err := bot.Cache.Get(user.Name); err == nil {
