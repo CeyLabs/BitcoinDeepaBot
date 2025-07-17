@@ -40,14 +40,19 @@ const (
 
 // NewPendingTransaction creates a new pending transaction
 func NewPendingTransaction(req *SendRequest, fromUser, toUser *lnbits.User, clientIP string) *PendingTransaction {
-	id := fmt.Sprintf("pending-%s-%s-%d-%d", req.From, req.To, req.Amount, time.Now().Unix())
+	fromUsername := ""
+	if fromUser != nil {
+		fromUsername = fromUser.Telegram.Username
+	}
+
+	id := fmt.Sprintf("pending-%s-%s-%d-%d", fromUsername, req.To, req.Amount, time.Now().Unix())
 
 	return &PendingTransaction{
 		Base:             storage.New(storage.ID(id)),
 		ID:               id,
 		FromUser:         fromUser,
 		ToUser:           toUser,
-		FromUsername:     req.From,
+		FromUsername:     fromUsername,
 		ToUsername:       req.To,
 		Amount:           req.Amount,
 		Memo:             req.Memo,

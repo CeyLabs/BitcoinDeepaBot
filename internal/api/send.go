@@ -19,7 +19,6 @@ import (
 
 // SendRequest represents the JSON request for the send API
 type SendRequest struct {
-	From   string `json:"from"`   // Telegram username (without @) - must be whitelisted
 	To     string `json:"to"`     // Telegram username (without @), Telegram ID, or wallet ID
 	Amount int64  `json:"amount"` // Amount in satoshis
 	Memo   string `json:"memo"`   // Optional memo
@@ -91,17 +90,6 @@ func getClientIP(r *http.Request) string {
 	return ip
 }
 
-// isWhitelistedAccount checks if the from account is in the whitelist
-func isWhitelistedAccount(username string) bool {
-	username = strings.TrimPrefix(username, "@")
-	for _, allowed := range GetWhitelistedFromAccounts() {
-		if strings.EqualFold(username, allowed) {
-			return true
-		}
-	}
-	return false
-}
-
 // isTelegramID checks if the given string is a valid Telegram ID (numeric)
 func isTelegramID(identifier string) bool {
 	// Remove @ prefix if present
@@ -121,11 +109,25 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate request
-	if req.From == "" {
-		RespondError(w, "Missing 'from' field")
+	// Get authenticated wallet from context (set by WalletHMACMiddleware)
+	authenticatedWallet := r.Context().Value("authenticated_wallet")
+	if authenticatedWallet == nil {
+		log.Error("[api/send] No authenticated wallet found in request context")
+		RespondError(w, "Authentication failed")
 		return
 	}
+	
+	walletID := authenticatedWallet.(string)
+	wallet, exists := GetWhitelistedWallets()[walletID]
+	if !exists {
+		log.Errorf("[api/send] Authenticated wallet %s not found in configuration", walletID)
+		RespondError(w, "Invalid wallet configuration")
+		return
+	}
+	
+	fromUsername := wallet.Username
+
+	// Validate request
 	if req.To == "" {
 		RespondError(w, "Missing 'to' field")
 		return
@@ -147,15 +149,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Clean usernames (remove @ if present)
-	fromUsername := strings.TrimPrefix(req.From, "@")
 	toIdentifier := strings.TrimPrefix(req.To, "@")
-
-	// Check if from account is whitelisted
-	if !isWhitelistedAccount(fromUsername) {
-		log.Warnf("[api/send] Unauthorized sender: %s", fromUsername)
-		RespondError(w, fmt.Sprintf("Sender account '@%s' is not authorized", fromUsername))
-		return
-	}
 
 	// Get the sender user
 	fromUser, err := telegram.GetUserByTelegramUsername(fromUsername, *s.Bot)
