@@ -4,11 +4,6 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal"
 )
 
-// GetWhitelistedFromAccounts returns the list of whitelisted sender accounts
-func GetWhitelistedFromAccounts() []string {
-	return internal.Configuration.API.Send.WhitelistedSenders
-}
-
 // GetInternalNetworkCIDR returns the allowed internal network range
 func GetInternalNetworkCIDR() string {
 	return internal.Configuration.API.Send.InternalNetwork
@@ -37,4 +32,9 @@ func GetMaxMemoLength() int {
 // GetAPIRateLimit returns the API rate limit
 func GetAPIRateLimit() int {
 	return internal.Configuration.API.Send.RateLimit
+}
+
+// GetAPIFromUserId returns the configured sender Telegram ID for API sends
+func GetAPIFromUserId() string {
+	return internal.Configuration.API.Send.FromUserId
 }

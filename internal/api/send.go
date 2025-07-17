@@ -9,18 +9,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/str"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
 	"github.com/LightningTipBot/LightningTipBot/internal/utils"
-	"github.com/LightningTipBot/LightningTipBot/pkg/lightning"
 	log "github.com/sirupsen/logrus"
 )
 
 // SendRequest represents the JSON request for the send API
 type SendRequest struct {
-	From   string `json:"from"`   // Telegram username (without @) - must be whitelisted
-	To     string `json:"to"`     // Telegram username (without @), Telegram ID, or wallet ID
+	To     string `json:"to"`     // Telegram user ID (numeric)
 	Amount int64  `json:"amount"` // Amount in satoshis
 	Memo   string `json:"memo"`   // Optional memo
 }
@@ -91,17 +88,6 @@ func getClientIP(r *http.Request) string {
 	return ip
 }
 
-// isWhitelistedAccount checks if the from account is in the whitelist
-func isWhitelistedAccount(username string) bool {
-	username = strings.TrimPrefix(username, "@")
-	for _, allowed := range GetWhitelistedFromAccounts() {
-		if strings.EqualFold(username, allowed) {
-			return true
-		}
-	}
-	return false
-}
-
 // isTelegramID checks if the given string is a valid Telegram ID (numeric)
 func isTelegramID(identifier string) bool {
 	// Remove @ prefix if present
@@ -122,10 +108,6 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate request
-	if req.From == "" {
-		RespondError(w, "Missing 'from' field")
-		return
-	}
 	if req.To == "" {
 		RespondError(w, "Missing 'to' field")
 		return
@@ -146,91 +128,59 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Clean usernames (remove @ if present)
-	fromUsername := strings.TrimPrefix(req.From, "@")
-	toIdentifier := strings.TrimPrefix(req.To, "@")
+	// Parse sender Telegram ID
+	fromUserIdStr := GetAPIFromUserId()
+	fromUserId, err := strconv.ParseInt(fromUserIdStr, 10, 64)
+	if err != nil {
+		log.Errorf("[api/send] Invalid sender Telegram ID %d: %v", fromUserId, err)
+		RespondError(w, "Invalid sender configuration")
+		return
+	}
 
-	// Check if from account is whitelisted
-	if !isWhitelistedAccount(fromUsername) {
-		log.Warnf("[api/send] Unauthorized sender: %s", fromUsername)
-		RespondError(w, fmt.Sprintf("Sender account '@%s' is not authorized", fromUsername))
+	// Validate recipient Telegram ID
+	if !isTelegramID(req.To) {
+		RespondError(w, "Recipient 'to' field must be a valid Telegram user ID (numeric)")
 		return
 	}
 
 	// Get the sender user
-	fromUser, err := telegram.GetUserByTelegramUsername(fromUsername, *s.Bot)
+	fromUser, err := telegram.GetUserByTelegramID(fromUserId, *s.Bot)
 	if err != nil {
-		log.Errorf("[api/send] Could not find sender user %s: %v", fromUsername, err)
-		RespondError(w, fmt.Sprintf("Sender '@%s' not found or has no wallet", fromUsername))
+		log.Errorf("[api/send] Could not find sender user %d: %v", fromUserId, err)
+		RespondError(w, fmt.Sprintf("Sender '%d' not found or has no wallet", fromUserId))
 		return
 	}
 
 	// Check sender's balance
 	balance, err := s.Bot.GetUserBalance(fromUser)
 	if err != nil {
-		log.Errorf("[api/send] Could not get balance for %s: %v", fromUsername, err)
+		log.Errorf("[api/send] Could not get balance for %d: %v", fromUserId, err)
 		RespondError(w, "Could not check sender balance")
 		return
 	}
 
 	if balance < req.Amount {
-		log.Warnf("[api/send] Insufficient balance for %s: %d < %d", fromUsername, balance, req.Amount)
+		log.Warnf("[api/send] Insufficient balance for %d: %d < %d", fromUserId, balance, req.Amount)
 		RespondError(w, fmt.Sprintf("Insufficient balance: %s available, %s required", utils.FormatSats(balance), utils.FormatSats(req.Amount)))
 		return
 	}
 
-	// Check if 'to' is a Lightning address
-	if lightning.IsLightningAddress(toIdentifier) {
-		log.Infof("[api/send] Sending to Lightning address: %s", toIdentifier)
-		err = s.sendToLightningAddress(fromUser, toIdentifier, req.Amount, req.Memo)
-		if err != nil {
-			log.Errorf("[api/send] Lightning address payment failed: %v", err)
-			RespondError(w, fmt.Sprintf("Lightning address payment failed: %v", err))
-			return
-		}
-
-		response := SendResponse{
-			Success:  true,
-			Message:  "Payment sent successfully to Lightning address",
-			FromUser: fromUsername,
-			ToUser:   toIdentifier,
-			Amount:   req.Amount,
-			Memo:     req.Memo,
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+	// Parse recipient Telegram ID
+	toUserId, err := strconv.ParseInt(req.To, 10, 64)
+	if err != nil {
+		log.Errorf("[api/send] Invalid Telegram ID %s: %v", req.To, err)
+		RespondError(w, fmt.Sprintf("Invalid Telegram ID '%s'", req.To))
 		return
 	}
 
-	// Try to find recipient by Telegram username or ID
-	var toUser *lnbits.User
-	if isTelegramID(toIdentifier) {
-		// It's a Telegram ID
-		telegramID, err := strconv.ParseInt(toIdentifier, 10, 64)
-		if err != nil {
-			log.Errorf("[api/send] Invalid Telegram ID %s: %v", toIdentifier, err)
-			RespondError(w, fmt.Sprintf("Invalid Telegram ID '%s'", toIdentifier))
-			return
-		}
-		toUser, err = telegram.GetUserByTelegramID(telegramID, *s.Bot)
-		if err != nil {
-			log.Errorf("[api/send] Could not find recipient user with ID %d: %v", telegramID, err)
-			RespondError(w, fmt.Sprintf("Recipient '%s' not found or has no wallet", toIdentifier))
-			return
-		}
-		log.Infof("[api/send] Found recipient by Telegram ID: %d", telegramID)
-	} else {
-		// It's a Telegram username
-		toUser, err = telegram.GetUserByTelegramUsername(toIdentifier, *s.Bot)
-		if err != nil {
-			log.Errorf("[api/send] Could not find recipient user %s: %v", toIdentifier, err)
-			RespondError(w, fmt.Sprintf("Recipient '@%s' not found or has no wallet", toIdentifier))
-			return
-		}
-		log.Infof("[api/send] Found recipient by username: %s", toIdentifier)
+	// Find recipient by Telegram ID
+	toUser, err := telegram.GetUserByTelegramID(toUserId, *s.Bot)
+	if err != nil {
+		log.Errorf("[api/send] Could not find recipient user with ID %d: %v", toUserId, err)
+		RespondError(w, fmt.Sprintf("Recipient '%d' not found or has no wallet", toUserId))
+		return
 	}
+	log.Infof("[api/send] Found recipient by Telegram ID: %d", toUserId)
 
 	// Check if trying to send to self
 	if fromUser.ID == toUser.ID {
@@ -240,11 +190,11 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 
 	// Check if amount requires admin approval
 	if requiresApproval {
-		log.Infof("[api/send] Large transaction requires admin approval: %s -> %s (%d sat(s))", fromUsername, toIdentifier, req.Amount)
+		log.Infof("[api/send] Large transaction requires admin approval: %d -> %d (%d sat(s))", fromUserId, toUserId, req.Amount)
 
 		// Create pending transaction
 		clientIP := getClientIP(r)
-		pendingTx := NewPendingTransaction(&req, fromUser, toUser, clientIP)
+		pendingTx := NewPendingTransaction(&req, fromUser, toUser, clientIP, fromUserId)
 
 		// Save to database
 		err = pendingTx.SaveToDB(s.Bot)
@@ -255,7 +205,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Send approval request using Telegram callback buttons (same as /send command)
-		err = telegram.CreateAPIApprovalRequest(s.Bot, fromUser, toIdentifier, req.Amount, req.Memo, pendingTx.ID, clientIP)
+		err = telegram.CreateAPIApprovalRequest(s.Bot, fromUser, toUserId, req.Amount, req.Memo, pendingTx.ID, clientIP)
 		if err != nil {
 			log.Warnf("[api/send] Failed to send approval request: %v", err)
 		}
@@ -264,8 +214,8 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 			Success: false,
 			Message: fmt.Sprintf("Transaction requires admin approval (amount: %s > threshold: %s). Approval request sent to you via Telegram. Transaction ID: %s",
 				utils.FormatSats(req.Amount), utils.FormatSats(GetAdminApprovalThreshold()), pendingTx.ID),
-			FromUser: fromUsername,
-			ToUser:   toIdentifier,
+			FromUser: fromUserIdStr,
+			ToUser:   req.To,
 			Amount:   req.Amount,
 			Memo:     req.Memo,
 		}
@@ -327,8 +277,8 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 	response := SendResponse{
 		Success:  true,
 		Message:  "Payment sent successfully",
-		FromUser: fromUsername,
-		ToUser:   toIdentifier,
+		FromUser: fromUserIdStr,
+		ToUser:   req.To,
 		Amount:   req.Amount,
 		Memo:     req.Memo,
 	}
@@ -336,11 +286,4 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
-}
-
-// sendToLightningAddress handles sending to Lightning addresses
-func (s Service) sendToLightningAddress(fromUser *lnbits.User, lightningAddress string, amount int64, memo string) error {
-	// This is a simplified implementation - you may need to implement the full Lightning address protocol
-	// For now, we'll return an error as this requires additional Lightning address handling logic
-	return fmt.Errorf("Lightning address payments not yet implemented in API")
 }

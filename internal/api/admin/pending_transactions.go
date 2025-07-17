@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/api"
+	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
 	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	"github.com/gorilla/mux"
@@ -126,15 +127,28 @@ func (s Service) ListPendingTransactions(w http.ResponseWriter, r *http.Request)
 
 // executePendingTransaction executes an approved pending transaction
 func (s Service) executePendingTransaction(pendingTx *api.PendingTransaction) error {
-	// Load the users again to ensure they still exist and have wallets
-	fromUser, err := telegram.GetUserByTelegramUsername(pendingTx.FromUsername, *s.bot)
-	if err != nil {
-		return fmt.Errorf("sender user %s no longer exists or has no wallet: %v", pendingTx.FromUsername, err)
+	// Use existing user objects if available, otherwise reload from IDs
+	var fromUser, toUser *lnbits.User
+	var err error
+
+	if pendingTx.FromUser != nil {
+		fromUser = pendingTx.FromUser
+	} else {
+		// Fallback: reload from ID if user object not available
+		fromUser, err = telegram.GetUserByTelegramID(pendingTx.FromUserId, *s.bot)
+		if err != nil {
+			return fmt.Errorf("sender user %d no longer exists or has no wallet: %v", pendingTx.FromUserId, err)
+		}
 	}
 
-	toUser, err := telegram.GetUserByTelegramUsername(pendingTx.ToUsername, *s.bot)
-	if err != nil {
-		return fmt.Errorf("recipient user %s no longer exists or has no wallet: %v", pendingTx.ToUsername, err)
+	if pendingTx.ToUser != nil {
+		toUser = pendingTx.ToUser
+	} else {
+		// Fallback: reload from ID if user object not available
+		toUser, err = telegram.GetUserByTelegramID(pendingTx.ToUserId, *s.bot)
+		if err != nil {
+			return fmt.Errorf("recipient user %d no longer exists or has no wallet: %v", pendingTx.ToUserId, err)
+		}
 	}
 
 	// Check sender's balance again

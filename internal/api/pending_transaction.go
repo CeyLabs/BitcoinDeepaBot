@@ -16,8 +16,8 @@ type PendingTransaction struct {
 	ID               string       `json:"id"`
 	FromUser         *lnbits.User `json:"from_user" gorm:"-"`
 	ToUser           *lnbits.User `json:"to_user" gorm:"-"`
-	FromUsername     string       `json:"from_username"`
-	ToUsername       string       `json:"to_username"`
+	FromUserId       int64        `json:"from_user_id"`
+	ToUserId         int64        `json:"to_user_id"`
 	Amount           int64        `json:"amount"`
 	Memo             string       `json:"memo"`
 	RequestTimestamp time.Time    `json:"request_timestamp"`
@@ -39,16 +39,16 @@ const (
 )
 
 // NewPendingTransaction creates a new pending transaction
-func NewPendingTransaction(req *SendRequest, fromUser, toUser *lnbits.User, clientIP string) *PendingTransaction {
-	id := fmt.Sprintf("pending-%s-%s-%d-%d", req.From, req.To, req.Amount, time.Now().Unix())
+func NewPendingTransaction(req *SendRequest, fromUser, toUser *lnbits.User, clientIP string, fromUserId int64) *PendingTransaction {
+	id := fmt.Sprintf("pending-%d-%d-%d-%d", fromUserId, toUser.Telegram.ID, req.Amount, time.Now().Unix())
 
 	return &PendingTransaction{
 		Base:             storage.New(storage.ID(id)),
 		ID:               id,
 		FromUser:         fromUser,
 		ToUser:           toUser,
-		FromUsername:     req.From,
-		ToUsername:       req.To,
+		FromUserId:       fromUserId,
+		ToUserId:         toUser.Telegram.ID,
 		Amount:           req.Amount,
 		Memo:             req.Memo,
 		RequestTimestamp: time.Now(),
@@ -122,18 +122,18 @@ func LoadPendingTransaction(id string, bot *telegram.TipBot) (*PendingTransactio
 
 	pendingTx := sn.(*PendingTransaction)
 
-	// Load user objects from usernames
-	fromUser, err := telegram.GetUserByTelegramUsername(pendingTx.FromUsername, *bot)
+	// Load user objects from Telegram IDs
+	fromUser, err := telegram.GetUserByTelegramID(pendingTx.FromUserId, *bot)
 	if err != nil {
-		log.Warnf("[ADMIN APPROVAL] Could not load from user @%s: %v", pendingTx.FromUsername, err)
+		log.Warnf("[ADMIN APPROVAL] Could not load from user %d: %v", pendingTx.FromUserId, err)
 		// Continue with nil user - this will be handled in the calling functions
 	} else {
 		pendingTx.FromUser = fromUser
 	}
 
-	toUser, err := telegram.GetUserByTelegramUsername(pendingTx.ToUsername, *bot)
+	toUser, err := telegram.GetUserByTelegramID(pendingTx.ToUserId, *bot)
 	if err != nil {
-		log.Warnf("[ADMIN APPROVAL] Could not load to user @%s: %v", pendingTx.ToUsername, err)
+		log.Warnf("[ADMIN APPROVAL] Could not load to user %d: %v", pendingTx.ToUserId, err)
 		// Continue with nil user - this will be handled in the calling functions
 	} else {
 		pendingTx.ToUser = toUser

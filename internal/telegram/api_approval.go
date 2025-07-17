@@ -26,7 +26,9 @@ type APIApprovalData struct {
 	*storage.Base
 	TransactionID   string       `json:"transaction_id"`
 	FromUser        *lnbits.User `json:"from_user"`
-	ToUsername      string       `json:"to_username"`
+	FromUserId      int64        `json:"from_user_id"`
+	ToUser          *lnbits.User `json:"to_user"`
+	ToUserId        int64        `json:"to_user_id"`
 	Amount          int64        `json:"amount"`
 	Memo            string       `json:"memo"`
 	Message         string       `json:"message"`
@@ -61,12 +63,19 @@ func (bot *TipBot) approveAPITransactionHandler(ctx intercept.Context) (intercep
 	from := LoadUser(ctx)
 	ResetUserState(from, bot)
 
-	// Get recipient user
-	toUser, err := GetUserByTelegramUsername(approvalData.ToUsername, *bot)
-	if err != nil {
-		log.Errorf("[approveAPITransactionHandler] Could not find recipient user %s: %v", approvalData.ToUsername, err)
-		bot.tryEditMessage(ctx.Callback().Message, "❌ Approval failed: recipient not found", &tb.ReplyMarkup{})
-		return ctx, err
+	// Get recipient user (use existing object if available, otherwise reload)
+	var toUser *lnbits.User
+	if approvalData.ToUser != nil {
+		toUser = approvalData.ToUser
+	} else {
+		// Fallback: reload from ID if user object not available
+		var err error
+		toUser, err = GetUserByTelegramID(approvalData.ToUserId, *bot)
+		if err != nil {
+			log.Errorf("[approveAPITransactionHandler] Could not find recipient user %d: %v", approvalData.ToUserId, err)
+			bot.tryEditMessage(ctx.Callback().Message, "❌ Approval failed: recipient not found", &tb.ReplyMarkup{})
+			return ctx, err
+		}
 	}
 
 	// Check sender's balance again
@@ -120,7 +129,7 @@ func (bot *TipBot) approveAPITransactionHandler(ctx intercept.Context) (intercep
 	// Update approval message to show success
 	if ctx.Callback().Message.Private() {
 		bot.tryDeleteMessage(ctx.Callback().Message)
-		successMsg := fmt.Sprintf("✅ Payment approved and sent successfully!\n\n💸 Amount: %s\n👤 To: @%s", utils.FormatSats(approvalData.Amount), approvalData.ToUsername)
+		successMsg := fmt.Sprintf("✅ Payment approved and sent successfully!\n\n💸 Amount: %s\n👤 To: @%s", utils.FormatSats(approvalData.Amount), toUser.Telegram.Username)
 		if approvalData.Memo != "" {
 			successMsg += fmt.Sprintf("\n✉️ Memo: %s", str.MarkdownEscape(approvalData.Memo))
 		}
@@ -165,9 +174,24 @@ func (bot *TipBot) cancelAPITransactionHandler(ctx intercept.Context) (intercept
 }
 
 // CreateAPIApprovalRequest creates an approval request for API transaction (similar to send confirmation)
-func CreateAPIApprovalRequest(bot *TipBot, fromUser *lnbits.User, toUsername string, amount int64, memo string, transactionID string, clientIP string) error {
+func CreateAPIApprovalRequest(bot *TipBot, fromUser *lnbits.User, toUserId int64, amount int64, memo string, transactionID string, clientIP string) error {
+	// Get recipient user for proper display
+	toUser, err := GetUserByTelegramID(toUserId, *bot)
+	var toUserStrMention string
+	if err != nil {
+		// Fallback to showing ID with @ if user lookup fails
+		toUserStrMention = fmt.Sprintf("@%d", toUserId)
+	} else {
+		// Use proper username with @ prefix
+		if toUser.Telegram.Username != "" {
+			toUserStrMention = fmt.Sprintf("@%s", toUser.Telegram.Username)
+		} else {
+			// Fallback to display name if no username
+			toUserStrMention = GetUserStr(toUser.Telegram)
+		}
+	}
+
 	// Create confirmation text (same format as /send command)
-	toUserStrMention := fmt.Sprintf("@%s", toUsername)
 	confirmText := fmt.Sprintf("Do you want to pay to %s?\n\n💸 Amount: %s", toUserStrMention, utils.FormatSats(amount))
 	if memo != "" {
 		confirmText += fmt.Sprintf("\n✉️ %s", str.MarkdownEscape(memo))
@@ -185,7 +209,9 @@ func CreateAPIApprovalRequest(bot *TipBot, fromUser *lnbits.User, toUsername str
 		Base:          storage.New(storage.ID(id)),
 		TransactionID: transactionID,
 		FromUser:      fromUser,
-		ToUsername:    toUsername,
+		FromUserId:    fromUser.Telegram.ID,
+		ToUser:        toUser, // May be nil if lookup failed
+		ToUserId:      toUserId,
 		Amount:        amount,
 		Memo:          memo,
 		Message:       confirmText,
@@ -194,7 +220,7 @@ func CreateAPIApprovalRequest(bot *TipBot, fromUser *lnbits.User, toUsername str
 	}
 
 	// Save approval data to database
-	err := approvalData.Set(approvalData, bot.Bunt)
+	err = approvalData.Set(approvalData, bot.Bunt)
 	if err != nil {
 		log.Errorf("[CreateAPIApprovalRequest] Failed to save approval data: %v", err)
 		return err

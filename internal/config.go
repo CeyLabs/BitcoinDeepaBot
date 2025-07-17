@@ -54,6 +54,7 @@ type TelegramConfiguration struct {
 	LogGroupId             int64  `yaml:"log_group_id"`
 	ErrorThreadId          int64  `yaml:"error_thread_id"`
 }
+
 type DatabaseConfiguration struct {
 	DbPath           string `yaml:"db_path"`
 	ShopBuntDbPath   string `yaml:"shop_buntdb_path"`
@@ -78,16 +79,16 @@ type APIConfiguration struct {
 }
 
 type APISendConfiguration struct {
-	Enabled                bool     `yaml:"enabled"`
-	InternalNetwork        string   `yaml:"internal_network"`
-	MaxAmount              int64    `yaml:"max_amount"`
-	MinAmount              int64    `yaml:"min_amount"`
-	AdminApprovalThreshold int64    `yaml:"admin_approval_threshold"`
-	MaxMemoLength          int      `yaml:"max_memo_length"`
-	RateLimit              int      `yaml:"rate_limit"`
-	WhitelistedSenders     []string `yaml:"whitelisted_senders"`
-	HMACSecret             string   `yaml:"hmac_secret"`
-	TimestampTolerance     int64    `yaml:"timestamp_tolerance"` // seconds
+	Enabled                bool   `yaml:"enabled"`
+	InternalNetwork        string `yaml:"internal_network"`
+	MaxAmount              int64  `yaml:"max_amount"`
+	MinAmount              int64  `yaml:"min_amount"`
+	AdminApprovalThreshold int64  `yaml:"admin_approval_threshold"`
+	MaxMemoLength          int    `yaml:"max_memo_length"`
+	RateLimit              int    `yaml:"rate_limit"`
+	HMACSecret             string `yaml:"hmac_secret"`
+	TimestampTolerance     int64  `yaml:"timestamp_tolerance"` // seconds
+	FromUserId             string `yaml:"from_user_id"`        // Telegram user ID to use as sender
 }
 
 func init() {
@@ -185,19 +186,16 @@ func setAPISendDefaults() {
 	if Configuration.API.Send.RateLimit == 0 {
 		Configuration.API.Send.RateLimit = 60
 	}
-	if len(Configuration.API.Send.WhitelistedSenders) == 0 {
-		Configuration.API.Send.WhitelistedSenders = []string{
-			"BiccoindeepaDSA",
-			"CeycubeBank",
-		}
-	}
 
-	// Log API Send configuration status
+	// FromUserId and HMACSecret must be configured in environment - no default value
 	if Configuration.API.Send.Enabled {
-		log.Infof("API Send module enabled with %d whitelisted senders, network: %s",
-			len(Configuration.API.Send.WhitelistedSenders), Configuration.API.Send.InternalNetwork)
-	} else {
-		log.Infof("API Send module disabled in configuration")
+		if Configuration.API.Send.HMACSecret == "" {
+			panic(fmt.Errorf("API Send is enabled but CONFIGOR_API_SEND_HMAC_SECRET is not configured"))
+		}
+
+		if Configuration.API.Send.FromUserId == "" {
+			panic(fmt.Errorf("API Send is enabled but CONFIGOR_API_SEND_FROM_USER_ID is not configured"))
+		}
 	}
 }
 

@@ -5,8 +5,12 @@ API_URL="https://your-bot-domain.com"
 HMAC_SECRET="your-hmac-secret-here"
 ENDPOINT="/api/v1/send"
 
-# Payment data
-PAYLOAD='{"amount":1000,"destination":"lnbc10u1p3xnhl2pp5e6v94jmw....","memo":"Test payment"}'
+# Payment data 
+# - to: Telegram user ID (numeric only, not username)
+# - amount: Amount in satoshis
+# - memo: Optional memo text
+# Note: 'from' user is now configured via environment variable from_user_id
+PAYLOAD='{"to":"123456789","amount":1000,"memo":"Test payment"}'
 
 # Generate timestamp
 TIMESTAMP=$(date +%s)
