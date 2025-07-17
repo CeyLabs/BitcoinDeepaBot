@@ -78,16 +78,20 @@ type APIConfiguration struct {
 }
 
 type APISendConfiguration struct {
-	Enabled                bool     `yaml:"enabled"`
-	InternalNetwork        string   `yaml:"internal_network"`
-	MaxAmount              int64    `yaml:"max_amount"`
-	MinAmount              int64    `yaml:"min_amount"`
-	AdminApprovalThreshold int64    `yaml:"admin_approval_threshold"`
-	MaxMemoLength          int      `yaml:"max_memo_length"`
-	RateLimit              int      `yaml:"rate_limit"`
-	WhitelistedSenders     []string `yaml:"whitelisted_senders"`
-	HMACSecret             string   `yaml:"hmac_secret"`
-	TimestampTolerance     int64    `yaml:"timestamp_tolerance"` // seconds
+	Enabled                bool                         `yaml:"enabled"`
+	InternalNetwork        string                       `yaml:"internal_network"`
+	MaxAmount              int64                        `yaml:"max_amount"`
+	MinAmount              int64                        `yaml:"min_amount"`
+	AdminApprovalThreshold int64                        `yaml:"admin_approval_threshold"`
+	MaxMemoLength          int                          `yaml:"max_memo_length"`
+	RateLimit              int                          `yaml:"rate_limit"`
+	WhitelistedWallets     map[string]WhitelistedWallet `yaml:"whitelisted_wallets"`
+	TimestampTolerance     int64                        `yaml:"timestamp_tolerance"` // seconds
+}
+
+type WhitelistedWallet struct {
+	Username   string `yaml:"username"`    // Telegram username without @
+	HMACSecret string `yaml:"hmac_secret"` // Unique HMAC secret for this wallet
 }
 
 func init() {
@@ -185,17 +189,22 @@ func setAPISendDefaults() {
 	if Configuration.API.Send.RateLimit == 0 {
 		Configuration.API.Send.RateLimit = 60
 	}
-	if len(Configuration.API.Send.WhitelistedSenders) == 0 {
-		Configuration.API.Send.WhitelistedSenders = []string{
-			"BiccoindeepaDSA",
-			"CeycubeBank",
+
+	// Set default whitelisted wallets if none configured
+	if len(Configuration.API.Send.WhitelistedWallets) == 0 {
+		Configuration.API.Send.WhitelistedWallets = map[string]WhitelistedWallet{
+			"CeycubeBank": {
+				Username:   "CeycubeBank",
+				HMACSecret: "change-me-ceycube-secret",
+			},
 		}
+		log.Warn("Using default whitelisted wallets. Please configure unique HMAC secrets for each wallet in production!")
 	}
 
 	// Log API Send configuration status
 	if Configuration.API.Send.Enabled {
-		log.Infof("API Send module enabled with %d whitelisted senders, network: %s",
-			len(Configuration.API.Send.WhitelistedSenders), Configuration.API.Send.InternalNetwork)
+		log.Infof("API Send module enabled with %d whitelisted wallets, network: %s",
+			len(Configuration.API.Send.WhitelistedWallets), Configuration.API.Send.InternalNetwork)
 	} else {
 		log.Infof("API Send module disabled in configuration")
 	}

@@ -133,29 +133,14 @@ func dump(r *http.Request) string {
 	return string(x)
 }
 
-// HMACMiddleware validates HMAC signatures for sensitive endpoints
-func HMACMiddleware(next http.HandlerFunc) http.HandlerFunc {
+// WalletHMACMiddleware validates HMAC signatures for wallet-based API endpoints
+// It identifies the sending wallet by validating the signature against each whitelisted wallet's secret
+func WalletHMACMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Get HMAC secret from configuration
-		secret := internal.Configuration.API.Send.HMACSecret
-		if secret == "" {
-			log.Error("HMAC secret not configured for API send endpoint")
-			http.Error(w, "Server configuration error", http.StatusInternalServerError)
-			return
-		}
-
-		// Get signature from header
-		signature := r.Header.Get("X-HMAC-Signature")
-		if signature == "" {
-			log.Warn("Missing HMAC signature in payment API request")
-			http.Error(w, "Missing signature", http.StatusUnauthorized)
-			return
-		}
-
 		// Get timestamp from header for replay attack prevention
 		timestampStr := r.Header.Get("X-Timestamp")
 		if timestampStr == "" {
-			log.Warn("Missing timestamp in payment API request")
+			log.Warn("Missing timestamp in wallet API request")
 			http.Error(w, "Missing timestamp", http.StatusUnauthorized)
 			return
 		}
@@ -163,7 +148,7 @@ func HMACMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		// Parse timestamp
 		timestamp, err := strconv.ParseInt(timestampStr, 10, 64)
 		if err != nil {
-			log.Warn("Invalid timestamp format in payment API request")
+			log.Warn("Invalid timestamp format in wallet API request")
 			http.Error(w, "Invalid timestamp", http.StatusBadRequest)
 			return
 		}
@@ -181,6 +166,14 @@ func HMACMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		// Get signature from header
+		signature := r.Header.Get("X-HMAC-Signature")
+		if signature == "" {
+			log.Warn("Missing HMAC signature in wallet API request")
+			http.Error(w, "Missing signature", http.StatusUnauthorized)
+			return
+		}
+
 		// Read request body
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -195,17 +188,28 @@ func HMACMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		// Create message to sign: METHOD + PATH + TIMESTAMP + BODY
 		message := fmt.Sprintf("%s%s%s%s", r.Method, r.URL.Path, timestampStr, string(body))
 
-		// Calculate expected signature
-		expectedSignature := calculateHMAC(message, secret)
+		// Try to validate signature against each whitelisted wallet
+		var authenticatedWallet string
+		for walletID, wallet := range internal.Configuration.API.Send.WhitelistedWallets {
+			expectedSignature := calculateHMAC(message, wallet.HMACSecret)
+			if hmac.Equal([]byte(signature), []byte(expectedSignature)) {
+				authenticatedWallet = walletID
+				log.Debugf("HMAC signature verified for wallet: %s", walletID)
+				break
+			}
+		}
 
-		// Compare signatures using constant-time comparison
-		if !hmac.Equal([]byte(signature), []byte(expectedSignature)) {
-			log.Warn("HMAC signature verification failed for payment API")
+		if authenticatedWallet == "" {
+			log.Warn("HMAC signature verification failed - no matching wallet found")
 			http.Error(w, "Invalid signature", http.StatusUnauthorized)
 			return
 		}
 
-		log.Debug("HMAC signature verified successfully for payment API")
+		// Add authenticated wallet info to request context
+		ctx := context.WithValue(r.Context(), "authenticated_wallet", authenticatedWallet)
+		r = r.WithContext(ctx)
+
+		log.Debugf("Wallet API request authenticated for wallet: %s", authenticatedWallet)
 		next.ServeHTTP(w, r)
 	}
 }

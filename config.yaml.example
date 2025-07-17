@@ -46,8 +46,11 @@ api:
     admin_approval_threshold: 100000
     max_memo_length: 280
     rate_limit: 60
-    whitelisted_senders:
-      - "BiccoindeepaDSA"
-      - "CeycubeBank"
-    hmac_secret: "your-generated-secret"
+    whitelisted_wallets:
+      BiccoindeepaDSA:
+        username: "BiccoindeepaDSA"
+        hmac_secret: "your-unique-bitcoindeepa-secret-here"
+      CeycubeBank:
+        username: "CeycubeBank"
+        hmac_secret: "your-unique-ceycube-secret-here"
     timestamp_tolerance: 300
