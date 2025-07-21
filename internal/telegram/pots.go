@@ -243,8 +243,9 @@ func (bot *TipBot) addToPotHandler(ctx intercept.Context) (intercept.Context, er
 		return ctx, nil
 	}
 	
-	potName := arguments[1]
-	amountStr := arguments[2]
+	// Last argument is amount, everything in between is pot name
+	amountStr := arguments[len(arguments)-1]
+	potName := strings.Join(arguments[1:len(arguments)-1], " ")
 	
 	amount, err := getAmount(ctx, amountStr)
 	if err != nil {
@@ -281,8 +282,9 @@ func (bot *TipBot) withdrawFromPotHandler(ctx intercept.Context) (intercept.Cont
 		return ctx, nil
 	}
 	
-	potName := arguments[1]
-	amountStr := arguments[2]
+	// Last argument is amount, everything in between is pot name
+	amountStr := arguments[len(arguments)-1]
+	potName := strings.Join(arguments[1:len(arguments)-1], " ")
 	
 	amount, err := getAmount(ctx, amountStr)
 	if err != nil {
@@ -319,7 +321,8 @@ func (bot *TipBot) deletePotHandler(ctx intercept.Context) (intercept.Context, e
 		return ctx, nil
 	}
 	
-	potName := arguments[1]
+	// Everything after the command is the pot name
+	potName := strings.TrimSpace(strings.Join(arguments[1:], " "))
 	
 	err := bot.DeletePot(user, potName)
 	if err != nil {
