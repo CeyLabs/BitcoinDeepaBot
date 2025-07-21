@@ -112,26 +112,11 @@ func (bot *TipBot) TransferToPot(user *lnbits.User, potName string, amount int64
 			return err
 		}
 		
-		wallet, err := bot.Client.Info(*user.Wallet)
-		if err != nil {
-			return fmt.Errorf("failed to get wallet info: %w", err)
-		}
-		
-		currentBalance := wallet.Balance / 1000
-		if currentBalance < amount {
-			return fmt.Errorf("insufficient balance")
-		}
-		
 		pot.Balance += amount
 		pot.UpdatedAt = time.Now()
 		
 		if err := tx.Save(pot).Error; err != nil {
 			return fmt.Errorf("failed to update pot balance: %w", err)
-		}
-		
-		user.Wallet.Balance = wallet.Balance - (amount * 1000)
-		if err := tx.Save(user).Error; err != nil {
-			return fmt.Errorf("failed to update user wallet: %w", err)
 		}
 		
 		return nil
@@ -153,21 +138,11 @@ func (bot *TipBot) WithdrawFromPot(user *lnbits.User, potName string, amount int
 			return fmt.Errorf("insufficient pot balance. Available: %d sats, Requested: %d sats", pot.Balance, amount)
 		}
 		
-		wallet, err := bot.Client.Info(*user.Wallet)
-		if err != nil {
-			return fmt.Errorf("failed to get wallet info: %w", err)
-		}
-		
 		pot.Balance -= amount
 		pot.UpdatedAt = time.Now()
 		
 		if err := tx.Save(pot).Error; err != nil {
 			return fmt.Errorf("failed to update pot balance: %w", err)
-		}
-		
-		user.Wallet.Balance = wallet.Balance + (amount * 1000)
-		if err := tx.Save(user).Error; err != nil {
-			return fmt.Errorf("failed to update user wallet: %w", err)
 		}
 		
 		return nil
