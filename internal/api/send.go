@@ -12,6 +12,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/str"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
+	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	"github.com/LightningTipBot/LightningTipBot/pkg/lightning"
 	log "github.com/sirupsen/logrus"
@@ -32,6 +33,7 @@ type SendResponse struct {
 	FromUser        string `json:"from_user"`
 	ToUser          string `json:"to_user"`
 	Amount          int64  `json:"amount"`
+	AmountLKR       string `json:"amount_lkr,omitempty"` // LKR conversion
 	Memo            string `json:"memo,omitempty"`
 }
 
@@ -133,11 +135,11 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Amount <= GetMinAPITransactionAmount() {
-		RespondError(w, fmt.Sprintf("Amount must be greater than %s", utils.FormatSats(GetMinAPITransactionAmount())))
+		RespondError(w, fmt.Sprintf("Amount must be greater than %s", thirdparty.FormatSatsWithLKR(GetMinAPITransactionAmount())))
 		return
 	}
 	if req.Amount > GetMaxAPITransactionAmount() {
-		RespondError(w, fmt.Sprintf("Amount cannot exceed %s", utils.FormatSats(GetMaxAPITransactionAmount())))
+		RespondError(w, fmt.Sprintf("Amount cannot exceed %s", thirdparty.FormatSatsWithLKR(GetMaxAPITransactionAmount())))
 		return
 	}
 
@@ -169,7 +171,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 
 	if balance < req.Amount {
 		log.Warnf("[api/send] Insufficient balance for %s: %d < %d", fromUsername, balance, req.Amount)
-		RespondError(w, fmt.Sprintf("Insufficient balance: %s available, %s required", utils.FormatSats(balance), utils.FormatSats(req.Amount)))
+		RespondError(w, fmt.Sprintf("Insufficient balance: %s available, %s required", thirdparty.FormatSatsWithLKR(balance), thirdparty.FormatSatsWithLKR(req.Amount)))
 		return
 	}
 
@@ -184,12 +186,13 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		}
 
 		response := SendResponse{
-			Success:  true,
-			Message:  "Payment sent successfully to Lightning address",
-			FromUser: fromUsername,
-			ToUser:   toIdentifier,
-			Amount:   req.Amount,
-			Memo:     req.Memo,
+			Success:   true,
+			Message:   "Payment sent successfully to Lightning address",
+			FromUser:  fromUsername,
+			ToUser:    toIdentifier,
+			Amount:    req.Amount,
+			AmountLKR: getLKRValue(req.Amount),
+			Memo:      req.Memo,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -257,11 +260,12 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		response := SendResponse{
 			Success: false,
 			Message: fmt.Sprintf("Transaction requires admin approval (amount: %s > threshold: %s). Approval request sent to you via Telegram. Transaction ID: %s",
-				utils.FormatSats(req.Amount), utils.FormatSats(GetAdminApprovalThreshold()), pendingTx.ID),
-			FromUser: fromUsername,
-			ToUser:   toIdentifier,
-			Amount:   req.Amount,
-			Memo:     req.Memo,
+				thirdparty.FormatSatsWithLKR(req.Amount), thirdparty.FormatSatsWithLKR(GetAdminApprovalThreshold()), pendingTx.ID),
+			FromUser:  fromUsername,
+			ToUser:    toIdentifier,
+			Amount:    req.Amount,
+			AmountLKR: getLKRValue(req.Amount),
+			Memo:      req.Memo,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -296,7 +300,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 
 	// Send notification to recipient with memo included in same message
 	fromUserStrMd := telegram.GetUserStrMd(fromUser.Telegram)
-	notificationMsg := fmt.Sprintf("💰 You received %s from %s via Automated API", utils.FormatSats(req.Amount), fromUserStrMd)
+	notificationMsg := fmt.Sprintf("💰 You received %s from %s via Automated API", thirdparty.FormatSatsWithLKR(req.Amount), fromUserStrMd)
 	if req.Memo != "" {
 		notificationMsg += fmt.Sprintf("\n✉️ Memo: %s", str.MarkdownEscape(req.Memo))
 	}
@@ -308,7 +312,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 
 	// Send confirmation to sender (from user) - same format as /send command
 	toUserStrMd := telegram.GetUserStrMd(toUser.Telegram)
-	senderConfirmationMsg := fmt.Sprintf("✅ Payment sent successfully!\n\n💸 Amount: %s\n👤 To: %s", utils.FormatSats(req.Amount), toUserStrMd)
+	senderConfirmationMsg := fmt.Sprintf("✅ Payment sent successfully!\n\n💸 Amount: %s\n👤 To: %s", thirdparty.FormatSatsWithLKR(req.Amount), toUserStrMd)
 	if req.Memo != "" {
 		senderConfirmationMsg += fmt.Sprintf("\n✉️ Memo: %s", str.MarkdownEscape(req.Memo))
 	}
@@ -319,12 +323,13 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := SendResponse{
-		Success:  true,
-		Message:  "Payment sent successfully",
-		FromUser: fromUsername,
-		ToUser:   toIdentifier,
-		Amount:   req.Amount,
-		Memo:     req.Memo,
+		Success:   true,
+		Message:   "Payment sent successfully",
+		FromUser:  fromUsername,
+		ToUser:    toIdentifier,
+		Amount:    req.Amount,
+		AmountLKR: getLKRValue(req.Amount),
+		Memo:      req.Memo,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -337,4 +342,14 @@ func (s Service) sendToLightningAddress(fromUser *lnbits.User, lightningAddress 
 	// This is a simplified implementation - you may need to implement the full Lightning address protocol
 	// For now, we'll return an error as this requires additional Lightning address handling logic
 	return fmt.Errorf("Lightning address payments not yet implemented in API")
+}
+
+// getLKRValue converts satoshi amount to LKR string or returns empty string if price unavailable
+func getLKRValue(amount int64) string {
+	lkrPerSat, _, err := thirdparty.GetSatPrice()
+	if err != nil {
+		return "" // Return empty string if LKR price is unavailable
+	}
+	lkrValue := lkrPerSat * float64(amount)
+	return utils.FormatFloatWithCommas(lkrValue)
 }
