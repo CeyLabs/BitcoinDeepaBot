@@ -57,13 +57,15 @@ func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, err
 	}
 
 	totalBalance := balance + potBalance
+	mainUSDValue := USDPerSat * float64(balance)
+	mainLKRValue := LKRPerSat * float64(balance)
 	USDValue := USDPerSat * float64(totalBalance)
 	LKRValue := LKRPerSat * float64(totalBalance)
 
-	message := fmt.Sprintf(Translate(ctx, "balanceMessage"), utils.FormatSats(balance), utils.FormatFloatWithCommas(USDValue), utils.FormatFloatWithCommas(LKRValue))
+	message := fmt.Sprintf(Translate(ctx, "balanceMessage"), utils.FormatSats(balance), utils.FormatFloatWithCommas(mainUSDValue), utils.FormatFloatWithCommas(mainLKRValue))
 	
 	if potBalance > 0 {
-		message += fmt.Sprintf("\n💰 **In savings pots**: %s sats\n🏦 **Total balance**: %s sats", utils.FormatSats(potBalance), utils.FormatSats(totalBalance))
+		message += fmt.Sprintf("\n💰 **In savings pots**: %s sats\n🏦 **Total balance**: %s sats (%s USD / රු. %s)", utils.FormatSats(potBalance), utils.FormatSats(totalBalance), utils.FormatFloatWithCommas(USDValue), utils.FormatFloatWithCommas(LKRValue))
 	}
 
 	bot.trySendMessage(ctx.Sender(), message)
