@@ -85,7 +85,7 @@ func (bot TipBot) createFaucet(ctx context.Context, text string, sender *tb.User
 	// // check for memo in command
 	memo := GetMemoFromCommand(text, 3)
 
-	inlineMessage := fmt.Sprintf(Translate(ctx, "inlineFaucetMessage"), perUserAmount, GetUserStrMd(sender), amount, amount, 0, nTotal, MakeProgressbar(amount, amount))
+	inlineMessage := fmt.Sprintf(Translate(ctx, "inlineFaucetMessage"), thirdparty.FormatSatsWithLKR(perUserAmount), GetUserStrMd(sender), thirdparty.FormatSatsWithLKR(amount), thirdparty.FormatSatsWithLKR(amount), strconv.Itoa(0), strconv.Itoa(nTotal), MakeProgressbar(amount, amount))
 	if len(memo) > 0 {
 		inlineMessage = inlineMessage + fmt.Sprintf(Translate(ctx, "inlineFaucetAppendMemo"), memo)
 	}
@@ -217,7 +217,7 @@ func (bot TipBot) handleInlineFaucetQuery(ctx intercept.Context) (intercept.Cont
 		result := &tb.ArticleResult{
 			// URL:         url,
 			Text:        inlineFaucet.Message,
-			Title:       fmt.Sprintf(TranslateUser(ctx, "inlineResultFaucetTitle"), inlineFaucet.Amount),
+			Title:       fmt.Sprintf(TranslateUser(ctx, "inlineResultFaucetTitle"), thirdparty.FormatSatsWithLKR(inlineFaucet.Amount)),
 			Description: TranslateUser(ctx, "inlineResultFaucetDescription"),
 			// required for photos
 			ThumbURL: url,
@@ -336,7 +336,7 @@ func (bot *TipBot) acceptInlineFaucetHandler(ctx intercept.Context) (intercept.C
 		}()
 
 		// build faucet message
-		inlineFaucet.Message = fmt.Sprintf(i18n.Translate(inlineFaucet.LanguageCode, "inlineFaucetMessage"), thirdparty.FormatSatsWithLKR(inlineFaucet.PerUserAmount), GetUserStrMd(inlineFaucet.From.Telegram), thirdparty.FormatSatsWithLKR(inlineFaucet.RemainingAmount), thirdparty.FormatSatsWithLKR(inlineFaucet.Amount), inlineFaucet.NTaken, inlineFaucet.NTotal, MakeProgressbar(inlineFaucet.RemainingAmount, inlineFaucet.Amount))
+		inlineFaucet.Message = fmt.Sprintf(i18n.Translate(inlineFaucet.LanguageCode, "inlineFaucetMessage"), thirdparty.FormatSatsWithLKR(inlineFaucet.PerUserAmount), GetUserStrMd(inlineFaucet.From.Telegram), thirdparty.FormatSatsWithLKR(inlineFaucet.RemainingAmount), thirdparty.FormatSatsWithLKR(inlineFaucet.Amount), strconv.Itoa(inlineFaucet.NTaken), strconv.Itoa(inlineFaucet.NTotal), MakeProgressbar(inlineFaucet.RemainingAmount, inlineFaucet.Amount))
 		memo := inlineFaucet.Memo
 		if len(memo) > 0 {
 			inlineFaucet.Message = inlineFaucet.Message + fmt.Sprintf(i18n.Translate(inlineFaucet.LanguageCode, "inlineFaucetAppendMemo"), memo)

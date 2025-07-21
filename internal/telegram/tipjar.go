@@ -211,7 +211,7 @@ func (bot TipBot) handleInlineTipjarQuery(ctx intercept.Context) (intercept.Cont
 		result := &tb.ArticleResult{
 			// URL:         url,
 			Text:        inlineTipjar.Message,
-			Title:       fmt.Sprintf(TranslateUser(ctx, "inlineResultTipjarTitle"), inlineTipjar.Amount),
+			Title:       fmt.Sprintf(TranslateUser(ctx, "inlineResultTipjarTitle"), thirdparty.FormatSatsWithLKR(inlineTipjar.Amount)),
 			Description: TranslateUser(ctx, "inlineResultTipjarDescription"),
 			// required for photos
 			ThumbURL: url,
