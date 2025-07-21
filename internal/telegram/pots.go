@@ -37,28 +37,37 @@ func (bot *TipBot) CreatePot(user *lnbits.User, name string) (*lnbits.SavingsPot
 		return nil, fmt.Errorf("pot name can only contain letters, numbers, spaces, hyphens, and underscores")
 	}
 	
-	var existingPot lnbits.SavingsPot
-	if err := bot.DB.Users.Where("user_id = ? AND name = ?", user.ID, name).First(&existingPot).Error; err == nil {
-		return nil, fmt.Errorf("pot with name '%s' already exists", name)
-	}
+	var pot *lnbits.SavingsPot
+	err := bot.DB.Users.Transaction(func(tx *gorm.DB) error {
+		var existingPot lnbits.SavingsPot
+		if err := tx.Where("user_id = ? AND name = ?", user.ID, name).First(&existingPot).Error; err == nil {
+			return fmt.Errorf("pot with name '%s' already exists", name)
+		}
+		
+		var potCount int64
+		tx.Model(&lnbits.SavingsPot{}).Where("user_id = ?", user.ID).Count(&potCount)
+		if potCount >= MaxPotsPerUser {
+			return fmt.Errorf("maximum number of pots reached (%d)", MaxPotsPerUser)
+		}
+		
+		pot = &lnbits.SavingsPot{
+			ID:        uuid.NewV4().String(),
+			UserID:    user.ID,
+			Name:      name,
+			Balance:   0,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+		
+		if err := tx.Create(pot).Error; err != nil {
+			return fmt.Errorf("failed to create pot: %w", err)
+		}
+		
+		return nil
+	})
 	
-	var potCount int64
-	bot.DB.Users.Model(&lnbits.SavingsPot{}).Where("user_id = ?", user.ID).Count(&potCount)
-	if potCount >= MaxPotsPerUser {
-		return nil, fmt.Errorf("maximum number of pots reached (%d)", MaxPotsPerUser)
-	}
-	
-	pot := &lnbits.SavingsPot{
-		ID:        uuid.NewV4().String(),
-		UserID:    user.ID,
-		Name:      name,
-		Balance:   0,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	
-	if err := bot.DB.Users.Create(pot).Error; err != nil {
-		return nil, fmt.Errorf("failed to create pot: %w", err)
+	if err != nil {
+		return nil, err
 	}
 	
 	return pot, nil
