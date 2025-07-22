@@ -99,7 +99,7 @@ func startApiServer(bot *telegram.TipBot) {
 
 	// Bot pay HTTP API module with wallet-based HMAC security (only if enabled)
 	if internal.IsAPISendEnabled() {
-		s.AppendRoute(`/api/v1/send`, api.WalletHMACMiddleware(api.InternalNetworkMiddleware(apiService.Send)), http.MethodPost)
+		s.AppendRoute(`/api/v1/send`, api.WalletHMACMiddleware(apiService.Send), http.MethodPost)
 		log.Infof("API Send endpoint registered at /api/v1/send with wallet-based HMAC security")
 	} else {
 		log.Infof("API Send endpoint disabled in configuration")
