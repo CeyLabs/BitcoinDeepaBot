@@ -113,6 +113,13 @@ func (bot *TipBot) TransferToPot(user *lnbits.User, potName string, amount int64
 			return err
 		}
 
+		// Deduct from user wallet balance
+		user.Wallet.Balance -= amount
+		if err := tx.Save(user).Error; err != nil {
+			return fmt.Errorf("failed to update user balance: %w", err)
+		}
+
+		// Add to pot balance
 		pot.Balance += amount
 		pot.UpdatedAt = time.Now()
 
@@ -139,11 +146,18 @@ func (bot *TipBot) WithdrawFromPot(user *lnbits.User, potName string, amount int
 			return fmt.Errorf("insufficient pot balance. Available: %d sats, Requested: %d sats", pot.Balance, amount)
 		}
 
+		// Deduct from pot balance
 		pot.Balance -= amount
 		pot.UpdatedAt = time.Now()
 
 		if err := tx.Save(pot).Error; err != nil {
 			return fmt.Errorf("failed to update pot balance: %w", err)
+		}
+
+		// Add back to user wallet balance
+		user.Wallet.Balance += amount
+		if err := tx.Save(user).Error; err != nil {
+			return fmt.Errorf("failed to update user balance: %w", err)
 		}
 
 		return nil
