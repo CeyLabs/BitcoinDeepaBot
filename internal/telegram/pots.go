@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/errors"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
@@ -52,12 +51,10 @@ func (bot *TipBot) CreatePot(user *lnbits.User, name string) (*lnbits.SavingsPot
 		}
 
 		pot = &lnbits.SavingsPot{
-			ID:        uuid.NewV4().String(),
-			UserID:    user.ID,
-			Name:      name,
-			Balance:   0,
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
+			ID:      uuid.NewV4().String(),
+			UserID:  user.ID,
+			Name:    name,
+			Balance: 0,
 		}
 
 		if err := tx.Create(pot).Error; err != nil {
@@ -121,7 +118,6 @@ func (bot *TipBot) TransferToPot(user *lnbits.User, potName string, amount int64
 
 		// Add to pot balance
 		pot.Balance += amount
-		pot.UpdatedAt = time.Now()
 
 		if err := tx.Save(pot).Error; err != nil {
 			return fmt.Errorf("failed to update pot balance: %w", err)
@@ -148,7 +144,6 @@ func (bot *TipBot) WithdrawFromPot(user *lnbits.User, potName string, amount int
 
 		// Deduct from pot balance
 		pot.Balance -= amount
-		pot.UpdatedAt = time.Now()
 
 		if err := tx.Save(pot).Error; err != nil {
 			return fmt.Errorf("failed to update pot balance: %w", err)

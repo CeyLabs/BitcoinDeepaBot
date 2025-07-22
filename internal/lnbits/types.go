@@ -189,7 +189,7 @@ type SavingsPot struct {
 	UserID    string    `json:"user_id" gorm:"index"`
 	Name      string    `json:"name"`
 	Balance   int64     `json:"balance" gorm:"default:0;check:balance >= 0" validate:"min=0"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 	User      *User     `gorm:"foreignKey:UserID;references:ID"`
 }
