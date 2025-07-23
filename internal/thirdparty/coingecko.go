@@ -14,7 +14,6 @@ import (
 type PriceResponse struct {
 	Bitcoin struct {
 		USD float64 `json:"usd"`
-		LKR float64 `json:"lkr"`
 	} `json:"bitcoin"`
 }
 
@@ -23,7 +22,7 @@ const SATS_PER_BITCOIN = 100_000_000
 // Caching price for 10 mins
 var cache = utils.NewCache(10 * time.Minute)
 
-// GetSatPrice fetches the current Bitcoin price in USD and returns the price per satoshi
+// GetSatPrice fetches the current Bitcoin price in USD and LKR exchange rate, then calculates the price per satoshi
 func GetSatPrice() (float64, float64, error) {
 	key := "sat-price"
 	valueFromCache, hasCache := cache.Get(key)
@@ -36,30 +35,50 @@ func GetSatPrice() (float64, float64, error) {
 		return LKRPerSat, USDPerSat, nil
 	}
 
-	url := "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,lkr"
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(url)
+	// Get Bitcoin price in USD from CoinGecko
+	bitcoinUSD, err := getBitcoinPriceUSD()
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to fetch bitcoin price: %v", err)
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return 0, 0, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	// Get USD to LKR exchange rate from Ceylon Cash
+	usdToLKR, err := GetUSDToLKRRate()
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to fetch exchange rate: %v", err)
 	}
 
-	var priceResponse PriceResponse
-	if err := json.NewDecoder(resp.Body).Decode(&priceResponse); err != nil {
-		return 0, 0, fmt.Errorf("failed to decode response: %v", err)
-	}
+	// Calculate Bitcoin price in LKR
+	bitcoinLKR := bitcoinUSD * usdToLKR
 
 	// Calculate price per sat
-	LKRPerSat := priceResponse.Bitcoin.LKR / SATS_PER_BITCOIN
-	USDPerSat := priceResponse.Bitcoin.USD / SATS_PER_BITCOIN
+	LKRPerSat := bitcoinLKR / SATS_PER_BITCOIN
+	USDPerSat := bitcoinUSD / SATS_PER_BITCOIN
 
 	cache.Set(key, fmt.Sprintf("%f-%f", LKRPerSat, USDPerSat))
 
 	return LKRPerSat, USDPerSat, nil
+}
+
+// getBitcoinPriceUSD fetches Bitcoin price in USD from CoinGecko
+func getBitcoinPriceUSD() (float64, error) {
+	url := "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch bitcoin price: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var priceResponse PriceResponse
+	if err := json.NewDecoder(resp.Body).Decode(&priceResponse); err != nil {
+		return 0, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	return priceResponse.Bitcoin.USD, nil
 }
 
 // LKRToSat converts a LKR amount to satoshis using the current price.
