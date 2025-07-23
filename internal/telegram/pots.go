@@ -95,22 +95,28 @@ func (bot *TipBot) TransferToPot(user *lnbits.User, potName string, amount int64
 		return fmt.Errorf("amount must be positive")
 	}
 
-	balance, err := bot.GetUserBalance(user)
-	if err != nil {
-		return fmt.Errorf("failed to get user balance: %w", err)
-	}
-
-	if balance < amount {
-		return fmt.Errorf("insufficient balance. Available: %d sats, Requested: %d sats", balance, amount)
-	}
-
 	return bot.DB.Users.Transaction(func(tx *gorm.DB) error {
-		pot, err := bot.GetPot(user, potName)
+		// Get current user balance (within transaction)
+		balance, err := bot.GetUserBalance(user)
 		if err != nil {
+			return fmt.Errorf("failed to get user balance: %w", err)
+		}
+
+		// Check if sufficient funds
+		if balance < amount {
+			return fmt.Errorf("insufficient balance. Available: %d sats, Requested: %d sats", balance, amount)
+		}
+
+		// Get the pot (within transaction)
+		var pot lnbits.SavingsPot
+		if err := tx.Where("user_id = ? AND name = ?", user.ID, strings.TrimSpace(potName)).First(&pot).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return fmt.Errorf("pot '%s' not found", potName)
+			}
 			return err
 		}
 
-		// Deduct from user wallet balance
+		// Deduct from user balance
 		user.Wallet.Balance -= amount
 		if err := tx.Save(user).Error; err != nil {
 			return fmt.Errorf("failed to update user balance: %w", err)
@@ -118,8 +124,7 @@ func (bot *TipBot) TransferToPot(user *lnbits.User, potName string, amount int64
 
 		// Add to pot balance
 		pot.Balance += amount
-
-		if err := tx.Save(pot).Error; err != nil {
+		if err := tx.Save(&pot).Error; err != nil {
 			return fmt.Errorf("failed to update pot balance: %w", err)
 		}
 
