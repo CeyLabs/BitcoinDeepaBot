@@ -2,6 +2,8 @@ package telegram
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/errors"
 	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
@@ -21,6 +23,13 @@ var (
 	btnCancelAPITx              = apiApprovalConfirmationMenu.Data("🚫 Cancel", "cancel_api_tx")
 	btnApproveAPITx             = apiApprovalConfirmationMenu.Data("✅ Approve & Send", "approve_api_tx")
 )
+
+// isTelegramID checks if the identifier is a Telegram ID (numeric string)
+func isTelegramID(identifier string) bool {
+	// Check if it's all digits and has reasonable length for Telegram ID
+	match, _ := regexp.MatchString(`^[0-9]{5,15}$`, identifier)
+	return match
+}
 
 // APIApprovalData holds data for API transaction approval (similar to SendData)
 type APIApprovalData struct {
@@ -167,8 +176,21 @@ func (bot *TipBot) cancelAPITransactionHandler(ctx intercept.Context) (intercept
 
 // CreateAPIApprovalRequest creates an approval request for API transaction (similar to send confirmation)
 func CreateAPIApprovalRequest(bot *TipBot, fromUser *lnbits.User, toUsername string, amount int64, memo string, transactionID string, clientIP string) error {
+	// Check if toUsername is actually a user ID and get the actual username
+	actualUsername := toUsername
+	if isTelegramID(toUsername) {
+		// It's a Telegram ID, get the user and use their username
+		telegramID, err := strconv.ParseInt(toUsername, 10, 64)
+		if err == nil {
+			toUser, err := GetUserByTelegramID(telegramID, *bot)
+			if err == nil && toUser.Telegram.Username != "" {
+				actualUsername = toUser.Telegram.Username
+			}
+		}
+	}
+	
 	// Create confirmation text (same format as /send command)
-	toUserStrMention := fmt.Sprintf("@%s", toUsername)
+	toUserStrMention := fmt.Sprintf("@%s", actualUsername)
 	confirmText := fmt.Sprintf("Do you want to pay to %s?\n\n💸 Amount: %s", toUserStrMention, thirdparty.FormatSatsWithLKR(amount))
 	if memo != "" {
 		confirmText += fmt.Sprintf("\n✉️ %s", str.MarkdownEscape(memo))
@@ -186,7 +208,7 @@ func CreateAPIApprovalRequest(bot *TipBot, fromUser *lnbits.User, toUsername str
 		Base:          storage.New(storage.ID(id)),
 		TransactionID: transactionID,
 		FromUser:      fromUser,
-		ToUsername:    toUsername,
+		ToUsername:    actualUsername, // Use the actual username instead of the original toUsername
 		Amount:        amount,
 		Memo:          memo,
 		Message:       confirmText,
