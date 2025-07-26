@@ -37,5 +37,5 @@ func GetUSDToLKRRate() (float64, error) {
 	}
 
 	// Use selling rate as it's typically what you'd pay to get LKR for USD
-	return exchangeResponse.BuyingRate, nil
+	return exchangeResponse.SellingRate, nil
 }
