@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -97,12 +98,11 @@ func (bot TipBot) handleInlineReceiveQuery(ctx intercept.Context) (intercept.Con
 
 	// check for memo in command
 	memo := GetMemoFromCommand(q.Text, memo_argn)
-	urls := []string{
-		queryImage,
-	}
-	results := make(tb.Results, len(urls)) // []tb.Result
-	for i, url := range urls {
-		inlineMessage := fmt.Sprintf(Translate(ctx, "inlineReceiveMessage"), toUserStr, thirdparty.FormatSatsWithLKR(amount))
+	results := make(tb.Results, 0, 2) // []tb.Result
+
+	// helper function to create a result and store inline receive data
+	createResult := func(amountSat int64, title string, description string) {
+		inlineMessage := fmt.Sprintf(Translate(ctx, "inlineReceiveMessage"), toUserStr, thirdparty.FormatSatsWithLKR(amountSat))
 
 		// modify message if payment is to specific user
 		if from_SpecificUser {
@@ -113,30 +113,45 @@ func (bot TipBot) handleInlineReceiveQuery(ctx intercept.Context) (intercept.Con
 			inlineMessage = inlineMessage + fmt.Sprintf(Translate(ctx, "inlineReceiveAppendMemo"), memo)
 		}
 		result := &tb.ArticleResult{
-			// URL:         url,
 			Text:        inlineMessage,
-			Title:       fmt.Sprintf(TranslateUser(ctx, "inlineResultReceiveTitle"), thirdparty.FormatSatsWithLKR(amount)),
-			Description: fmt.Sprintf(TranslateUser(ctx, "inlineResultReceiveDescription"), thirdparty.FormatSatsWithLKR(amount)),
-			// required for photos
-			ThumbURL: url,
+			Title:       title,
+			Description: description,
+			ThumbURL:    queryImage,
 		}
-		id := fmt.Sprintf("inl-receive-%d-%d-%s", q.Sender.ID, amount, RandStringRunes(5))
+		id := fmt.Sprintf("inl-receive-%d-%d-%s", q.Sender.ID, amountSat, RandStringRunes(5))
 		result.ReplyMarkup = &tb.ReplyMarkup{InlineKeyboard: bot.makeReceiveKeyboard(ctx, id).InlineKeyboard}
-		results[i] = result
-		// needed to set a unique string ID for each result
-		results[i].SetResultID(id)
-		// create persistend inline send struct
+		result.SetResultID(id)
+		results = append(results, result)
+
+		// create persistend inline receive struct
 		inlineReceive := InlineReceive{
 			Base:              storage.New(storage.ID(id)),
 			MessageText:       inlineMessage,
 			To:                to,
 			Memo:              memo,
-			Amount:            amount,
+			Amount:            amountSat,
 			From:              fromUserDb,
 			From_SpecificUser: from_SpecificUser,
 			LanguageCode:      ctx.Value("publicLanguageCode").(string),
 		}
 		bot.Cache.Set(inlineReceive.ID, inlineReceive, &store.Options{Expiration: 5 * time.Minute})
+	}
+
+	// result treating the amount as sats
+	title := fmt.Sprintf(TranslateUser(ctx, "inlineResultReceiveTitle"), thirdparty.FormatSatsWithLKR(amount))
+	description := fmt.Sprintf(TranslateUser(ctx, "inlineResultReceiveDescription"), thirdparty.FormatSatsWithLKR(amount))
+	createResult(amount, title, description)
+
+	// result treating the amount as LKR
+	amountStr, errArg := getArgumentFromCommand(q.Text, 1)
+	if errArg == nil {
+		if f, err := strconv.ParseFloat(strings.ReplaceAll(amountStr, ",", ""), 64); err == nil {
+			if satFromLKR, err := thirdparty.LKRToSat(f); err == nil {
+				title := fmt.Sprintf("💸 Request %.2f LKR (~%d sat)", f, satFromLKR)
+				description := fmt.Sprintf("👉 Click to request %.2f LKR (~%d sat) from this chat.", f, satFromLKR)
+				createResult(satFromLKR, title, description)
+			}
+		}
 	}
 
 	err = bot.Telegram.Answer(q, &tb.QueryResponse{
@@ -325,7 +340,6 @@ func (bot *TipBot) finishInlineReceiveHandler(ctx context.Context, c *tb.Callbac
 	to := inlineReceive.To
 	toUserStrMd := GetUserStrMd(to.Telegram)
 	fromUserStrMd := GetUserStrMd(from.Telegram)
-	toUserStr := GetUserStr(to.Telegram)
 	inlineReceive.MessageText = fmt.Sprintf(i18n.Translate(inlineReceive.LanguageCode, "inlineSendUpdateMessageAccept"), thirdparty.FormatSatsWithLKR(inlineReceive.Amount), fromUserStrMd, toUserStrMd)
 	memo := inlineReceive.Memo
 	if len(memo) > 0 {
@@ -340,11 +354,6 @@ func (bot *TipBot) finishInlineReceiveHandler(ctx context.Context, c *tb.Callbac
 	// notify users
 	bot.trySendMessage(to.Telegram, fmt.Sprintf(i18n.Translate(to.Telegram.LanguageCode, "sendReceivedMessage"), fromUserStrMd, thirdparty.FormatSatsWithLKR(inlineReceive.Amount)))
 	bot.trySendMessage(from.Telegram, fmt.Sprintf(i18n.Translate(from.Telegram.LanguageCode, "sendSentMessage"), thirdparty.FormatSatsWithLKR(inlineReceive.Amount), toUserStrMd))
-	if err != nil {
-		errmsg := fmt.Errorf("[acceptInlineReceiveHandler] Error: Receive message to %s: %s", toUserStr, err)
-		log.Warnln(errmsg)
-		return ctx, err
-	}
 	return ctx, nil
 	// inlineReceive.Release(inlineReceive, bot.Bunt)
 }
