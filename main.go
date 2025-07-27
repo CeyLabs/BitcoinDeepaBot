@@ -101,6 +101,10 @@ func startApiServer(bot *telegram.TipBot) {
 	if internal.IsAPISendEnabled() {
 		s.AppendRoute(`/api/v1/send`, api.WalletHMACMiddleware(apiService.Send), http.MethodPost)
 		log.Infof("API Send endpoint registered at /api/v1/send with wallet-based HMAC security")
+		
+		// User balance endpoint with wallet-based HMAC security
+		s.AppendRoute(`/api/v1/userbalance`, api.WalletHMACMiddleware(apiService.UserBalance), http.MethodPost)
+		log.Infof("API UserBalance endpoint registered at /api/v1/userbalance with wallet-based HMAC security")
 	} else {
 		log.Infof("API Send endpoint disabled in configuration")
 	}
