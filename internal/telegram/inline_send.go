@@ -149,8 +149,8 @@ func (bot TipBot) handleInlineSendQuery(ctx intercept.Context) (intercept.Contex
 
 	// result treating the amount as sats
 	if balance >= amount {
-		title := fmt.Sprintf(TranslateUser(ctx, "inlineResultSendTitle"), amount)
-		description := fmt.Sprintf(TranslateUser(ctx, "inlineResultSendDescription"), amount)
+		title := fmt.Sprintf(TranslateUser(ctx, "inlineResultSendTitle"), thirdparty.FormatSatsWithLKR(amount))
+		description := fmt.Sprintf(TranslateUser(ctx, "inlineResultSendDescription"), thirdparty.FormatSatsWithLKR(amount))
 		createResult(amount, title, description)
 	}
 
