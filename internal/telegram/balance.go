@@ -36,12 +36,8 @@ func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, err
 	}
 
 	usrStr := GetUserStr(ctx.Sender())
-	balance, err := bot.GetUserBalance(user)
-	if err != nil {
-		log.Errorf("[/balance] Error fetching %s's balance: %s", usrStr, err)
-		bot.trySendMessage(ctx.Sender(), Translate(ctx, "balanceErrorMessage"))
-		return ctx, err
-	}
+	// Use database balance (in msat) to reflect pot transfers
+	balance := user.Wallet.Balance / 1000
 
 	log.Infof("[/balance] %s's balance: %s\n", usrStr, utils.FormatSats(balance))
 
@@ -50,9 +46,37 @@ func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, err
 		log.Infof("[/balance] error fetching price from coingecko\n")
 	}
 
-	USDValue := USDPerSat * float64(balance)
-	LKRValue := LKRPerSat * float64(balance)
+	potBalance, err := bot.GetUserTotalPotBalance(user)
+	if err != nil {
+		log.Errorf("[/balance] Error fetching %s's pot balance: %s", usrStr, err)
+		potBalance = 0
+	}
 
-	bot.trySendMessage(ctx.Sender(), fmt.Sprintf(Translate(ctx, "balanceMessage"), utils.FormatSats(balance), utils.FormatFloatWithCommas(USDValue), utils.FormatFloatWithCommas(LKRValue)))
+	totalBalance := balance + potBalance
+	mainUSDValue := USDPerSat * float64(balance)
+	mainLKRValue := LKRPerSat * float64(balance)
+	totalUSDValue := USDPerSat * float64(totalBalance)
+	totalLKRValue := LKRPerSat * float64(totalBalance)
+	potUSDValue := USDPerSat * float64(potBalance)
+	potLKRValue := LKRPerSat * float64(potBalance)
+
+	message := fmt.Sprintf(Translate(ctx, "balanceMessage"),
+		utils.FormatSats(balance),
+		utils.FormatFloatWithCommas(mainUSDValue),
+		utils.FormatFloatWithCommas(mainLKRValue))
+
+	if potBalance > 0 {
+		potInfo := fmt.Sprintf(Translate(ctx, "potBalanceInfo"),
+			utils.FormatSats(potBalance),
+			utils.FormatFloatWithCommas(potUSDValue),
+			utils.FormatFloatWithCommas(potLKRValue))
+		totalInfo := fmt.Sprintf(Translate(ctx, "totalBalanceInfo"),
+			utils.FormatSats(totalBalance),
+			utils.FormatFloatWithCommas(totalUSDValue),
+			utils.FormatFloatWithCommas(totalLKRValue))
+		message += "\n" + potInfo + "\n" + totalInfo
+	}
+
+	bot.trySendMessage(ctx.Sender(), message)
 	return ctx, nil
 }
