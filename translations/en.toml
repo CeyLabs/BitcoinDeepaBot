@@ -150,6 +150,8 @@ startNoUsernameMessage    = """☝️ It looks like you don't have a Telegram @u
 
 balanceMessage      = """👑 *Your balance:* %s. (%s USD / රු. %s)"""
 balanceErrorMessage = """🚫 Could not fetch your balance. Please try again later."""
+potBalanceInfo      = """💰 **In savings pots**: %s sats"""
+totalBalanceInfo    = """🏦 **Total balance**: %s sats (%s USD / %s)"""
 
 # TIP
 
@@ -418,3 +420,38 @@ convertResultMessage = """%.2f LKR is about %s."""
 
 # CONVERT SAT TO FIAT
 convertSatsResultMessage = """%s is about %s USD / රු. %s"""
+
+# POTS
+
+createPotHelpText = """📖 Create a savings pot to set aside sats.
+
+*Usage:* `/createpot <name>`
+*Example:* `/createpot Holiday Fund`
+
+🏺 _Create up to 20 savings pots_
+📝 _Name can contain letters, numbers, spaces, hyphens, and underscores_
+💰 _Transfer sats using /addtopot and /withdrawfrompot_"""
+
+addToPotHelpText = """📖 Transfer sats from your main balance to a savings pot.
+
+*Usage:* `/addtopot <pot_name> <amount>`
+*Example:* `/addtopot "Holiday Fund" 1000`
+
+💰 _Moves sats from your main balance to the pot_
+🔒 _Sats are safely stored in the pot until withdrawn_"""
+
+withdrawFromPotHelpText = """📖 Withdraw sats from a savings pot to your main balance.
+
+*Usage:* `/withdrawfrompot <pot_name> <amount>`
+*Example:* `/withdrawfrompot "Holiday Fund" 500`
+
+💸 _Moves sats from the pot back to your main balance_
+✅ _Sats become available for sending and payments_"""
+
+deletePotHelpText = """📖 Delete an empty savings pot.
+
+*Usage:* `/deletepot <pot_name>`
+*Example:* `/deletepot "Holiday Fund"`
+
+⚠️ _Pot must be empty (0 sats) before deletion_
+🗑️ _This action cannot be undone_"""

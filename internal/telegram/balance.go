@@ -50,9 +50,33 @@ func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, err
 		log.Infof("[/balance] error fetching price from coingecko\n")
 	}
 
-	USDValue := USDPerSat * float64(balance)
-	LKRValue := LKRPerSat * float64(balance)
+	potBalance, err := bot.GetUserTotalPotBalance(user)
+	if err != nil {
+		log.Errorf("[/balance] Error fetching %s's pot balance: %s", usrStr, err)
+		potBalance = 0
+	}
 
-	bot.trySendMessage(ctx.Sender(), fmt.Sprintf(Translate(ctx, "balanceMessage"), utils.FormatSats(balance), utils.FormatFloatWithCommas(USDValue), utils.FormatFloatWithCommas(LKRValue)))
+	totalBalance := balance + potBalance
+	mainUSDValue := USDPerSat * float64(balance)
+	mainLKRValue := LKRPerSat * float64(balance)
+	USDValue := USDPerSat * float64(totalBalance)
+	LKRValue := LKRPerSat * float64(totalBalance)
+
+	message := fmt.Sprintf(Translate(ctx, "balanceMessage"), 
+		utils.FormatSats(balance), 
+		utils.FormatFloatWithCommas(mainUSDValue), 
+		utils.FormatFloatWithCommas(mainLKRValue))
+	
+	if potBalance > 0 {
+		potInfo := fmt.Sprintf(Translate(ctx, "potBalanceInfo"), 
+			utils.FormatSats(potBalance))
+		totalInfo := fmt.Sprintf(Translate(ctx, "totalBalanceInfo"), 
+			utils.FormatSats(totalBalance),
+			utils.FormatFloatWithCommas(USDValue),
+			utils.FormatFloatWithCommas(LKRValue))
+		message += "\n" + potInfo + "\n" + totalInfo
+	}
+
+	bot.trySendMessage(ctx.Sender(), message)
 	return ctx, nil
 }

@@ -183,3 +183,13 @@ func (u User) SignKeyAuth(domain string, k1hex string) (key string, sig string, 
 
 	return key, sig, nil
 }
+
+type SavingsPot struct {
+	ID        string    `json:"id" gorm:"primaryKey"`
+	UserID    string    `json:"user_id" gorm:"index"`
+	Name      string    `json:"name"`
+	Balance   int64     `json:"balance" gorm:"default:0;check:balance >= 0" validate:"min=0"`
+	CreatedAt time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	User      *User     `gorm:"foreignKey:UserID;references:ID"`
+}
