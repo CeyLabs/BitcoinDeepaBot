@@ -69,6 +69,7 @@ jobs:
         run: echo "::set-output name=git_exists::$(echo '${{ steps.check_git.outputs.stdout }}' | tr -d '\r')"
 
       - name: Copy Files to Server
+        if: steps.set_git_output.outputs.git_exists == 'false'
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
