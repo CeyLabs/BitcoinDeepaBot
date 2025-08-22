@@ -1,19 +1,17 @@
+
 name: BitcoinDeepaBot Deployment - Dev
 
 on:
   push:
     branches:
-      - develop
-  pull_request:
-    branches:
-      - main
+      - dev
 
 defaults:
   run:
     working-directory: .
 
 jobs:
-  build-and-test:
+  build-and-deploy:
     runs-on: ubuntu-latest      
     env:
       GO_VERSION: "1.21"
@@ -32,70 +30,46 @@ jobs:
           ${{ env.PROJECT_NAME }} Build Started 🚀
           📁 Repository: ${{ github.repository }}
           👤 Initiator: ${{ github.actor }}
-          🌿 Branch: ${{ github.ref_name }}
           🕒 Timestamp: ${{ github.event.head_commit.timestamp}} 
           📝 Commit Message: ${{ github.event.head_commit.message }}"
 
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Go Environment
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Setup Build Environment
-        run: |
-          go mod download
-          go mod verify
-
-      - name: Run Tests
-        run: |
-          go test -v ./...
-
-      - name: Run Go Vet
-        run: |
-          go vet ./...
-
-      - name: Build Application
-        run: |
-          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o ${{ env.BINARY_NAME }} .
-
       - name: Notify Build Complete
         run: |
           curl -s -X POST https://api.telegram.org/bot${{ secrets.DEV_ACTIONS_BOT_TOKEN }}/sendMessage \
             -d chat_id="${{ secrets.DEV_ACTIONS_GROUP_ID }}" \
             -d text="
-          ${{ env.PROJECT_NAME }} Build Complete 🛠
+          ${{ env.PROJECT_NAME }} Code Checked Out �
           📁 Repository: ${{ github.repository }}
           👤 Initiator: ${{ github.actor }}
-          🌿 Branch: ${{ github.ref_name }}
           🕒 Timestamp: ${{ github.event.head_commit.timestamp }}
           📝 Commit Message: ${{ github.event.head_commit.message }}"
 
-      # Only deploy if this is a push to develop branch (not a PR)
-      - name: Check Git Repository and Create Deploy Path
-        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+      # ✅ Check if .git directory exists remotely
+      - name: Check if Git Exists on Server
+        id: check_git
         uses: appleboy/ssh-action@master
-        id: check_git_dev
         with:
           host: ${{ secrets.DEV_SERVER_HOST }}
           username: ${{ secrets.DEV_SERVER_USERNAME }}
           key: ${{ secrets.DEV_SERVER_KEY }}
           port: ${{ secrets.DEV_SERVER_PORT }}
           script: |
-            sudo mkdir -p ${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}
-            cd ${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}
-            if [ -d ".git" ]; then
-              echo "git_exists=true" >> $GITHUB_OUTPUT
-              echo "Git repository exists - will use git pull"
+            if [ -d "${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}/.git" ]; then
+              echo "true"
             else
-              echo "git_exists=false" >> $GITHUB_OUTPUT
-              echo "No git repository - will copy files"
+              echo "false"
             fi
-      
-      - name: Copy Files to Development Server
-        if: github.event_name == 'push' && github.ref == 'refs/heads/develop' && steps.check_git_dev.outputs.git_exists == 'false'
+
+      # ✅ Capture the above output
+      - name: Set git_exists output
+        id: set_git_output
+        run: echo "::set-output name=git_exists::$(echo '${{ steps.check_git.outputs.stdout }}' | tr -d '\r')"
+
+      - name: Copy Files to Server
+        if: steps.set_git_output.outputs.git_exists == 'false'
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.DEV_SERVER_HOST }}
@@ -104,10 +78,10 @@ jobs:
           port: ${{ secrets.DEV_SERVER_PORT }}
           source: "."
           target: "${{ env.DEPLOY_PATH }}${{ env.PROJECT_DIR }}"
+          strip_components: 1
           rm: true
 
-      - name: Deploy to Development
-        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+      - name: Deploy Application
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.DEV_SERVER_HOST }}
@@ -121,7 +95,7 @@ jobs:
             if [ -d ".git" ]; then
               echo "Git repository exists, pulling latest changes..."
               git fetch origin
-              git reset --hard origin/develop
+              git reset --hard origin/dev
               git clean -fd
             else
               echo "Fresh deployment - no git repository found"
@@ -132,6 +106,12 @@ jobs:
             export GOPATH=$HOME/go
             export GOOS=linux
             export GOARCH=amd64
+
+            # Build the application on the server
+            echo "Building application on server..."
+            go mod download
+            go mod verify
+            CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o ${{ env.BINARY_NAME }} .
 
             # Make binary executable
             chmod +x ${{ env.BINARY_NAME }}
@@ -168,7 +148,6 @@ jobs:
             sudo systemctl status ${{ env.SERVICE_NAME }} --no-pager
 
       - name: Notify Deploy Complete
-        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
         run: |
           curl -s -X POST https://api.telegram.org/bot${{ secrets.DEV_ACTIONS_BOT_TOKEN }}/sendMessage \
             -d chat_id="${{ secrets.DEV_ACTIONS_GROUP_ID }}" \
@@ -176,20 +155,18 @@ jobs:
           ${{ env.PROJECT_NAME }} Deploy Complete ✅
           📁 Repository: ${{ github.repository }}
           👤 Initiator: ${{ github.actor }}
-          🌿 Branch: ${{ github.ref_name }}
           🕒 Timestamp: ${{ github.event.head_commit.timestamp }}
           📝 Commit Message: ${{ github.event.head_commit.message }}"
 
-      - name: Notify Failure
+      - name: Notify Deploy Failure
         if: failure()
         run: |
           curl -s -X POST https://api.telegram.org/bot${{ secrets.DEV_ACTIONS_BOT_TOKEN }}/sendMessage \
             -d chat_id="${{ secrets.DEV_ACTIONS_GROUP_ID }}" \
             -d text="
-          ❌ ${{ env.PROJECT_NAME }} Failed!
+          ❌ ${{ env.PROJECT_NAME }} Deploy Failed!
           📁 Repository: ${{ github.repository }}
           👤 Initiator: ${{ github.actor }}
-          🌿 Branch: ${{ github.ref_name }}
           🕒 Timestamp: ${{ github.event.head_commit.timestamp }}
           📝 Commit Message: ${{ github.event.head_commit.message }}
           
