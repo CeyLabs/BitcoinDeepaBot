@@ -97,17 +97,18 @@ func (bot *TipBot) TransferToPot(user *lnbits.User, potName string, amount int64
 
 	return bot.DB.Users.Transaction(func(tx *gorm.DB) error {
 		// Get current user balance (within transaction)
-		balance, err := bot.GetUserBalance(user)
-		if err != nil {
-			return fmt.Errorf("failed to get user balance: %w", err)
+		var userWallet lnbits.User
+		if err := tx.Where("id = ?", user.ID).First(&userWallet).Error; err != nil {
+			return fmt.Errorf("failed to get user: %w", err)
 		}
 
+		balance := userWallet.Wallet.Balance
 		// Check if sufficient funds
 		if balance < amount {
 			return fmt.Errorf("insufficient balance. Available: %d sats, Requested: %d sats", balance, amount)
 		}
 
-		// Get the pot (within transaction)
+		// Verify the pot exists
 		var pot lnbits.SavingsPot
 		if err := tx.Where("user_id = ? AND name = ?", user.ID, strings.TrimSpace(potName)).First(&pot).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
@@ -116,15 +117,19 @@ func (bot *TipBot) TransferToPot(user *lnbits.User, potName string, amount int64
 			return err
 		}
 
-		// Deduct from user balance
-		user.Wallet.Balance -= amount
-		if err := tx.Save(user).Error; err != nil {
-			return fmt.Errorf("failed to update user balance: %w", err)
+		// Atomically deduct from user balance
+		result := tx.Model(&lnbits.User{}).Where("id = ? AND wallet_balance >= ?", user.ID, amount).
+			UpdateColumn("wallet_balance", gorm.Expr("wallet_balance - ?", amount))
+		if result.Error != nil {
+			return fmt.Errorf("failed to update user balance: %w", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			return fmt.Errorf("insufficient balance or user not found")
 		}
 
-		// Add to pot balance
-		pot.Balance += amount
-		if err := tx.Save(&pot).Error; err != nil {
+		// Atomically add to pot balance
+		if err := tx.Model(&lnbits.SavingsPot{}).Where("user_id = ? AND name = ?", user.ID, strings.TrimSpace(potName)).
+			UpdateColumn("balance", gorm.Expr("balance + ?", amount)).Error; err != nil {
 			return fmt.Errorf("failed to update pot balance: %w", err)
 		}
 
@@ -138,8 +143,12 @@ func (bot *TipBot) WithdrawFromPot(user *lnbits.User, potName string, amount int
 	}
 
 	return bot.DB.Users.Transaction(func(tx *gorm.DB) error {
-		pot, err := bot.GetPot(user, potName)
-		if err != nil {
+		// Verify the pot exists and has sufficient balance
+		var pot lnbits.SavingsPot
+		if err := tx.Where("user_id = ? AND name = ?", user.ID, strings.TrimSpace(potName)).First(&pot).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return fmt.Errorf("pot '%s' not found", potName)
+			}
 			return err
 		}
 
@@ -147,16 +156,19 @@ func (bot *TipBot) WithdrawFromPot(user *lnbits.User, potName string, amount int
 			return fmt.Errorf("insufficient pot balance. Available: %d sats, Requested: %d sats", pot.Balance, amount)
 		}
 
-		// Deduct from pot balance
-		pot.Balance -= amount
-
-		if err := tx.Save(pot).Error; err != nil {
-			return fmt.Errorf("failed to update pot balance: %w", err)
+		// Atomically deduct from pot balance
+		result := tx.Model(&lnbits.SavingsPot{}).Where("user_id = ? AND name = ? AND balance >= ?", user.ID, strings.TrimSpace(potName), amount).
+			UpdateColumn("balance", gorm.Expr("balance - ?", amount))
+		if result.Error != nil {
+			return fmt.Errorf("failed to update pot balance: %w", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			return fmt.Errorf("insufficient pot balance or pot not found")
 		}
 
-		// Add back to user wallet balance
-		user.Wallet.Balance += amount
-		if err := tx.Save(user).Error; err != nil {
+		// Atomically add back to user wallet balance
+		if err := tx.Model(&lnbits.User{}).Where("id = ?", user.ID).
+			UpdateColumn("wallet_balance", gorm.Expr("wallet_balance + ?", amount)).Error; err != nil {
 			return fmt.Errorf("failed to update user balance: %w", err)
 		}
 
