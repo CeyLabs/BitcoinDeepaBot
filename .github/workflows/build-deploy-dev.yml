@@ -111,7 +111,7 @@ jobs:
             echo "Building application on server..."
             go mod download
             go mod verify
-            CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o ${{ env.BINARY_NAME }} .
+            CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -buildvcs=false -o ${{ env.BINARY_NAME }} .
 
             # Make binary executable
             chmod +x ${{ env.BINARY_NAME }}
