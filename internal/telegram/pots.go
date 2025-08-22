@@ -247,10 +247,10 @@ func (bot *TipBot) listPotsHandler(ctx intercept.Context) (intercept.Context, er
 
 	for i, pot := range pots {
 		totalBalance += pot.Balance
-		message += fmt.Sprintf("%d. **%s**: %s sats\n", i+1, pot.Name, utils.FormatSats(pot.Balance))
+		message += fmt.Sprintf("%d. **%s**: %s\n", i+1, pot.Name, utils.FormatSats(pot.Balance))
 	}
 
-	message += fmt.Sprintf("\n💰 **Total in pots**: %s sats", utils.FormatSats(totalBalance))
+	message += fmt.Sprintf("\n💰 **Total in pots**: %s", utils.FormatSats(totalBalance))
 
 	bot.trySendMessage(ctx.Sender(), message)
 	return ctx, nil

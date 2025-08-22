@@ -55,8 +55,10 @@ func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, err
 	totalBalance := balance + potBalance
 	mainUSDValue := USDPerSat * float64(balance)
 	mainLKRValue := LKRPerSat * float64(balance)
-	USDValue := USDPerSat * float64(totalBalance)
-	LKRValue := LKRPerSat * float64(totalBalance)
+	totalUSDValue := USDPerSat * float64(totalBalance)
+	totalLKRValue := LKRPerSat * float64(totalBalance)
+	potUSDValue := USDPerSat * float64(potBalance)
+	potLKRValue := LKRPerSat * float64(potBalance)
 
 	message := fmt.Sprintf(Translate(ctx, "balanceMessage"),
 		utils.FormatSats(balance),
@@ -65,11 +67,13 @@ func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, err
 
 	if potBalance > 0 {
 		potInfo := fmt.Sprintf(Translate(ctx, "potBalanceInfo"),
-			utils.FormatSats(potBalance))
+			utils.FormatSats(potBalance),
+			utils.FormatFloatWithCommas(potUSDValue),
+			utils.FormatFloatWithCommas(potLKRValue))
 		totalInfo := fmt.Sprintf(Translate(ctx, "totalBalanceInfo"),
 			utils.FormatSats(totalBalance),
-			utils.FormatFloatWithCommas(USDValue),
-			utils.FormatFloatWithCommas(LKRValue))
+			utils.FormatFloatWithCommas(totalUSDValue),
+			utils.FormatFloatWithCommas(totalLKRValue))
 		message += "\n" + potInfo + "\n" + totalInfo
 	}
 
