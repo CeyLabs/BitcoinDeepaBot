@@ -166,9 +166,12 @@ func (bot *TipBot) WithdrawFromPot(user *lnbits.User, potName string, amount int
 			return fmt.Errorf("insufficient pot balance or pot not found")
 		}
 
-		// Atomically add back to user wallet balance
-		if err := tx.Model(&lnbits.User{}).Where("id = ?", user.ID).
-			UpdateColumn("wallet_balance", gorm.Expr("wallet_balance + ?", amount)).Error; err != nil {
+		balance, err := bot.GetUserBalance(user)
+		if err != nil {
+			return fmt.Errorf("failed to get user balance: %w", err)
+		}
+		user.Wallet.Balance = balance + amount
+		if err := tx.Save(user).Error; err != nil {
 			return fmt.Errorf("failed to update user balance: %w", err)
 		}
 
