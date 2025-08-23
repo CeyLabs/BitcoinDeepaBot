@@ -9,7 +9,9 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/errors"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
+	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 	"github.com/LightningTipBot/LightningTipBot/internal/utils"
+	log "github.com/sirupsen/logrus"
 	uuid "github.com/satori/go.uuid"
 	"gorm.io/gorm"
 )
@@ -225,15 +227,38 @@ func (bot *TipBot) listPotsHandler(ctx intercept.Context) (intercept.Context, er
 		return ctx, nil
 	}
 
+	LKRPerSat, USDPerSat, err := thirdparty.GetSatPrice()
+	if err != nil {
+		log.Infof("[/pots] error fetching price from coingecko\n")
+	}
+
 	message := "🏺 Your Savings Pots:\n\n"
 	totalBalance := int64(0)
 
 	for i, pot := range pots {
 		totalBalance += pot.Balance
-		message += fmt.Sprintf("%d. **%s**: %s\n", i+1, pot.Name, utils.FormatSats(pot.Balance))
+		if err == nil {
+			potUSDValue := USDPerSat * float64(pot.Balance)
+			potLKRValue := LKRPerSat * float64(pot.Balance)
+			message += fmt.Sprintf("%d. **%s**: %s (%s USD / රු. %s)\n", i+1, pot.Name, 
+				utils.FormatSats(pot.Balance), 
+				utils.FormatFloatWithCommas(potUSDValue), 
+				utils.FormatFloatWithCommas(potLKRValue))
+		} else {
+			message += fmt.Sprintf("%d. **%s**: %s\n", i+1, pot.Name, utils.FormatSats(pot.Balance))
+		}
 	}
 
-	message += fmt.Sprintf("\n💰 **Total in pots**: %s", utils.FormatSats(totalBalance))
+	if err == nil {
+		totalUSDValue := USDPerSat * float64(totalBalance)
+		totalLKRValue := LKRPerSat * float64(totalBalance)
+		message += fmt.Sprintf("\n💰 **Total in pots**: %s (%s USD / රු. %s)", 
+			utils.FormatSats(totalBalance),
+			utils.FormatFloatWithCommas(totalUSDValue),
+			utils.FormatFloatWithCommas(totalLKRValue))
+	} else {
+		message += fmt.Sprintf("\n💰 **Total in pots**: %s", utils.FormatSats(totalBalance))
+	}
 
 	bot.trySendMessage(ctx.Sender(), message)
 	return ctx, nil
