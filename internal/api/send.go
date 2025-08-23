@@ -161,16 +161,16 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check sender's balance
-	balance, err := s.Bot.GetUserBalance(fromUser)
+	// Check sender's available balance (wallet balance - pot balance)
+	balance, err := s.Bot.GetUserAvailableBalance(fromUser)
 	if err != nil {
-		log.Errorf("[api/send] Could not get balance for %s: %v", fromUsername, err)
+		log.Errorf("[api/send] Could not get available balance for %s: %v", fromUsername, err)
 		RespondError(w, "Could not check sender balance")
 		return
 	}
 
 	if balance < req.Amount {
-		log.Warnf("[api/send] Insufficient balance for %s: %d < %d", fromUsername, balance, req.Amount)
+		log.Warnf("[api/send] Insufficient available balance for %s: %d < %d", fromUsername, balance, req.Amount)
 		RespondError(w, fmt.Sprintf("Insufficient balance: %s available, %s required", thirdparty.FormatSatsWithLKR(balance), thirdparty.FormatSatsWithLKR(req.Amount)))
 		return
 	}

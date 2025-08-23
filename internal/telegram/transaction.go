@@ -91,17 +91,17 @@ func (t *Transaction) SendTransaction(bot *TipBot, from *lnbits.User, to *lnbits
 	t.FromWallet = from.Wallet.ID
 	t.FromLNbitsID = from.ID
 
-	// check if fromUser has balance
-	balance, err := bot.GetUserBalance(from)
+	// check if fromUser has available balance (wallet balance - pot balance)
+	balance, err := bot.GetUserAvailableBalance(from)
 	if err != nil {
-		errmsg := fmt.Sprintf("could not get balance of user %s", fromUserStr)
+		errmsg := fmt.Sprintf("could not get available balance of user %s", fromUserStr)
 		log.Errorln(errmsg)
 		return false, err
 	}
-	// check if fromUser has balance
+	// check if fromUser has sufficient available balance
 	if balance < amount {
-		errmsg := fmt.Sprintf("balance too low.")
-		log.Warnf("Balance of user %s too low", fromUserStr)
+		errmsg := fmt.Sprintf("available balance too low.")
+		log.Warnf("Available balance of user %s too low", fromUserStr)
 		return false, fmt.Errorf(errmsg)
 	}
 

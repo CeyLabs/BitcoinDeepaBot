@@ -99,6 +99,28 @@ func (bot *TipBot) GetUserBalance(user *lnbits.User) (amount int64, err error) {
 	return
 }
 
+func (bot *TipBot) GetUserAvailableBalance(user *lnbits.User) (amount int64, err error) {
+	walletBalance, err := bot.GetUserBalance(user)
+	if err != nil {
+		return 0, err
+	}
+
+	potBalance, err := bot.GetUserTotalPotBalance(user)
+	if err != nil {
+		return 0, fmt.Errorf("could not get pot balance: %w", err)
+	}
+
+	availableBalance := walletBalance - potBalance
+	if availableBalance < 0 {
+		availableBalance = 0
+	}
+
+	log.Debugf("[GetUserAvailableBalance] %s's available balance: %d sat (wallet: %d, pots: %d)\n", 
+		GetUserStr(user.Telegram), availableBalance, walletBalance, potBalance)
+
+	return availableBalance, nil
+}
+
 func (bot *TipBot) CreateWalletForTelegramUser(tbUser *tb.User) (*lnbits.User, error) {
 	// failsafe: do not create wallet for existing user
 	if _, exists := bot.UserExists(tbUser); exists {

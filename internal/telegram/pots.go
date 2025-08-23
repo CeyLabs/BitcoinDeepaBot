@@ -95,18 +95,17 @@ func (bot *TipBot) TransferToPot(user *lnbits.User, potName string, amount int64
 		return fmt.Errorf("amount must be positive")
 	}
 
-	return bot.DB.Users.Transaction(func(tx *gorm.DB) error {
-		// Get current user balance (within transaction)
-		var userWallet lnbits.User
-		if err := tx.Where("id = ?", user.ID).First(&userWallet).Error; err != nil {
-			return fmt.Errorf("failed to get user: %w", err)
-		}
+	// Check sender's available balance (excluding money already in pots)
+	balance, err := bot.GetUserAvailableBalance(user)
+	if err != nil {
+		return fmt.Errorf("could not get user available balance: %w", err)
+	}
 
-		balance := userWallet.Wallet.Balance
-		// Check if sufficient funds
-		if balance < amount {
-			return fmt.Errorf("insufficient balance. Available: %d sats, Requested: %d sats", balance, amount)
-		}
+	if balance < amount {
+		return fmt.Errorf("insufficient available balance. Available: %d sats, Requested: %d sats", balance, amount)
+	}
+
+	return bot.DB.Users.Transaction(func(tx *gorm.DB) error {
 
 		// Verify the pot exists
 		var pot lnbits.SavingsPot
@@ -117,19 +116,8 @@ func (bot *TipBot) TransferToPot(user *lnbits.User, potName string, amount int64
 			return err
 		}
 
-		// Atomically deduct from user balance
-		result := tx.Model(&lnbits.User{}).Where("id = ? AND wallet_balance >= ?", user.ID, amount).
-			UpdateColumn("wallet_balance", gorm.Expr("wallet_balance - ?", amount))
-		if result.Error != nil {
-			return fmt.Errorf("failed to update user balance: %w", result.Error)
-		}
-		if result.RowsAffected == 0 {
-			return fmt.Errorf("insufficient balance or user not found")
-		}
-
-		// Atomically add to pot balance
-		if err := tx.Model(&lnbits.SavingsPot{}).Where("user_id = ? AND name = ?", user.ID, strings.TrimSpace(potName)).
-			UpdateColumn("balance", gorm.Expr("balance + ?", amount)).Error; err != nil {
+		// Atomically add to pot balance (no need to update wallet_balance as it's handled by LNbits)
+		if err := tx.Model(&lnbits.SavingsPot{}).Where("user_id = ? AND name = ?", user.ID, strings.TrimSpace(potName)).UpdateColumn("balance", gorm.Expr("balance + ?", amount)).Error; err != nil {
 			return fmt.Errorf("failed to update pot balance: %w", err)
 		}
 
@@ -145,21 +133,19 @@ func (bot *TipBot) WithdrawFromPot(user *lnbits.User, potName string, amount int
 		return fmt.Errorf("amount must be positive")
 	}
 
+	// Pre-check that the pot exists and has sufficient balance
+	pot, err := bot.GetPot(user, potName)
+	if err != nil {
+		return err
+	}
+
+	if pot.Balance < amount {
+		return fmt.Errorf("insufficient pot balance. Available: %d sats, Requested: %d sats", pot.Balance, amount)
+	}
+
 	return bot.DB.Users.Transaction(func(tx *gorm.DB) error {
-		// Verify the pot exists and has sufficient balance
-		var pot lnbits.SavingsPot
-		if err := tx.Where("user_id = ? AND name = ?", user.ID, strings.TrimSpace(potName)).First(&pot).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				return fmt.Errorf("pot '%s' not found", potName)
-			}
-			return err
-		}
 
-		if pot.Balance < amount {
-			return fmt.Errorf("insufficient pot balance. Available: %d sats, Requested: %d sats", pot.Balance, amount)
-		}
-
-		// Atomically deduct from pot balance
+		// Atomically deduct from pot balance (no need to update wallet_balance as it's handled by LNbits)
 		result := tx.Model(&lnbits.SavingsPot{}).Where("user_id = ? AND name = ? AND balance >= ?", user.ID, strings.TrimSpace(potName), amount).
 			UpdateColumn("balance", gorm.Expr("balance - ?", amount))
 		if result.Error != nil {
@@ -168,19 +154,6 @@ func (bot *TipBot) WithdrawFromPot(user *lnbits.User, potName string, amount int
 		if result.RowsAffected == 0 {
 			return fmt.Errorf("insufficient pot balance or pot not found")
 		}
-
-		// Atomically add to user wallet balance
-		result = tx.Model(&lnbits.User{}).Where("id = ?", user.ID).
-			UpdateColumn("wallet_balance", gorm.Expr("wallet_balance + ?", amount))
-		if result.Error != nil {
-			return fmt.Errorf("failed to update user balance: %w", result.Error)
-		}
-		if result.RowsAffected == 0 {
-			return fmt.Errorf("user not found")
-		}
-
-		// Update in-memory user balance
-		user.Wallet.Balance += amount
 
 		return nil
 	})

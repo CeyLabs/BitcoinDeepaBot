@@ -36,10 +36,14 @@ func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, err
 	}
 
 	usrStr := GetUserStr(ctx.Sender())
-	// Use database balance (in msat) to reflect pot transfers
-	balance := user.Wallet.Balance / 1000
+	// Get available balance (wallet balance - pot balance)
+	availableBalance, err := bot.GetUserAvailableBalance(user)
+	if err != nil {
+		log.Errorf("[/balance] Error fetching %s's available balance: %s", usrStr, err)
+		availableBalance = 0
+	}
 
-	log.Infof("[/balance] %s's balance: %s\n", usrStr, utils.FormatSats(balance))
+	log.Infof("[/balance] %s's available balance: %s\n", usrStr, utils.FormatSats(availableBalance))
 
 	LKRPerSat, USDPerSat, err := thirdparty.GetSatPrice()
 	if err != nil {
@@ -52,16 +56,16 @@ func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, err
 		potBalance = 0
 	}
 
-	totalBalance := balance + potBalance
-	mainUSDValue := USDPerSat * float64(balance)
-	mainLKRValue := LKRPerSat * float64(balance)
+	totalBalance := availableBalance + potBalance
+	mainUSDValue := USDPerSat * float64(availableBalance)
+	mainLKRValue := LKRPerSat * float64(availableBalance)
 	totalUSDValue := USDPerSat * float64(totalBalance)
 	totalLKRValue := LKRPerSat * float64(totalBalance)
 	potUSDValue := USDPerSat * float64(potBalance)
 	potLKRValue := LKRPerSat * float64(potBalance)
 
 	message := fmt.Sprintf(Translate(ctx, "balanceMessage"),
-		utils.FormatSats(balance),
+		utils.FormatSats(availableBalance),
 		utils.FormatFloatWithCommas(mainUSDValue),
 		utils.FormatFloatWithCommas(mainLKRValue))
 
