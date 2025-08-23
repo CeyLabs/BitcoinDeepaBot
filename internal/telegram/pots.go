@@ -133,11 +133,8 @@ func (bot *TipBot) TransferToPot(user *lnbits.User, potName string, amount int64
 			return fmt.Errorf("failed to update pot balance: %w", err)
 		}
 
-		// Update in-memory user balance and persist
+		// Update in-memory user balance
 		user.Wallet.Balance = balance - amount
-		if err := UpdateUserRecord(user, *bot); err != nil {
-			return fmt.Errorf("failed to update user record: %w", err)
-		}
 
 		return nil
 	})
@@ -172,15 +169,18 @@ func (bot *TipBot) WithdrawFromPot(user *lnbits.User, potName string, amount int
 			return fmt.Errorf("insufficient pot balance or pot not found")
 		}
 
-		// Update in-memory user balance and persist
-		balance, err := bot.GetUserBalance(user)
-		if err != nil {
-			return fmt.Errorf("failed to get user balance: %w", err)
+		// Atomically add to user wallet balance
+		result = tx.Model(&lnbits.User{}).Where("id = ?", user.ID).
+			UpdateColumn("wallet_balance", gorm.Expr("wallet_balance + ?", amount))
+		if result.Error != nil {
+			return fmt.Errorf("failed to update user balance: %w", result.Error)
 		}
-		user.Wallet.Balance = balance + amount
-		if err := UpdateUserRecord(user, *bot); err != nil {
-			return fmt.Errorf("failed to update user record: %w", err)
+		if result.RowsAffected == 0 {
+			return fmt.Errorf("user not found")
 		}
+
+		// Update in-memory user balance
+		user.Wallet.Balance += amount
 
 		return nil
 	})
