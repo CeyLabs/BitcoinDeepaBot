@@ -274,7 +274,7 @@ func (bot *TipBot) addToPotHandler(ctx intercept.Context) (intercept.Context, er
 		return ctx, err
 	}
 
-	bot.trySendMessage(ctx.Sender(), fmt.Sprintf("✅ Transferred %s sats to pot '%s'", utils.FormatSats(amount), potName))
+	bot.trySendMessage(ctx.Sender(), fmt.Sprintf("✅ Transferred %s to pot '%s'", utils.FormatSats(amount), potName))
 	return ctx, nil
 }
 
