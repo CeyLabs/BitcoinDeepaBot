@@ -155,8 +155,8 @@ startNoUsernameMessage    = """☝️ It looks like you don't have a Telegram @u
 
 balanceMessage      = """👑 *Main balance:* %s (%s USD / රු. %s)"""
 balanceErrorMessage = """🚫 Could not fetch your balance. Please try again later."""
-potBalanceInfo      = """💰 **In savings pots**: %s (%s USD / රු. %s)"""
-totalBalanceInfo    = """🏦 **Total balance**: %s (%s USD / %s)"""
+potBalanceInfo      = """💰 *In savings pots:* %s (%s USD / රු. %s)"""
+totalBalanceInfo    = """🏦 *Total balance:* %s (%s USD / රු. %s)"""
 
 # TIP
 
