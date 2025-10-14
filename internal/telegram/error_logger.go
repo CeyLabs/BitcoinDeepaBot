@@ -58,11 +58,58 @@ func (el *ErrorLogger) LogError(err error, context string, userInfo ...interface
 		return // Skip logging this specific interceptor error
 	}
 
-	// Format error message
-	formattedMsg := el.formatErrorMessage(err, context, userInfo...)
+	// Format error message as HTML (like payment error)
+	htmlEscape := utils.EscapeHTML
+	timestamp := time.Now().Format("2006-01-02 15:04:05 UTC")
 
-	// Send to Telegram group
-	go el.sendToTelegram(formattedMsg)
+	// User and chat details
+	userStr := "Unknown"
+	userId := ""
+	chatStr := ""
+	chatId := ""
+
+	for _, info := range userInfo {
+		switch v := info.(type) {
+		case *tb.User:
+			if v.Username != "" {
+				userStr = "<span class=\"tg-spoiler\">@" + htmlEscape(v.Username) + "</span>"
+			} else {
+				userStr = "<span class=\"tg-spoiler\">" + htmlEscape(v.FirstName+" "+v.LastName) + "</span>"
+			}
+			userId = fmt.Sprintf("%d", v.ID)
+		case *tb.Chat:
+			chatStr = htmlEscape(v.Title)
+			chatId = fmt.Sprintf("%d", v.ID)
+		}
+	}
+
+	msg := ""
+	msg += "🚫 <b>Bot Error</b>\n\n"
+	msg += " Context: " + htmlEscape(context) + "\n"
+	if userStr != "" && userId != "" {
+		msg += "👤 User: " + userStr + " (ID: " + userId + ")\n"
+	}
+	if chatStr != "" && chatId != "" {
+		msg += "💬 Chat: " + chatStr + " (ID: " + chatId + ")\n"
+	}
+	msg += "<blockquote expandable>\n"
+	msg += "❗ Error: " + htmlEscape(err.Error()) + "\n"
+	// Add stack trace location if available
+	if pc, file, line, ok := runtime.Caller(1); ok {
+		if strings.Contains(file, "error_logger.go") {
+			if pc2, file2, line2, ok2 := runtime.Caller(2); ok2 {
+				pc = pc2
+				file = file2
+				line = line2
+			}
+		}
+		funcName := runtime.FuncForPC(pc).Name()
+		msg += fmt.Sprintf("📍 Location: %s:%d in %s\n", htmlEscape(file), line, htmlEscape(funcName))
+	}
+	msg += "🕒 Time: " + htmlEscape(timestamp) + "\n"
+	msg += "</blockquote>"
+
+	go el.sendToTelegramHTML(msg)
 }
 
 // LogPanic logs a panic with stack trace to the Telegram group
