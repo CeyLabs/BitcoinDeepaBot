@@ -302,11 +302,34 @@ func (el *ErrorLogger) LogPaymentError(err error, amount int64, memo, invoice st
 
 	timestamp := time.Now().Format("2006-01-02 15:04:05 UTC")
 
-	msg := fmt.Sprintf("🚫 Payment Error for %s (ID: %d)\n\n", el.getUserStrV2(user), user.ID)
-	msg += fmt.Sprintf("💰 Amount: %s\n", el.escapeMarkdownV2(utils.FormatSats(amount)))
-	msg += fmt.Sprintf("📝 Memo: %s\n", el.escapeMarkdownV2(memo))
-	msg += fmt.Sprintf("📄 Invoice: %s\n", el.escapeMarkdownV2(invoice))
-	msg += fmt.Sprintf("❗ Error: %s\n\n", el.escapeMarkdownV2(err.Error()))
+	// HTML escaping utility
+	htmlEscape := utils.EscapeHTML
+
+	userStr := "Unknown"
+	if user != nil {
+		if user.Username != "" {
+			userStr = "<span class=\"tg-spoiler\">@" + htmlEscape(user.Username) + "</span>"
+		} else {
+			userStr = "<span class=\"tg-spoiler\">" + htmlEscape(user.FirstName+" "+user.LastName) + "</span>"
+		}
+	}
+
+	amountStr := "<span class=\"tg-spoiler\">" + htmlEscape(utils.FormatSats(amount)) + "</span>"
+	memoStr := htmlEscape(memo)
+	invoiceStr := htmlEscape(invoice)
+
+	// Compose HTML message
+	msg := fmt.Sprintf(
+		"🚫 Payment Error for <b>%s</b> (ID: %d)\n\n"+
+			"💰 Amount: <span class=\"tg-spoiler\">%s</span>\n"+
+			"📄 Invoice: %s\n"+
+			"📝 Memo: %s\n"+
+			"<blockquote expandable>",
+		userStr, user.ID, amountStr, invoiceStr, memoStr,
+	)
+
+	// Expandable details (Telegram does not support true expandable blocks, but blockquote visually separates)
+	detail := fmt.Sprintf("❗ Error: %s\n", htmlEscape(err.Error()))
 
 	if _, file, line, ok := runtime.Caller(1); ok {
 		if strings.Contains(file, "error_logger.go") {
@@ -318,12 +341,34 @@ func (el *ErrorLogger) LogPaymentError(err error, amount int64, memo, invoice st
 		if idx := strings.Index(file, "/internal/"); idx > -1 {
 			file = file[idx:]
 		}
-		msg += fmt.Sprintf("📍 Logged at:\n%s:%d\n(from github.com/LightningTipBot/LightningTipBot)", el.escapeMarkdownV2(file), line)
+		detail += fmt.Sprintf("📍 Logged at:\n%s:%d\n(from github.com/LightningTipBot/LightningTipBot)\n", htmlEscape(file), line)
+	}
+	detail += fmt.Sprintf("🕒 Time: %s", htmlEscape(timestamp))
+
+	msg += detail + "</blockquote>"
+
+	go el.sendToTelegramHTML(msg)
+}
+
+// sendToTelegramHTML sends the formatted HTML message to the Telegram group
+func (el *ErrorLogger) sendToTelegramHTML(message string) {
+	if el.bot == nil || el.bot.Telegram == nil {
+		log.Warnf("[ErrorLogger] Cannot send error log - Telegram bot not initialized")
+		return
 	}
 
-	msg += fmt.Sprintf("\n🕒 Time: %s", el.escapeMarkdownV2(timestamp))
-
-	go el.sendToTelegram(msg)
+	recipient := &tb.Chat{ID: el.logGroupId}
+	sendOptions := &tb.SendOptions{
+		ParseMode:             "HTML",
+		DisableWebPagePreview: true,
+	}
+	if el.threadId > 0 {
+		sendOptions.ReplyTo = &tb.Message{ID: int(el.threadId)}
+	}
+	_, err := el.bot.Telegram.Send(recipient, message, sendOptions)
+	if err != nil {
+		log.Errorf("[ErrorLogger] Failed to send HTML error log to Telegram: %v", err)
+	}
 }
 
 // LogTransactionError logs transaction-related errors with sender/receiver info
