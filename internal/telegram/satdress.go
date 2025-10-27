@@ -10,13 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/runtime"
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/runtime"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/telegram/intercept"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
-	"github.com/LightningTipBot/LightningTipBot/internal/satdress"
-	"github.com/LightningTipBot/LightningTipBot/internal/storage"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/lnbits"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/satdress"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/storage"
 	"github.com/eko/gocache/store"
 	log "github.com/sirupsen/logrus"
 	"github.com/skip2/go-qrcode"

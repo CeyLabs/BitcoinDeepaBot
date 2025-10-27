@@ -93,7 +93,7 @@ _La red Lightning es un protocolo de pago que permite realizar pagos con Bitcoin
 _Tus fondos en este bot pueden ser enviados a cualquier otro monedero Lightning y viceversa. Los monederos Lightning recomendados para su teléfono son_ [Phoenix](https://phoenix.acinq.co/)_,_ [Breez](https://breez.technology/)_,_ [Muun](https://muun.com/)_ (sin custodia), o_ [Wallet of Satoshi](https://www.walletofsatoshi.com/) _(fácil)_.
 
 📄 *Código abierto*
-_Este bot es gratuito y de_ [Código abierto](https://github.com/LightningTipBot/LightningTipBot)_. Puedes ejecutarlo en tu propio ordenador y utilizarlo en tu propia comunidad._
+_Este bot es gratuito y de_ [Código abierto](https://github.com/BitcoinDeepaBot/BitcoinDeepaBot)_. Puedes ejecutarlo en tu propio ordenador y utilizarlo en tu propia comunidad._
 
 ✈️ *Telegram*
 _Añade este bot al chat de tu grupo de Telegram para enviar fondos usando /tip. Si haces al bot administrador del grupo, también limpiará los comandos para mantener el chat ordenado._
@@ -174,12 +174,12 @@ confirmSendMessage         = """¿Desea pagar a %s?\n\n💸 Monto: %s"""
 confirmSendAppendMemo      = """\n✉️ %s"""
 sendCancelledMessage       = """🚫 Envío cancelado."""
 errorTryLaterMessage       = """🚫 Error. Por favor, inténtelo de nuevo más tarde."""
-sendSyntaxErrorMessage     = """¿Has introducido un monto y un destinatario? Puedes utilizar el comando /send para enviar a usuarios de Telegram como %s o a una dirección Lightning como LightningTipBot@ln.tips."""
+sendSyntaxErrorMessage     = """¿Has introducido un monto y un destinatario? Puedes utilizar el comando /send para enviar a usuarios de Telegram como %s o a una dirección Lightning como BitcoinDeepaBot@ln.tips."""
 sendHelpText               = """📖 Oops, eso no funcionó. %s
 
 *Uso:* `/send <monto> <usuario> [<memo>]`
-*Ejemplo:* `/send 1000 @LightningTipBot Me gusta el bot ❤️`.
-*Ejemplo:* `/send 1234 LightningTipBot@ln.tips`"""
+*Ejemplo:* `/send 1000 @BitcoinDeepaBot Me gusta el bot ❤️`.
+*Ejemplo:* `/send 1234 BitcoinDeepaBot@ln.tips`"""
 
 # INVOICE
 

@@ -1,9 +1,9 @@
 package telegram
 
 import (
-	"github.com/LightningTipBot/LightningTipBot/internal/errors"
-	"github.com/LightningTipBot/LightningTipBot/internal/runtime"
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/errors"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/runtime"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/telegram/intercept"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 	"time"
 )

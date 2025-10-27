@@ -6,7 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/lnbits"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 )
 

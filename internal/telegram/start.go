@@ -7,16 +7,16 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/telegram/intercept"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/errors"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/errors"
 
-	"github.com/LightningTipBot/LightningTipBot/internal"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal"
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
-	"github.com/LightningTipBot/LightningTipBot/internal/str"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/lnbits"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/str"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 	"gorm.io/gorm"
 )

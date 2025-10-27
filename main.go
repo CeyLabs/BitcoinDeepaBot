@@ -5,22 +5,22 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/LightningTipBot/LightningTipBot/internal"
-	"github.com/LightningTipBot/LightningTipBot/internal/api"
-	"github.com/LightningTipBot/LightningTipBot/internal/api/admin"
-	"github.com/LightningTipBot/LightningTipBot/internal/api/userpage"
-	"github.com/LightningTipBot/LightningTipBot/internal/lndhub"
-	"github.com/LightningTipBot/LightningTipBot/internal/lnurl"
-	"github.com/LightningTipBot/LightningTipBot/internal/nostr"
-	"github.com/LightningTipBot/LightningTipBot/internal/runtime/mutex"
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/api"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/api/admin"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/api/userpage"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/lndhub"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/lnurl"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/nostr"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/runtime/mutex"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/telegram"
 
 	_ "net/http/pprof"
 
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/lnbits/webhook"
-	"github.com/LightningTipBot/LightningTipBot/internal/price"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/lnbits/webhook"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/price"
 	log "github.com/sirupsen/logrus"
 )
 

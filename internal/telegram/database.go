@@ -11,19 +11,19 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/database"
-	"github.com/LightningTipBot/LightningTipBot/internal/str"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/database"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/str"
 
 	"github.com/eko/gocache/store"
 
-	"github.com/LightningTipBot/LightningTipBot/internal"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/storage"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/storage"
 	"github.com/tidwall/buntdb"
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/lnbits"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

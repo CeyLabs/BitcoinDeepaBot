@@ -97,7 +97,7 @@ _Lightningová síť je platební protokol který umožňuje rychlé a levné bi
 _Tvoje prostředky z této lightning peněženky můžeš poslat na jakoukoliv jinou a naopak. Doporučené lightning peněženky pro mobil jsou_ [Phoenix](https://phoenix.acinq.co/)_,_ [Breez](https://breez.technology/)_,_ [Muun](https://muun.com/)_ (držíte své klíče), nebo_ [Wallet of Satoshi](https://www.walletofsatoshi.com/) _(jednoduchá, ale klíče od sats nedržíte)_.
 
 📄 *Open Source*
-_Tento bot je volný a otevřený_ [open source](https://github.com/LightningTipBot/LightningTipBot) _software. Můžeš ho běžet na vlastním počítači a používat jej ve vlastní komunitě._
+_Tento bot je volný a otevřený_ [open source](https://github.com/BitcoinDeepaBot/BitcoinDeepaBot) _software. Můžeš ho běžet na vlastním počítači a používat jej ve vlastní komunitě._
 
 ✈️ *Telegram*
 _Přidej tohoto bota do své skupiny na Telegramu a můžeš posílat /tip za zprávy. Pokud uděláš bota adminem skupiny, bude odstraňovat příkazy, aby zůstal chat přehlednější._
@@ -179,12 +179,12 @@ confirmSendMessage         = """Chceš zaplatit uživateli %s?\n\n💸 Částka:
 confirmSendAppendMemo      = """\n✉️ %s"""
 sendCancelledMessage       = """🚫 Odeslání zrušeno."""
 errorTryLaterMessage       = """🚫 Chyba. Prosím, zkus to později znovu."""
-sendSyntaxErrorMessage     = """Zadal jsi částku a příjemce? Můžeš použít příkaz /send k poslání platby buď uživateli Telegramu jako %s nebo na lightning adresu jako LightningTipBot@ln.tips."""
+sendSyntaxErrorMessage     = """Zadal jsi částku a příjemce? Můžeš použít příkaz /send k poslání platby buď uživateli Telegramu jako %s nebo na lightning adresu jako BitcoinDeepaBot@ln.tips."""
 sendHelpText               = """📖 Ou, tohle se nezdařilo. %s
 
 *Použití:* `/send <částka> <uživatel> [<zpráva>]`
-*Příklad:* `/send 1000 @LightningTipBot Všichni jsme Satoshi ❤️`
-*Příklad:* `/send 1234 LightningTipBot@ln.tips`"""
+*Příklad:* `/send 1000 @BitcoinDeepaBot Všichni jsme Satoshi ❤️`
+*Příklad:* `/send 1234 BitcoinDeepaBot@ln.tips`"""
 
 # INVOICE
 

@@ -7,22 +7,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/telegram/intercept"
 	"github.com/nbd-wtf/go-nostr"
 
-       "github.com/LightningTipBot/LightningTipBot/internal/errors"
-       "github.com/LightningTipBot/LightningTipBot/internal/storage"
+       "github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/errors"
+       "github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/storage"
 
-	"github.com/LightningTipBot/LightningTipBot/internal"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal"
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
-	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
-	"github.com/LightningTipBot/LightningTipBot/internal/runtime"
-       "github.com/LightningTipBot/LightningTipBot/internal/str"
-       "github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
-       "github.com/LightningTipBot/LightningTipBot/internal/utils"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/i18n"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/lnbits"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/runtime"
+       "github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/str"
+       "github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/thirdparty"
+       "github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/utils"
        "github.com/skip2/go-qrcode"
        tb "gopkg.in/lightningtipbot/telebot.v3"
 )

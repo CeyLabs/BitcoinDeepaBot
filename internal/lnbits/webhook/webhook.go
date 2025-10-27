@@ -5,22 +5,22 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/LightningTipBot/LightningTipBot/internal"
-	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
-	"github.com/LightningTipBot/LightningTipBot/internal/utils"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/lnbits"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/telegram"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/utils"
 
 	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 
 	"net/http"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/storage"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/storage"
 
 	"github.com/gorilla/mux"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/i18n"
 )
 
 type Server struct {

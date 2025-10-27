@@ -97,7 +97,7 @@ _Sieć Lightning jest protokołem, który umożliwia szybkie i tanie płatności
 _Twoje środki na tym bocie mogą być wysłane na inne portfele Lightning i vice versa. Rekomendowane portfele dla Twojego telefonu to_ [Phoenix](https://phoenix.acinq.co/)_,_ [Breez](https://breez.technology/)_,_ [Muun](https://muun.com/)_ (niepowierniczy), lub_ [Wallet of Satoshi](https://www.walletofsatoshi.com/) _(łatwy)_.
 
 📄 *Open Source*
-_Ten bot to wolne oprogramowanie [open source](https://github.com/LightningTipBot/LightningTipBot)_. Możesz go uruchomić na własnym komputerze i używać we własnej społeczności._
+_Ten bot to wolne oprogramowanie [open source](https://github.com/BitcoinDeepaBot/BitcoinDeepaBot)_. Możesz go uruchomić na własnym komputerze i używać we własnej społeczności._
 
 ✈️ *Telegram*
 _Dodaj tego bota do swojego chatu grupowego na Telegramie aby dawać napiwki za wiadomości. Jeśli uczynisz bota adminem grupy będzie czyścił komendy aby chat był uporządkowany._
@@ -180,12 +180,12 @@ confirmSendMessage         = """Czy chcesz zapłacić %s?\n\n💸 Kwota: %s"""
 confirmSendAppendMemo      = """\n✉️ %s"""
 sendCancelledMessage       = """🚫 Wysłanie anulowane."""
 errorTryLaterMessage       = """🚫 Błąd. Spróbuj ponownie później."""
-sendSyntaxErrorMessage     = """Czy wpropwadzono kwotę i odbiorcę? Możesz użyć komendy /send albo żeby wysłać do użytkownika takiego jak %s lub pod adres Lightning taki jak LightningTipBot@ln.tips."""
+sendSyntaxErrorMessage     = """Czy wpropwadzono kwotę i odbiorcę? Możesz użyć komendy /send albo żeby wysłać do użytkownika takiego jak %s lub pod adres Lightning taki jak BitcoinDeepaBot@ln.tips."""
 sendHelpText               = """📖 Ojej, to nie zadziałało. %s
 
 *Użycie:* `/send <kwota> <użytkownik> [<notatka>]`
-*Przykład:* `/send 1000 @LightningTipBot Po prostu lubię tego bota ❤️`
-*Przykład:* `/send 1234 LightningTipBot@ln.tips`"""
+*Przykład:* `/send 1000 @BitcoinDeepaBot Po prostu lubię tego bota ❤️`
+*Przykład:* `/send 1234 BitcoinDeepaBot@ln.tips`"""
 
 # INVOICE
 

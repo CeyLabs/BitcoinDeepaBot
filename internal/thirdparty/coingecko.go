@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	utils "github.com/LightningTipBot/LightningTipBot/internal/utils"
+	utils "github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/utils"
 )
 
 type PriceResponse struct {

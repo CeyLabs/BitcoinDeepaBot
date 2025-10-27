@@ -93,7 +93,7 @@ _Le Lightning Network est un protocole de paiement qui permet d'envoyer et de re
 _Vos fonds sur ce bot peuvent être envoyés à n'importe quel Lightning Wallet. Nous recommandons de télécharger sur votre téléphone les wallets suivant_ [Phoenix](https://phoenix.acinq.co/)_,_ [Breez](https://breez.technology/)_,_ [Muun](https://muun.com/)_ (non-custodial), ou_ [Wallet of Satoshi](https://www.walletofsatoshi.com/) _(facile)_.
 
 📄 *Logiciel libre*
-_Ce bot est gratuit et_ [libre de droits](https://github.com/LightningTipBot/LightningTipBot)_. Vous pouvez éxecuter le bot sur votre ordinateur et l'utiliser dans votre communauté._
+_Ce bot est gratuit et_ [libre de droits](https://github.com/BitcoinDeepaBot/BitcoinDeepaBot)_. Vous pouvez éxecuter le bot sur votre ordinateur et l'utiliser dans votre communauté._
 
 ✈️ *Telegram*
 _Ajoutez ce bot à un groupe Telegram pour envoyer des pourboires en répondant à des messages. Si vous faites de ce bot un adminstrateur d'un groupe, il va réorganiser les commandes pour plus de lisibilité._
@@ -174,12 +174,12 @@ confirmSendMessage         = """Voulez-vous envoyer à %s?\n\n💸 Montant : %s"
 confirmSendAppendMemo      = """\n✉️ %s"""
 sendCancelledMessage       = """🚫 Envoi annulé."""
 errorTryLaterMessage       = """🚫 Erreur. Merci de réésayer."""
-sendSyntaxErrorMessage     = """Avez-vous ajouté un montant et un destinataire ? Utilisez la commande /send pour envoyer à un utilisateur Telegram comme %s ou bien à une adresse Lightning comme LightningTipBot@ln.tips."""
+sendSyntaxErrorMessage     = """Avez-vous ajouté un montant et un destinataire ? Utilisez la commande /send pour envoyer à un utilisateur Telegram comme %s ou bien à une adresse Lightning comme BitcoinDeepaBot@ln.tips."""
 sendHelpText               = """📖 Oops, cela n'a pas fonctionné. %s
 
 *Usage:* `/send <montant> <utilisateur> [<memo>]`
-*Exemple:* `/send 1000 @LightningTipBot J'adore le bot ! ❤️`
-*Exemple:* `/send 1234 LightningTipBot@ln.tips`"""
+*Exemple:* `/send 1000 @BitcoinDeepaBot J'adore le bot ! ❤️`
+*Exemple:* `/send 1234 BitcoinDeepaBot@ln.tips`"""
 
 # INVOICE
 

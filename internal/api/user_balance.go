@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/telegram"
 	log "github.com/sirupsen/logrus"
 )
 

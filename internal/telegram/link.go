@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/telegram/intercept"
 
-	"github.com/LightningTipBot/LightningTipBot/internal"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/skip2/go-qrcode"

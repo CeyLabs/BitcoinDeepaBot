@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/api"
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
-	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/api"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/telegram"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/thirdparty"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 )

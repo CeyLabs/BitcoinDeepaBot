@@ -2,7 +2,7 @@ package dalle
 
 import (
 	"context"
-	"github.com/LightningTipBot/LightningTipBot/internal"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal"
 	"io"
 )
 

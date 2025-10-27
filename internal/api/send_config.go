@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/LightningTipBot/LightningTipBot/internal"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal"
 )
 
 // GetWhitelistedWallets returns the map of whitelisted wallets with their HMAC secrets

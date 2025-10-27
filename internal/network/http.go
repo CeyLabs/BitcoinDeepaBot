@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/LightningTipBot/LightningTipBot/internal"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/proxy"
 )

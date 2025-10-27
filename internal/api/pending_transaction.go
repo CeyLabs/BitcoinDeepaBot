@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
-	"github.com/LightningTipBot/LightningTipBot/internal/storage"
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/lnbits"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/storage"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/telegram"
 	log "github.com/sirupsen/logrus"
 )
 

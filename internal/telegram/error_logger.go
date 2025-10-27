@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LightningTipBot/LightningTipBot/internal"
-	"github.com/LightningTipBot/LightningTipBot/internal/utils"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/utils"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 )
@@ -318,7 +318,7 @@ func (el *ErrorLogger) LogPaymentError(err error, amount int64, memo, invoice st
 		if idx := strings.Index(file, "/internal/"); idx > -1 {
 			file = file[idx:]
 		}
-		msg += fmt.Sprintf("📍 Logged at:\n%s:%d\n(from github.com/LightningTipBot/LightningTipBot)", el.escapeMarkdownV2(file), line)
+		msg += fmt.Sprintf("📍 Logged at:\n%s:%d\n(from github.com/BitcoinDeepaBot/BitcoinDeepaBot)", el.escapeMarkdownV2(file), line)
 	}
 
 	msg += fmt.Sprintf("\n🕒 Time: %s", el.escapeMarkdownV2(timestamp))

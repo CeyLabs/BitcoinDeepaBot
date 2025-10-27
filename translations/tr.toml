@@ -93,7 +93,7 @@ _Lightning Network neredeyse hiç enerji gerektirmeyen hızlı ve ucuz Bitcoin �
 _Bu bottaki paranı dünyadaki herhangi bir Lightning cüzdanına gönderebilirsin. Cep telefonunun için önerilen Lightning cüzdanları şunlardır:_ [Phoenix](https://phoenix.acinq.co/)_,_ [Breez](https://breez.technology/)_,_ [Muun](https://muun.com/)_ (emanet edilmeyen), veya_ [Wallet of Satoshi](https://www.walletofsatoshi.com/) _(kolay)_.
 
 📄 *Açık Kaynak*
-_Bu bot ücretsiz ve_ [açık kaynak](https://github.com/LightningTipBot/LightningTipBot) _yazılım. Kendi bilgisayarında çalıştırabilir ve topluluğun için kullanabilirsin._
+_Bu bot ücretsiz ve_ [açık kaynak](https://github.com/BitcoinDeepaBot/BitcoinDeepaBot) _yazılım. Kendi bilgisayarında çalıştırabilir ve topluluğun için kullanabilirsin._
 
 ✈️ *Telegram*
 _/tip göndermek için botu Telegram grubunuza ekle. Bot grubun yöneticisiyse, yürütmeden sonra bazı komutları silerek sohbeti de temizleyecektir._
@@ -173,12 +173,12 @@ confirmSendMessage = """%s a ödeme göndermek istiyor musun?\n\n💸 Miktar: %s
 confirmSendAppendMemo = """\n✉️ %s"""
 sendCancelledMessage = """🚫 Gönderim iptal edildi."""
 errorTryLaterMessage = """🚫 Hata. Lütfen daha sonra tekrar dene."""
-sendSyntaxErrorMessage = """Geçerli bir miktar ve kullanıcı girdin mi? /send komutu ile bir Telegram kullanıcısına, örnek %s, veya bir Lightning adrese, örnek LightningTipBot@ln.tips, gönderilebilir."""
+sendSyntaxErrorMessage = """Geçerli bir miktar ve kullanıcı girdin mi? /send komutu ile bir Telegram kullanıcısına, örnek %s, veya bir Lightning adrese, örnek BitcoinDeepaBot@ln.tips, gönderilebilir."""
 sendHelpText = """📖 Hoppalaa… olmadı. %s
 
 *Komut:* `/send <miktar> <kullanıcı> [<bildirim>]`
-*Örnek:* `/send 1000 @LightningTipBot Bot harika kanka! ❤️`
-*Örnek:* `/send 1234 LightningTipBot@ln.tips`"""
+*Örnek:* `/send 1000 @BitcoinDeepaBot Bot harika kanka! ❤️`
+*Örnek:* `/send 1234 BitcoinDeepaBot@ln.tips`"""
 
 # INVOICE
 

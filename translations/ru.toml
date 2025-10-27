@@ -97,7 +97,7 @@ _The Lightning Network - это платежный протокол, котор�
 _Ваши средства на этом боте могут быть отправлены на любой другой Lightning-кошелек и наоборот. Рекомендуемые Lightning-кошельки для вашего телефона:_ [Phoenix](https://phoenix.acinq.co/)_,_ [Breez](https://breez.technology/)_,_ [Muun](https://muun.com/)_ (не требующие обслуживания), или_ [Wallet of Satoshi](https://www.walletofsatoshi.com/) _(простой)_.
 
 📄 *Open Source*
-_Этот бот является бесплатным и_ [с открытым исходным кодом](https://github.com/LightningTipBot/LightningTipBot) _. Вы можете запустить его на своем компьютере и использовать в своем сообществе._
+_Этот бот является бесплатным и_ [с открытым исходным кодом](https://github.com/BitcoinDeepaBot/BitcoinDeepaBot) _. Вы можете запустить его на своем компьютере и использовать в своем сообществе._
 
 ✈️ *Telegram*
 _Добавьте этого бота в чат вашей группы Telegram для /tip сообщений. Если вы сделаете бота администратором группы, он также будет очищать команды для поддержания чистоты в чате._
@@ -177,12 +177,12 @@ confirmSendMessage         = """Вы хотите отправить Сатош�
 confirmSendAppendMemo      = """\n✉️ %s"""
 sendCancelledMessage       = """🚫 Отправка отменена."""
 errorTryLaterMessage       = """🚫 Ошибка. Пожалуйста попробуйте позже."""
-sendSyntaxErrorMessage     = """Вы ввели сумму и получателя? Вы можете использовать команду /send для отправки либо пользователям Telegram, например %s, либо на адрес Lightning, например LightningTipBot@ln.tips."""
+sendSyntaxErrorMessage     = """Вы ввели сумму и получателя? Вы можете использовать команду /send для отправки либо пользователям Telegram, например %s, либо на адрес Lightning, например BitcoinDeepaBot@ln.tips."""
 sendHelpText               = """📖 Упс, это не сработало. %s
 
 *Использование:* `/send <количество> <пользователь> [<memo>]`
-*Пример:* `/send 1000 @LightningTipBot I just like the bot ❤️`
-*Пример:* `/send 1234 LightningTipBot@ln.tips`"""
+*Пример:* `/send 1000 @BitcoinDeepaBot I just like the bot ❤️`
+*Пример:* `/send 1234 BitcoinDeepaBot@ln.tips`"""
 
 # INVOICE
 

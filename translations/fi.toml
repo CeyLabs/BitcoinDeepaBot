@@ -77,7 +77,7 @@ _Tämä botti ei veloita kuluja, mutta sen ylläpidosta aiheutuu kuluja. Jos tyk
 */send* 💸 Lähetä varoja käyttäjälle: `/send <amount> @user or user@ln.tips [<memo>]`
 */invoice* ⚡️ Vastaanota Lightning-maksu: `/invoice <amount> [<memo>]`
 */pay* ⚡️ Lähetä Lightning-maksu: `/pay <invoice>`
-*/donate* ❤️ Lahjoitus LightningTipBot-tiimille: `/donate 1000`
+*/donate* ❤️ Lahjoitus BitcoinDeepaBot-tiimille: `/donate 1000`
 */advanced* 🤖 Lisäasetukset.
 */help* 📖 Lue tämä ohje."""
 
@@ -97,7 +97,7 @@ _Lightning-verkko on maksuprotokolla, joka mahdollistaa nopeat ja edulliset bitc
 _Tämän botin lompakosta voit lähettää, tai vastaanottaa siihen, varoja kenen tahansa omistaman Lightning-lompakon välillä. Suositeltuja muita lompakkoja mobiililaitteisiin ovat_ [Phoenix](https://phoenix.acinq.co/)_,_ [Breez](https://breez.technology/)_,_ [Muun](https://muun.com/)_ (non-custodial), tai_ [Wallet of Satoshi](https://www.walletofsatoshi.com/) _(helppo)_.
 
 📄 *Open Source*
-_Tämä bottiohjelmisto on vapaa ja_ [open source](https://github.com/LightningTipBot/LightningTipBot) _ohjelmisto. Voit ajaa bottia omassa tietokoneessasi ja käyttää sitä yhdessä lähipiirisi kanssa._
+_Tämä bottiohjelmisto on vapaa ja_ [open source](https://github.com/BitcoinDeepaBot/BitcoinDeepaBot) _ohjelmisto. Voit ajaa bottia omassa tietokoneessasi ja käyttää sitä yhdessä lähipiirisi kanssa._
 
 ✈️ *Telegram*
 _Lisää tämä botti Telegram-ryhmäkeskusteluun, ja /tip -komennolla voit tipata kuita keskustelijoita. Kun määrität botin ryhmän pääkäyttäjäksi (admin), niin se myös siivoaa myös bottikomennot pois keskustelusta ja ryhmäsi sisältö pysyy siistinä._
@@ -179,12 +179,12 @@ confirmSendMessage         = """Haluatko lähettää vastaanottajalle %s?\n\n�
 confirmSendAppendMemo      = """\n✉️ %s"""
 sendCancelledMessage       = """🚫 Lähetys peruutettu."""
 errorTryLaterMessage       = """🚫 Virhe. Yritä myöhemmin uudelleen."""
-sendSyntaxErrorMessage     = """Annoithan määrän ja vastaanottajan? Lähetä /send komennolla joko Telegram-käyttäjänimelle (kuten %s) tai Lightning Address -osoitteeseen muotoa LightningTipBot@ln.tips."""
+sendSyntaxErrorMessage     = """Annoithan määrän ja vastaanottajan? Lähetä /send komennolla joko Telegram-käyttäjänimelle (kuten %s) tai Lightning Address -osoitteeseen muotoa BitcoinDeepaBot@ln.tips."""
 sendHelpText               = """📖 Hups, sepä ei toiminutkaan. %s
 
 *Muoto:* `/send <amount> <user> [<memo>]`
-*Esimerkki:* `/send 1000 @LightningTipBot Rakastan bottia ❤️`
-*Esimerkki:* `/send 1234 LightningTipBot@ln.tips`"""
+*Esimerkki:* `/send 1000 @BitcoinDeepaBot Rakastan bottia ❤️`
+*Esimerkki:* `/send 1234 BitcoinDeepaBot@ln.tips`"""
 
 # INVOICE
 

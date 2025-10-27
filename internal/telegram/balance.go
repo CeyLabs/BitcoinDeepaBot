@@ -3,10 +3,10 @@ package telegram
 import (
 	"fmt"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/errors"
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
-	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
-	"github.com/LightningTipBot/LightningTipBot/internal/utils"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/errors"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/telegram/intercept"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/thirdparty"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/utils"
 
 	log "github.com/sirupsen/logrus"
 

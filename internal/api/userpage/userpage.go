@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LightningTipBot/LightningTipBot/internal"
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/telegram"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/fiatjaf/go-lnurl"
 	"github.com/gorilla/mux"

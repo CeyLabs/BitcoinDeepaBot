@@ -12,13 +12,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/telegram/intercept"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/errors"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/errors"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/str"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/str"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/lnbits"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 )
@@ -165,7 +165,7 @@ func (bot TipBot) parseCmdDonHandler(ctx intercept.Context) error {
 			return fmt.Errorf("err")
 		}
 	}
-	if arg == "@LightningTipBot" || len(arg) < 1 {
+	if arg == "@BitcoinDeepaBot" || len(arg) < 1 {
 		return fmt.Errorf("err")
 	}
 

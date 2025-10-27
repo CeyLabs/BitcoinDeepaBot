@@ -8,20 +8,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/errors"
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/errors"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/telegram/intercept"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/runtime/mutex"
-	"github.com/LightningTipBot/LightningTipBot/internal/storage"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/runtime/mutex"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/storage"
 
 	"github.com/eko/gocache/store"
 	"github.com/skip2/go-qrcode"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
-	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
-	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/i18n"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/lnbits"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/thirdparty"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/runtime"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/runtime"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 )
@@ -74,7 +74,7 @@ func (bot TipBot) handleInlineReceiveQuery(ctx intercept.Context) (intercept.Con
 	toUserStr := GetUserStr(q.Sender)
 
 	// check whether the 3rd argument is a username
-	// command is "@LightningTipBot receive 123 @from_user This is the memo"
+	// command is "@BitcoinDeepaBot receive 123 @from_user This is the memo"
 	memo_argn := 2 // argument index at which the memo starts, will be 3 if there is a from_username in command
 	fromUserDb := &lnbits.User{}
 	from_SpecificUser := false

@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"github.com/LightningTipBot/LightningTipBot/internal/runtime"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/runtime"
 	"time"
 
 	"github.com/eko/gocache/store"

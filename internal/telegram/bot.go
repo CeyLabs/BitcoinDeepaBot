@@ -8,15 +8,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/runtime/mutex"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/runtime/mutex"
 
-	limiter "github.com/LightningTipBot/LightningTipBot/internal/rate"
+	limiter "github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/rate"
 
 	"github.com/eko/gocache/store"
 
-	"github.com/LightningTipBot/LightningTipBot/internal"
-	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
-	"github.com/LightningTipBot/LightningTipBot/internal/storage"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/lnbits"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/storage"
 	gocache "github.com/patrickmn/go-cache"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/lightningtipbot/telebot.v3"

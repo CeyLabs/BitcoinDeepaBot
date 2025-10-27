@@ -6,14 +6,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/errors"
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/errors"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/telegram/intercept"
 
-	"github.com/LightningTipBot/LightningTipBot/internal"
-	"github.com/LightningTipBot/LightningTipBot/internal/str"
-	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/str"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/thirdparty"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/i18n"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 )

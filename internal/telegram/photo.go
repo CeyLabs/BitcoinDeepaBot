@@ -8,11 +8,11 @@ import (
 	"image/jpeg"
 	"strings"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/telegram/intercept"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/errors"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/errors"
 
-	"github.com/LightningTipBot/LightningTipBot/pkg/lightning"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/pkg/lightning"
 	"github.com/makiuchi-d/gozxing"
 	"github.com/makiuchi-d/gozxing/qrcode"
 	"github.com/nfnt/resize"

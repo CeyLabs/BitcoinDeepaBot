@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/runtime"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/runtime"
 	"github.com/tidwall/buntdb"
 	"github.com/tidwall/gjson"
 
-	"github.com/LightningTipBot/LightningTipBot/internal/utils"
+	"github.com/BitcoinDeepaBot/BitcoinDeepaBot/internal/utils"
 	log "github.com/sirupsen/logrus"
 
 	tb "gopkg.in/lightningtipbot/telebot.v3"
