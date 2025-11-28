@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"runtime/debug"
 	"strings"
+	"time"
 
 	"github.com/LightningTipBot/LightningTipBot/internal"
 	"github.com/LightningTipBot/LightningTipBot/internal/api"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits/webhook"
 	"github.com/LightningTipBot/LightningTipBot/internal/price"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -89,7 +91,10 @@ func startApiServer(bot *telegram.TipBot) {
 	s.AppendAuthorizedRoute(`/lndhub/ext`, api.AuthTypeBearerBase64, api.AccessKeyTypeAdmin, bot.DB.Users, hub.Handle)
 
 	// starting api service
-	apiService := api.Service{Bot: bot}
+	apiService := api.Service{
+		Bot:       bot,
+		MemoCache: utils.NewCache(time.Minute * 5),
+	}
 	s.AppendAuthorizedRoute(`/api/v1/paymentstatus/{payment_hash}`, api.AuthTypeBasic, api.AccessKeyTypeInvoice, bot.DB.Users, apiService.PaymentStatus, http.MethodPost)
 	s.AppendAuthorizedRoute(`/api/v1/invoicestatus/{payment_hash}`, api.AuthTypeBasic, api.AccessKeyTypeInvoice, bot.DB.Users, apiService.InvoiceStatus, http.MethodPost)
 	s.AppendAuthorizedRoute(`/api/v1/payinvoice`, api.AuthTypeBasic, api.AccessKeyTypeAdmin, bot.DB.Users, apiService.PayInvoice, http.MethodPost)
@@ -101,7 +106,7 @@ func startApiServer(bot *telegram.TipBot) {
 	if internal.IsAPISendEnabled() {
 		s.AppendRoute(`/api/v1/send`, api.WalletHMACMiddleware(apiService.Send), http.MethodPost)
 		log.Infof("API Send endpoint registered at /api/v1/send with wallet-based HMAC security")
-		
+
 		// User balance endpoint with wallet-based HMAC security
 		s.AppendRoute(`/api/v1/userbalance`, api.WalletHMACMiddleware(apiService.UserBalance), http.MethodPost)
 		log.Infof("API UserBalance endpoint registered at /api/v1/userbalance with wallet-based HMAC security")

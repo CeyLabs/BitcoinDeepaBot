@@ -9,12 +9,14 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
+	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	"github.com/gorilla/mux"
 	"github.com/r3labs/sse"
 )
 
 type Service struct {
-	Bot *telegram.TipBot
+	Bot       *telegram.TipBot
+	MemoCache *utils.Cache
 }
 
 type ErrorResponse struct {

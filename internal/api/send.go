@@ -118,7 +118,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		RespondError(w, "Authentication failed")
 		return
 	}
-	
+
 	walletID := authenticatedWallet.(string)
 	wallet, exists := GetWhitelistedWallets()[walletID]
 	if !exists {
@@ -126,7 +126,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		RespondError(w, "Invalid wallet configuration")
 		return
 	}
-	
+
 	fromUsername := wallet.Username
 
 	// Validate request
@@ -148,6 +148,19 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 	if len(req.Memo) > GetMaxMemoLength() {
 		RespondError(w, fmt.Sprintf("Memo cannot exceed %d characters", GetMaxMemoLength()))
 		return
+	}
+
+	if req.Memo != "" {
+		memoLockKey := fmt.Sprintf("api_send_memo_%s", req.Memo)
+		if _, exists := s.MemoCache.Get(memoLockKey); exists {
+			log.Warnf("[api/send] Transaction with memo '%s' is already processing", req.Memo)
+			RespondError(w, fmt.Sprintf("Transaction with memo '%s' is already processing", req.Memo))
+			return
+		}
+		// Lock the memo
+		s.MemoCache.Set(memoLockKey, "locked")
+		// Unlock when done
+		defer s.MemoCache.Delete(memoLockKey)
 	}
 
 	// Clean usernames (remove @ if present)

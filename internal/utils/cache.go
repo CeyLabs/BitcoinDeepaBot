@@ -43,3 +43,9 @@ func (c *Cache) Get(key string) (string, bool) {
 	}
 	return item.value, true
 }
+
+func (c *Cache) Delete(key string) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	delete(c.data, key)
+}
