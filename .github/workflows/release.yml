@@ -34,6 +34,9 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           default_bump: patch
 
+      - name: Create local tag
+        run: git tag ${{ steps.tag_version.outputs.new_tag }}
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
