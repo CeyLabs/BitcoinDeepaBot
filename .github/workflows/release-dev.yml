@@ -33,6 +33,9 @@ jobs:
           custom_tag: dev-${{ github.sha }}
           tag_prefix: ""
 
+      - name: Create local tag
+        run: git tag ${{ steps.tag_version.outputs.new_tag }}
+
       - name: Run GoReleaser (dev)
         uses: goreleaser/goreleaser-action@v5
         with:
