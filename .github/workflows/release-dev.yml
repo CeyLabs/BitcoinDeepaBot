@@ -1,21 +1,19 @@
-name: Release
+name: Dev Release
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches:
-      - main
+      - dev
 
 permissions:
   contents: write
 
 jobs:
-  release:
-    if: github.event.pull_request.merged == true
+  release-dev:
     runs-on: ubuntu-latest
     env:
       BOT_TOKEN: ${{ secrets.MAIN_BOT_TOKEN }}
-      CHAT_ID: ${{ vars.RELEASE_CHAT_IDS }}
+      CHAT_ID: ${{ vars.DEV_RELEASE_CHAT_IDS }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,14 +25,15 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Bump version and push tag
+      - name: Tag dev build
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          default_bump: patch
+          custom_tag: dev-${{ github.sha }}
+          tag_prefix: ""
 
-      - name: Run GoReleaser
+      - name: Run GoReleaser (dev)
         uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
@@ -43,25 +42,32 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Notify Telegram Success
+      - name: Mark as prerelease
+        run: gh release edit ${{ steps.tag_version.outputs.new_tag }} --prerelease
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify Telegram (Dev)
         if: success()
         run: |
           IFS=',' read -ra TARGETS <<< "${{ env.CHAT_ID }}"
           for target in "${TARGETS[@]}"; do
             target=$(echo "$target" | xargs)
+            if [[ -z "$target" ]]; then
+              continue
+            fi
             if [[ "$target" == *":"* ]]; then
               chat_id=${target%%:*}
               thread_id=${target#*:}
               curl -s -X POST https://api.telegram.org/bot${{ env.BOT_TOKEN }}/sendMessage \
                 -d chat_id="$chat_id" \
                 -d message_thread_id="$thread_id" \
-                -d text="🚀 *New Release Published!*%0A%0A*Version:* ${{ steps.tag_version.outputs.new_tag }}%0A*Title:* ${{ github.event.pull_request.title }}%0A*Author:* ${{ github.actor }}%0A%0A[View Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag_version.outputs.new_tag }})" \
+                -d text="🧪 *New Dev Build Published!*%0A%0A*Tag:* ${{ steps.tag_version.outputs.new_tag }}%0A*Commit:* ${{ github.sha }}%0A*Author:* ${{ github.actor }}%0A%0A[View Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag_version.outputs.new_tag }})" \
                 -d parse_mode="Markdown"
             else
               curl -s -X POST https://api.telegram.org/bot${{ env.BOT_TOKEN }}/sendMessage \
                 -d chat_id="$target" \
-                -d text="🚀 *New Release Published!*%0A%0A*Version:* ${{ steps.tag_version.outputs.new_tag }}%0A*Title:* ${{ github.event.pull_request.title }}%0A*Author:* ${{ github.actor }}%0A%0A[View Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag_version.outputs.new_tag }})" \
+                -d text="🧪 *New Dev Build Published!*%0A%0A*Tag:* ${{ steps.tag_version.outputs.new_tag }}%0A*Commit:* ${{ github.sha }}%0A*Author:* ${{ github.actor }}%0A%0A[View Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag_version.outputs.new_tag }})" \
                 -d parse_mode="Markdown"
             fi
           done
-
