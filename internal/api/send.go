@@ -152,11 +152,15 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 
 	if req.Memo != "" {
 		memoLockKey := fmt.Sprintf("api_send_memo_%s", req.Memo)
-		if _, exists := s.MemoCache.Get(memoLockKey); exists {
+
+		// Try to acquire lock first to prevent concurrent processing
+		if success := s.MemoCache.SetNX(memoLockKey, "locked"); !success {
 			log.Warnf("[api/send] Transaction with memo '%s' is already processing", req.Memo)
 			RespondError(w, fmt.Sprintf("Transaction with memo '%s' is already processing", req.Memo))
 			return
 		}
+		// Unlock when done
+		defer s.MemoCache.Delete(memoLockKey)
 
 		// Check if transaction with this memo already exists in database
 		// We search for the memo in the transaction memo field
@@ -176,11 +180,6 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 			RespondError(w, fmt.Sprintf("Transaction with memo '%s' already completed", req.Memo))
 			return
 		}
-
-		// Lock the memo
-		s.MemoCache.Set(memoLockKey, "locked")
-		// Unlock when done
-		defer s.MemoCache.Delete(memoLockKey)
 	}
 
 	// Clean usernames (remove @ if present)

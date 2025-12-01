@@ -49,3 +49,20 @@ func (c *Cache) Delete(key string) {
 	defer c.mutex.Unlock()
 	delete(c.data, key)
 }
+
+// SetNX sets the key if it does not exist or has expired. Returns true if set, false if already exists.
+func (c *Cache) SetNX(key string, value string) bool {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	item, exists := c.data[key]
+	if exists && time.Now().Before(item.expiration) {
+		return false
+	}
+
+	c.data[key] = CacheItem{
+		value:      value,
+		expiration: time.Now().Add(c.ttl),
+	}
+	return true
+}
