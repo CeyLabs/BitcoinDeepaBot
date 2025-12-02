@@ -42,7 +42,7 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          custom_tag: v${{ steps.calc_version.outputs.new_version }}-${{ steps.vars.outputs.sha_short }}
+          custom_tag: v${{ steps.calc_version.outputs.major }}.${{ steps.calc_version.outputs.minor }}.${{ steps.calc_version.outputs.patch }}-${{ steps.vars.outputs.sha_short }}
           tag_prefix: ""
 
       - name: Create local tag
