@@ -16,6 +16,7 @@ jobs:
     env:
       BOT_TOKEN: ${{ secrets.MAIN_BOT_TOKEN }}
       CHAT_ID: ${{ vars.RELEASE_CHAT_IDS }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,7 +24,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v6
         with:
           go-version: '1.21'
 
@@ -58,12 +59,12 @@ jobs:
               curl -s -X POST https://api.telegram.org/bot${{ env.BOT_TOKEN }}/sendMessage \
                 -d chat_id="$chat_id" \
                 -d message_thread_id="$thread_id" \
-                -d text="🚀 *New Release Published!*%0A%0A*Version:* ${{ steps.tag_version.outputs.new_tag }}%0A*Title:* ${{ github.event.pull_request.title }}%0A*Author:* ${{ github.actor }}%0A%0A[View Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag_version.outputs.new_tag }})" \
+                -d text="🚀 *New Release Published!*%0A%0A*Version:* ${{ steps.tag_version.outputs.new_tag }}%0A*Title:* ${PR_TITLE}%0A*Author:* ${{ github.actor }}%0A%0A[View Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag_version.outputs.new_tag }})" \
                 -d parse_mode="Markdown"
             else
               curl -s -X POST https://api.telegram.org/bot${{ env.BOT_TOKEN }}/sendMessage \
                 -d chat_id="$target" \
-                -d text="🚀 *New Release Published!*%0A%0A*Version:* ${{ steps.tag_version.outputs.new_tag }}%0A*Title:* ${{ github.event.pull_request.title }}%0A*Author:* ${{ github.actor }}%0A%0A[View Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag_version.outputs.new_tag }})" \
+                -d text="🚀 *New Release Published!*%0A%0A*Version:* ${{ steps.tag_version.outputs.new_tag }}%0A*Title:* ${PR_TITLE}%0A*Author:* ${{ github.actor }}%0A%0A[View Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag_version.outputs.new_tag }})" \
                 -d parse_mode="Markdown"
             fi
           done
