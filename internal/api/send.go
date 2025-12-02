@@ -118,7 +118,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		RespondError(w, "Authentication failed")
 		return
 	}
-	
+
 	walletID := authenticatedWallet.(string)
 	wallet, exists := GetWhitelistedWallets()[walletID]
 	if !exists {
@@ -126,7 +126,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		RespondError(w, "Invalid wallet configuration")
 		return
 	}
-	
+
 	fromUsername := wallet.Username
 
 	// Validate request
@@ -148,6 +148,38 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 	if len(req.Memo) > GetMaxMemoLength() {
 		RespondError(w, fmt.Sprintf("Memo cannot exceed %d characters", GetMaxMemoLength()))
 		return
+	}
+
+	if req.Memo != "" {
+		memoLockKey := fmt.Sprintf("api_send_memo_%s", req.Memo)
+
+		// Try to acquire lock first to prevent concurrent processing
+		if success := s.MemoCache.SetNX(memoLockKey, "locked"); !success {
+			log.Warnf("[api/send] Transaction with memo '%s' is already processing", req.Memo)
+			RespondError(w, fmt.Sprintf("Transaction with memo '%s' is already processing", req.Memo))
+			return
+		}
+		// Unlock when done
+		defer s.MemoCache.Delete(memoLockKey)
+
+		// Check if transaction with this memo already exists in database
+		// We search for the memo in the transaction memo field
+		// The stored memo format is: "💸 API Send from @User to @User. Memo: <req.Memo>"
+		// So we search for the suffix "Memo: <req.Memo>"
+		var count int64
+		memoSearch := fmt.Sprintf("%%Memo: %s", req.Memo)
+		err := s.Bot.DB.Transactions.Model(&telegram.Transaction{}).Where("memo LIKE ? AND success = ?", memoSearch, true).Count(&count).Error
+		if err != nil {
+			log.Errorf("[api/send] Database error checking for duplicate memo: %v", err)
+			// Continue but log error - fail open or closed? Let's fail closed for safety
+			RespondError(w, "Internal server error checking transaction history")
+			return
+		}
+		if count > 0 {
+			log.Warnf("[api/send] Transaction with memo '%s' already completed", req.Memo)
+			RespondError(w, fmt.Sprintf("Transaction with memo '%s' already completed", req.Memo))
+			return
+		}
 	}
 
 	// Clean usernames (remove @ if present)
