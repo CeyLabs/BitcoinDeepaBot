@@ -50,18 +50,29 @@ func main() {
 func startApiServer(bot *telegram.TipBot) {
 	// log errors from interceptors
 	bot.Telegram.OnError = func(err error, ctx tb.Context) {
+		if err == nil {
+			return
+		}
+
+		errMsg := err.Error()
+
+		// Filter out empty/ghost errors from telebot (code:0, empty message)
+		if errMsg == "" || errMsg == `{"message":"","Err":{},"code":0}` {
+			return
+		}
+
 		// Filter out annoying interceptor errors
-		if err != nil && strings.Contains(err.Error(), "[requirePrivateChatInterceptor]") {
-			return // Skip logging this specific error
+		if strings.Contains(errMsg, "[requirePrivateChatInterceptor]") {
+			return
 		}
 
 		// Log errors to Telegram group
 		if bot.ErrorLogger != nil {
 			userInfo := []interface{}{}
-			if ctx.Sender() != nil {
+			if ctx != nil && ctx.Sender() != nil {
 				userInfo = append(userInfo, ctx.Sender())
 			}
-			if ctx.Chat() != nil {
+			if ctx != nil && ctx.Chat() != nil {
 				userInfo = append(userInfo, ctx.Chat())
 			}
 			bot.ErrorLogger.LogError(err, "Telegram Bot Error", userInfo...)
@@ -71,6 +82,11 @@ func startApiServer(bot *telegram.TipBot) {
 	webhook.NewServer(bot)
 	// start external api server
 	s := api.NewServer(internal.Configuration.Bot.LNURLServerUrl.Host)
+
+	s.AppendRoute("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	}, http.MethodGet)
 
 	// append lnurl ctx functions
 	lnUrl := lnurl.New(bot)
