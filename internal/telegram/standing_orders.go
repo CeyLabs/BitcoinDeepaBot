@@ -9,6 +9,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
 	"github.com/LightningTipBot/LightningTipBot/internal/utils"
+	log "github.com/sirupsen/logrus"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -153,7 +154,8 @@ func (bot *TipBot) soCreateHandler(ctx intercept.Context, user *lnbits.User, arg
 
 	order, err := bot.CreateStandingOrder(user, dayOfMonth, amount, potName)
 	if err != nil {
-		bot.trySendMessage(ctx.Sender(), fmt.Sprintf("❌ %s", err.Error()))
+		log.Errorf("[/so create] Failed to create standing order for user %s: %v", user.Name, err)
+		bot.trySendMessage(ctx.Sender(), "❌ Failed to create standing order. Please check your input and try again.")
 		return ctx, nil
 	}
 
@@ -222,7 +224,8 @@ func (bot *TipBot) soDeleteHandler(ctx intercept.Context, user *lnbits.User, arg
 
 	order := orders[index-1]
 	if err := bot.DeleteStandingOrder(user, order.ID); err != nil {
-		bot.trySendMessage(ctx.Sender(), fmt.Sprintf("❌ Failed to delete: %s", err.Error()))
+		log.Errorf("[/so delete] Failed to delete standing order %s for user %s: %v", order.ID, user.Name, err)
+		bot.trySendMessage(ctx.Sender(), "❌ Failed to delete standing order. Please try again.")
 		return ctx, err
 	}
 

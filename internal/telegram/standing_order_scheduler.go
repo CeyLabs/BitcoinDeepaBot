@@ -158,12 +158,14 @@ func (s *StandingOrderScheduler) notifySuccess(user *lnbits.User, order lnbits.S
 	s.bot.trySendMessage(user.Telegram, msg)
 }
 
-// notifyFailure logs the error and sends a Telegram message to the user explaining why the order failed.
+// notifyFailure logs the full error internally and sends a sanitized message to
+// the user. Raw error details are kept out of the Telegram message to avoid
+// leaking internal implementation details.
 func (s *StandingOrderScheduler) notifyFailure(user *lnbits.User, order lnbits.StandingOrder, err error) {
 	log.Errorf("[StandingOrderScheduler] Failed to execute order %s for user %s: %v", order.ID, user.Name, err)
 	msg := fmt.Sprintf(
-		"⚠️ *Standing Order Failed*\n\n📅 Day %d of month\n💰 %s → pot *'%s'*\n\n🚫 Reason: %s",
-		order.DayOfMonth, utils.FormatSats(order.Amount), order.PotName, err.Error(),
+		"⚠️ *Standing Order Failed*\n\n📅 Day %d of month\n💰 %s → pot *'%s'*\n\n🚫 The transfer could not be completed. Please check your available balance and that the pot still exists.",
+		order.DayOfMonth, utils.FormatSats(order.Amount), order.PotName,
 	)
 	s.bot.trySendMessage(user.Telegram, msg)
 }
