@@ -10,6 +10,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// maxConsecutiveFailures is the number of consecutive monthly failures after which
+// a standing order is automatically deactivated and the user is notified.
+// This prevents indefinite failure spam when a pot is deleted or renamed.
+const maxConsecutiveFailures = 3
+
 // StandingOrderScheduler runs hourly and executes standing orders on the
 // configured day of month, clamping days 29–31 to the last day of short months.
 type StandingOrderScheduler struct {
@@ -108,8 +113,29 @@ func (s *StandingOrderScheduler) processDueOrders() {
 		}
 
 		if err := s.executeOrder(&order, &user); err != nil {
-			s.notifyFailure(&user, order, err)
+			// Increment consecutive failure count and deactivate if threshold is reached
+			order.ConsecutiveFailures++
+			if order.ConsecutiveFailures >= maxConsecutiveFailures {
+				order.Active = false
+				log.Warnf("[StandingOrderScheduler] Deactivating order %s after %d consecutive failures", order.ID, order.ConsecutiveFailures)
+				if saveErr := s.bot.DB.Users.Save(&order).Error; saveErr != nil {
+					log.Errorf("[StandingOrderScheduler] Failed to deactivate order %s: %v", order.ID, saveErr)
+				}
+				s.notifyDeactivated(&user, order)
+			} else {
+				if saveErr := s.bot.DB.Users.Save(&order).Error; saveErr != nil {
+					log.Errorf("[StandingOrderScheduler] Failed to update failure count for order %s: %v", order.ID, saveErr)
+				}
+				s.notifyFailure(&user, order, err)
+			}
 		} else {
+			// Reset consecutive failure count on success
+			if order.ConsecutiveFailures > 0 {
+				order.ConsecutiveFailures = 0
+				if saveErr := s.bot.DB.Users.Save(&order).Error; saveErr != nil {
+					log.Errorf("[StandingOrderScheduler] Failed to reset failure count for order %s: %v", order.ID, saveErr)
+				}
+			}
 			s.notifySuccess(&user, order)
 		}
 	}
@@ -158,14 +184,31 @@ func (s *StandingOrderScheduler) notifySuccess(user *lnbits.User, order lnbits.S
 	s.bot.trySendMessage(user.Telegram, msg)
 }
 
+// notifyDeactivated informs the user that their standing order has been
+// automatically deactivated after too many consecutive failures.
+func (s *StandingOrderScheduler) notifyDeactivated(user *lnbits.User, order lnbits.StandingOrder) {
+	log.Warnf("[StandingOrderScheduler] Order %s for user %s deactivated after %d failures", order.ID, user.Name, order.ConsecutiveFailures)
+	msg := fmt.Sprintf(
+		"🚫 *Standing Order Deactivated*\n\n📅 Day %d of month\n💰 %s → pot *'%s'*\n\n"+
+			"This order has failed %d months in a row and has been automatically deactivated.\n\n"+
+			"Please check that the pot *'%s'* still exists and recreate the order with `/so create`.",
+		order.DayOfMonth, utils.FormatSats(order.Amount), order.PotName,
+		order.ConsecutiveFailures, order.PotName,
+	)
+	s.bot.trySendMessage(user.Telegram, msg)
+}
+
 // notifyFailure logs the full error internally and sends a sanitized message to
 // the user. Raw error details are kept out of the Telegram message to avoid
 // leaking internal implementation details.
 func (s *StandingOrderScheduler) notifyFailure(user *lnbits.User, order lnbits.StandingOrder, err error) {
 	log.Errorf("[StandingOrderScheduler] Failed to execute order %s for user %s: %v", order.ID, user.Name, err)
+	remaining := maxConsecutiveFailures - order.ConsecutiveFailures
 	msg := fmt.Sprintf(
-		"⚠️ *Standing Order Failed*\n\n📅 Day %d of month\n💰 %s → pot *'%s'*\n\n🚫 The transfer could not be completed. Please check your available balance and that the pot still exists.",
-		order.DayOfMonth, utils.FormatSats(order.Amount), order.PotName,
+		"⚠️ *Standing Order Failed*\n\n📅 Day %d of month\n💰 %s → pot *'%s'*\n\n"+
+			"🚫 The transfer could not be completed. Please check your available balance and that the pot still exists.\n\n"+
+			"_%d more failure(s) and this order will be automatically deactivated._",
+		order.DayOfMonth, utils.FormatSats(order.Amount), order.PotName, remaining,
 	)
 	s.bot.trySendMessage(user.Telegram, msg)
 }
