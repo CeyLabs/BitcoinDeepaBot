@@ -78,9 +78,10 @@ func parseBatchEntries(text string) (entries []parsedEntry, sharedMemo string, e
 }
 
 type parsedEntry struct {
-	Amount   int64
-	Username string // without @
-	Memo     string
+	Amount        int64
+	Username      string // without @
+	Memo          string
+	DisplayAmount string
 }
 
 func parseRecipientLine(line string, sharedMemo string) (parsedEntry, error) {
@@ -89,10 +90,34 @@ func parseRecipientLine(line string, sharedMemo string) (parsedEntry, error) {
 		return parsedEntry{}, fmt.Errorf("expected: <amount> @<username> [memo]")
 	}
 
-	// Parse amount
-	amount, err := strconv.ParseInt(fields[0], 10, 64)
-	if err != nil || amount < 1 {
-		return parsedEntry{}, fmt.Errorf("invalid amount: %s", fields[0])
+	var amount int64
+	var displayAmount string
+	amountStr := strings.ReplaceAll(fields[0], ",", "")
+	// Check for lkr suffix
+	if strings.HasSuffix(strings.ToLower(amountStr), "lkr") {
+		lkrPerSat, _, err := thirdparty.GetSatPrice()
+		if err != nil {
+			return parsedEntry{}, fmt.Errorf("failed to get LKR price: %v", err)
+		}
+		if lkrPerSat <= 0 {
+			return parsedEntry{}, fmt.Errorf("invalid LKR price")
+		}
+
+		valStr := strings.TrimSuffix(strings.ToLower(amountStr), "lkr")
+		val, err := strconv.ParseFloat(valStr, 64)
+		if err != nil || val <= 0 {
+			return parsedEntry{}, fmt.Errorf("invalid amount: %s", fields[0])
+		}
+		amount = int64(val / lkrPerSat)
+		displayAmount = fmt.Sprintf("`%s` (%d sats)", fields[0], amount)
+	} else {
+		// Parse amount as sats
+		parsedAmount, err := strconv.ParseInt(amountStr, 10, 64)
+		if err != nil || parsedAmount < 1 {
+			return parsedEntry{}, fmt.Errorf("invalid amount: %s", fields[0])
+		}
+		amount = parsedAmount
+		displayAmount = fmt.Sprintf("`%d` sats", amount)
 	}
 
 	// Parse username
@@ -113,9 +138,10 @@ func parseRecipientLine(line string, sharedMemo string) (parsedEntry, error) {
 	}
 
 	return parsedEntry{
-		Amount:   amount,
-		Username: username,
-		Memo:     memo,
+		Amount:        amount,
+		Username:      username,
+		Memo:          memo,
+		DisplayAmount: displayAmount,
 	}, nil
 }
 
@@ -164,7 +190,7 @@ func (bot *TipBot) sendbatchHandler(ctx intercept.Context) (intercept.Context, e
 		totalAmount += p.Amount
 
 		// Build confirmation line
-		line := fmt.Sprintf("`%d` sats → @%s", p.Amount, str.MarkdownEscape(p.Username))
+		line := fmt.Sprintf("%s → @%s", p.DisplayAmount, str.MarkdownEscape(p.Username))
 		if p.Memo != "" {
 			line += fmt.Sprintf(" _%s_", str.MarkdownEscape(p.Memo))
 		}
