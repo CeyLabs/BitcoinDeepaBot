@@ -111,7 +111,7 @@ func (bot *TipBot) soHandler(ctx intercept.Context) (intercept.Context, error) {
 
 	arguments := strings.Fields(m.Text)
 	if len(arguments) < 2 {
-		bot.trySendMessage(ctx.Sender(), soHelpText)
+		bot.trySendMessage(ctx.Sender(), Translate(ctx, "standingOrderHelpText"))
 		return ctx, nil
 	}
 
@@ -123,7 +123,7 @@ func (bot *TipBot) soHandler(ctx intercept.Context) (intercept.Context, error) {
 	case "delete":
 		return bot.soDeleteHandler(ctx, user, arguments)
 	default:
-		bot.trySendMessage(ctx.Sender(), soHelpText)
+		bot.trySendMessage(ctx.Sender(), Translate(ctx, "standingOrderHelpText"))
 	}
 	return ctx, nil
 }
