@@ -111,11 +111,26 @@ type TransferParams struct {
 }
 
 type Error struct {
-	Detail string `json:"detail"`
+	Detail     string `json:"detail"`
+	Message    string `json:"message"`
+	StatusCode int    `json:"-"`
+	RawBody    string `json:"-"`
 }
 
 func (err Error) Error() string {
-	return err.Detail
+	if err.Detail != "" {
+		return err.Detail
+	}
+	if err.Message != "" {
+		return err.Message
+	}
+	if err.RawBody != "" {
+		return fmt.Sprintf("LNbits HTTP %d: %s", err.StatusCode, err.RawBody)
+	}
+	if err.StatusCode != 0 {
+		return fmt.Sprintf("LNbits HTTP %d: unknown error", err.StatusCode)
+	}
+	return "unknown LNbits error"
 }
 
 type Wallet struct {
