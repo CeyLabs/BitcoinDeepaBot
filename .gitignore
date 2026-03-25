@@ -6,3 +6,9 @@ LightningTipBot
 LightningTipBot.exe
 BitcoinDeepaBot
 test_pay_api.sh
+ANALYTICS_API.md
+.gitignore
+ANALYTICS_QUICKSTART.md
+.claude/settings.local.json
+analytics_requirements.txt
+analytics_export.py
