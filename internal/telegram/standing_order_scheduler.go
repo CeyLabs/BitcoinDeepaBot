@@ -115,18 +115,35 @@ func (s *StandingOrderScheduler) processDueOrders() {
 	}
 }
 
-// executeOrder transfers the standing order amount to the target pot and
-// updates LastExecutedAt so the idempotency guard prevents re-execution today.
+// executeOrder transfers the standing order amount to the target pot.
+//
+// LastExecutedAt is saved BEFORE the transfer so that if the transfer succeeds
+// but the subsequent DB write fails, the order is not executed again on the next
+// tick (double-execution). If the transfer itself fails, LastExecutedAt is reset
+// to its previous value so the order can be retried next month.
+//
+// Worst case of this approach: a failed transfer + a failed reset means the order
+// is skipped for this month — which is far safer than a double transfer.
 func (s *StandingOrderScheduler) executeOrder(order *lnbits.StandingOrder, user *lnbits.User) error {
+	now := time.Now()
+	previousExecutedAt := order.LastExecutedAt
+
+	// Mark as executed before the transfer to prevent double-execution
+	order.LastExecutedAt = &now
+	if err := s.bot.DB.Users.Save(order).Error; err != nil {
+		return fmt.Errorf("failed to mark order as executed: %w", err)
+	}
+
+	// Execute the transfer
 	if err := s.bot.TransferToPot(user, order.PotName, order.Amount); err != nil {
+		// Transfer failed — reset LastExecutedAt so the order can be retried next month
+		order.LastExecutedAt = previousExecutedAt
+		if resetErr := s.bot.DB.Users.Save(order).Error; resetErr != nil {
+			log.Errorf("[StandingOrderScheduler] Failed to reset LastExecutedAt for order %s after transfer failure: %v", order.ID, resetErr)
+		}
 		return err
 	}
 
-	now := time.Now()
-	order.LastExecutedAt = &now
-	if err := s.bot.DB.Users.Save(order).Error; err != nil {
-		log.Errorf("[StandingOrderScheduler] Failed to update LastExecutedAt for order %s: %v", order.ID, err)
-	}
 	return nil
 }
 
