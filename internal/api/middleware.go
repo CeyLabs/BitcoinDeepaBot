@@ -226,3 +226,72 @@ func GenerateHMACSignature(method, path, timestamp, body, secret string) string 
 	message := fmt.Sprintf("%s%s%s%s", method, path, timestamp, body)
 	return calculateHMAC(message, secret)
 }
+
+// AnalyticsHMACMiddleware validates HMAC signatures for analytics API endpoints
+func AnalyticsHMACMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get timestamp from header
+		timestampStr := r.Header.Get("X-Timestamp")
+		if timestampStr == "" {
+			log.Warn("[Analytics] Missing timestamp in request")
+			http.Error(w, "Missing timestamp", http.StatusUnauthorized)
+			return
+		}
+
+		timestamp, err := strconv.ParseInt(timestampStr, 10, 64)
+		if err != nil {
+			log.Warn("[Analytics] Invalid timestamp format")
+			http.Error(w, "Invalid timestamp", http.StatusBadRequest)
+			return
+		}
+
+		// Check if request is not too old (prevent replay attacks)
+		now := time.Now().Unix()
+		tolerance := internal.Configuration.API.Analytics.TimestampTolerance
+		if tolerance == 0 {
+			tolerance = 300
+		}
+
+		if now-timestamp > tolerance {
+			log.Warnf("[Analytics] Request timestamp too old (age: %d seconds)", now-timestamp)
+			http.Error(w, "Request expired", http.StatusUnauthorized)
+			return
+		}
+
+		// Get signature from header
+		signature := r.Header.Get("X-HMAC-Signature")
+		if signature == "" {
+			log.Warn("[Analytics] Missing HMAC signature")
+			http.Error(w, "Missing signature", http.StatusUnauthorized)
+			return
+		}
+
+		// For GET requests, use query string as the body component
+		bodyComponent := r.URL.RawQuery
+
+		// Create message to sign: METHOD + PATH + TIMESTAMP + QUERY
+		message := fmt.Sprintf("%s%s%s%s", r.Method, r.URL.Path, timestampStr, bodyComponent)
+
+		// Try to validate signature against each configured analytics API key
+		var authenticatedKey string
+		for keyID, apiKey := range internal.Configuration.API.Analytics.APIKeys {
+			expectedSignature := calculateHMAC(message, apiKey.HMACSecret)
+			if hmac.Equal([]byte(signature), []byte(expectedSignature)) {
+				authenticatedKey = keyID
+				log.Debugf("[Analytics] HMAC verified for key: %s (%s)", keyID, apiKey.Name)
+				break
+			}
+		}
+
+		if authenticatedKey == "" {
+			log.Warn("[Analytics] HMAC signature verification failed")
+			http.Error(w, "Invalid signature", http.StatusUnauthorized)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), "analytics_api_key", authenticatedKey)
+		r = r.WithContext(ctx)
+
+		next.ServeHTTP(w, r)
+	}
+}

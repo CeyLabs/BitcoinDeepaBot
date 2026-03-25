@@ -50,18 +50,29 @@ func main() {
 func startApiServer(bot *telegram.TipBot) {
 	// log errors from interceptors
 	bot.Telegram.OnError = func(err error, ctx tb.Context) {
+		if err == nil {
+			return
+		}
+
+		errMsg := err.Error()
+
+		// Filter out empty/ghost errors from telebot (code:0, empty message)
+		if errMsg == "" || errMsg == `{"message":"","Err":{},"code":0}` {
+			return
+		}
+
 		// Filter out annoying interceptor errors
-		if err != nil && strings.Contains(err.Error(), "[requirePrivateChatInterceptor]") {
-			return // Skip logging this specific error
+		if strings.Contains(errMsg, "[requirePrivateChatInterceptor]") {
+			return
 		}
 
 		// Log errors to Telegram group
 		if bot.ErrorLogger != nil {
 			userInfo := []interface{}{}
-			if ctx.Sender() != nil {
+			if ctx != nil && ctx.Sender() != nil {
 				userInfo = append(userInfo, ctx.Sender())
 			}
-			if ctx.Chat() != nil {
+			if ctx != nil && ctx.Chat() != nil {
 				userInfo = append(userInfo, ctx.Chat())
 			}
 			bot.ErrorLogger.LogError(err, "Telegram Bot Error", userInfo...)
@@ -71,6 +82,11 @@ func startApiServer(bot *telegram.TipBot) {
 	webhook.NewServer(bot)
 	// start external api server
 	s := api.NewServer(internal.Configuration.Bot.LNURLServerUrl.Host)
+
+	s.AppendRoute("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	}, http.MethodGet)
 
 	// append lnurl ctx functions
 	lnUrl := lnurl.New(bot)
@@ -101,6 +117,15 @@ func startApiServer(bot *telegram.TipBot) {
 	s.AppendAuthorizedRoute(`/api/v1/invoicestream`, api.AuthTypeBasic, api.AccessKeyTypeInvoice, bot.DB.Users, apiService.InvoiceStream, http.MethodGet)
 	s.AppendAuthorizedRoute(`/api/v1/createinvoice`, api.AuthTypeBasic, api.AccessKeyTypeInvoice, bot.DB.Users, apiService.CreateInvoice, http.MethodPost)
 	s.AppendAuthorizedRoute(`/api/v1/balance`, api.AuthTypeBasic, api.AccessKeyTypeInvoice, bot.DB.Users, apiService.Balance, http.MethodGet)
+
+	// Analytics API endpoints (HMAC authenticated)
+	if internal.IsAPIAnalyticsEnabled() {
+		s.AppendRoute(`/api/v1/analytics/transactions`, api.AnalyticsHMACMiddleware(apiService.GetTransactionAnalytics), http.MethodGet)
+		s.AppendRoute(`/api/v1/analytics/user/{user_id}/transactions`, api.AnalyticsHMACMiddleware(apiService.GetUserTransactionHistory), http.MethodGet)
+		log.Infof("Analytics API endpoints registered with HMAC security")
+	} else {
+		log.Infof("Analytics API endpoints disabled in configuration")
+	}
 
 	// Bot pay HTTP API module with wallet-based HMAC security (only if enabled)
 	if internal.IsAPISendEnabled() {

@@ -52,8 +52,11 @@ func (el *ErrorLogger) LogError(err error, context string, userInfo ...interface
 		return
 	}
 
-	// Filter out annoying/irrelevant error messages
+	// Filter out empty/ghost errors and irrelevant messages
 	errorMsg := err.Error()
+	if errorMsg == "" || errorMsg == `{"message":"","Err":{},"code":0}` {
+		return // Skip empty/meaningless errors
+	}
 	if strings.Contains(errorMsg, "[requirePrivateChatInterceptor]") {
 		return // Skip logging this specific interceptor error
 	}
