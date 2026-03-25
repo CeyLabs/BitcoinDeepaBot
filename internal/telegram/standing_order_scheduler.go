@@ -16,6 +16,7 @@ type StandingOrderScheduler struct {
 	CheckInterval time.Duration
 }
 
+// NewStandingOrderScheduler creates a new scheduler instance attached to the given bot.
 func NewStandingOrderScheduler(bot *TipBot) *StandingOrderScheduler {
 	return &StandingOrderScheduler{
 		bot:           bot,
@@ -23,10 +24,12 @@ func NewStandingOrderScheduler(bot *TipBot) *StandingOrderScheduler {
 	}
 }
 
+// Start launches the scheduler in a background goroutine.
 func (s *StandingOrderScheduler) Start() {
 	go s.run()
 }
 
+// run is the main scheduler loop. It processes due orders every CheckInterval.
 func (s *StandingOrderScheduler) run() {
 	for {
 		s.processDueOrders()
@@ -56,6 +59,8 @@ func shouldExecuteToday(order lnbits.StandingOrder, now time.Time) bool {
 	return last.Year() != now.Year() || last.Month() != now.Month() || last.Day() != now.Day()
 }
 
+// processDueOrders fetches all active standing orders, filters to those due today
+// (accounting for month-end clamping), and executes each one.
 func (s *StandingOrderScheduler) processDueOrders() {
 	now := time.Now()
 	today := now.Day()
@@ -94,6 +99,8 @@ func (s *StandingOrderScheduler) processDueOrders() {
 	}
 }
 
+// executeOrder transfers the standing order amount to the target pot and
+// updates LastExecutedAt so the idempotency guard prevents re-execution today.
 func (s *StandingOrderScheduler) executeOrder(order *lnbits.StandingOrder, user *lnbits.User) error {
 	if err := s.bot.TransferToPot(user, order.PotName, order.Amount); err != nil {
 		return err
@@ -107,6 +114,7 @@ func (s *StandingOrderScheduler) executeOrder(order *lnbits.StandingOrder, user 
 	return nil
 }
 
+// notifySuccess logs and sends a Telegram message to the user after a successful execution.
 func (s *StandingOrderScheduler) notifySuccess(user *lnbits.User, order lnbits.StandingOrder) {
 	log.Infof("[StandingOrderScheduler] Executed order %s for user %s: %s → pot '%s'",
 		order.ID, user.Name, utils.FormatSats(order.Amount), order.PotName)
@@ -117,6 +125,7 @@ func (s *StandingOrderScheduler) notifySuccess(user *lnbits.User, order lnbits.S
 	s.bot.trySendMessage(user.Telegram, msg)
 }
 
+// notifyFailure logs the error and sends a Telegram message to the user explaining why the order failed.
 func (s *StandingOrderScheduler) notifyFailure(user *lnbits.User, order lnbits.StandingOrder, err error) {
 	log.Errorf("[StandingOrderScheduler] Failed to execute order %s for user %s: %v", order.ID, user.Name, err)
 	msg := fmt.Sprintf(

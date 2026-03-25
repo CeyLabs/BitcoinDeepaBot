@@ -18,6 +18,8 @@ const (
 	MaxDayOfMonth            = 31
 )
 
+// CreateStandingOrder creates a new standing order for a user.
+// It validates the day, amount, and that the target pot exists before saving.
 func (bot *TipBot) CreateStandingOrder(user *lnbits.User, dayOfMonth int, amount int64, potName string) (*lnbits.StandingOrder, error) {
 	if dayOfMonth < MinDayOfMonth || dayOfMonth > MaxDayOfMonth {
 		return nil, fmt.Errorf("day must be between %d and %d", MinDayOfMonth, MaxDayOfMonth)
@@ -26,11 +28,13 @@ func (bot *TipBot) CreateStandingOrder(user *lnbits.User, dayOfMonth int, amount
 		return nil, fmt.Errorf("amount must be positive")
 	}
 
+	// Verify the target pot exists before creating the order
 	potName = strings.TrimSpace(potName)
 	if _, err := bot.GetPot(user, potName); err != nil {
 		return nil, fmt.Errorf("pot '%s' not found — create it first with /createpot", potName)
 	}
 
+	// Enforce per-user standing order limit
 	var orderCount int64
 	bot.DB.Users.Model(&lnbits.StandingOrder{}).Where("user_id = ? AND active = true", user.ID).Count(&orderCount)
 	if orderCount >= MaxStandingOrdersPerUser {
@@ -53,12 +57,15 @@ func (bot *TipBot) CreateStandingOrder(user *lnbits.User, dayOfMonth int, amount
 	return order, nil
 }
 
+// ListStandingOrders returns all active standing orders for a user, sorted by day of month.
 func (bot *TipBot) ListStandingOrders(user *lnbits.User) ([]lnbits.StandingOrder, error) {
 	var orders []lnbits.StandingOrder
 	err := bot.DB.Users.Where("user_id = ? AND active = true", user.ID).Order("day_of_month ASC").Find(&orders).Error
 	return orders, err
 }
 
+// GetStandingOrderByID retrieves a single standing order by ID, scoped to the user
+// to prevent cross-user access.
 func (bot *TipBot) GetStandingOrderByID(user *lnbits.User, orderID string) (*lnbits.StandingOrder, error) {
 	var order lnbits.StandingOrder
 	err := bot.DB.Users.Where("id = ? AND user_id = ?", orderID, user.ID).First(&order).Error
@@ -68,6 +75,7 @@ func (bot *TipBot) GetStandingOrderByID(user *lnbits.User, orderID string) (*lnb
 	return &order, nil
 }
 
+// DeleteStandingOrder permanently removes a standing order by ID, scoped to the user.
 func (bot *TipBot) DeleteStandingOrder(user *lnbits.User, orderID string) error {
 	result := bot.DB.Users.Where("id = ? AND user_id = ?", orderID, user.ID).Delete(&lnbits.StandingOrder{})
 	if result.Error != nil {
@@ -79,8 +87,9 @@ func (bot *TipBot) DeleteStandingOrder(user *lnbits.User, orderID string) error 
 	return nil
 }
 
-// ─── Telegram Handler ─────────────────────────────────────────────────────────
+// ─── Telegram Handlers ───────────────────────────────────────────────────────
 
+// soHelpText is shown when /so is called without arguments or with an unknown sub-command.
 const soHelpText = "📅 *Standing Orders (/so)*\n\n" +
 	"`/so create <day> <amount> <pot>` — create a standing order\n" +
 	"`/so list` — list your standing orders\n" +
@@ -89,6 +98,8 @@ const soHelpText = "📅 *Standing Orders (/so)*\n\n" +
 	"_Day 29–31 fires on the last day of shorter months._"
 
 // soHandler is the single entry point for all /so sub-commands.
+// It dispatches to soCreateHandler, soListHandler, or soDeleteHandler based on
+// the first argument.
 func (bot *TipBot) soHandler(ctx intercept.Context) (intercept.Context, error) {
 	m := ctx.Message()
 	user := LoadUser(ctx)
@@ -116,6 +127,8 @@ func (bot *TipBot) soHandler(ctx intercept.Context) (intercept.Context, error) {
 	return ctx, nil
 }
 
+// soCreateHandler handles /so create <day> <amount> <pot_name>.
+// Parses and validates arguments then calls CreateStandingOrder.
 func (bot *TipBot) soCreateHandler(ctx intercept.Context, user *lnbits.User, arguments []string) (intercept.Context, error) {
 	// /so create <day> <amount> <pot_name>
 	if len(arguments) < 5 {
@@ -135,6 +148,7 @@ func (bot *TipBot) soCreateHandler(ctx intercept.Context, user *lnbits.User, arg
 		return ctx, err
 	}
 
+	// Everything after the amount is the pot name (supports spaces in pot names)
 	potName := strings.Join(arguments[4:], " ")
 
 	order, err := bot.CreateStandingOrder(user, dayOfMonth, amount, potName)
@@ -150,6 +164,8 @@ func (bot *TipBot) soCreateHandler(ctx intercept.Context, user *lnbits.User, arg
 	return ctx, nil
 }
 
+// soListHandler handles /so list.
+// Displays all active standing orders for the user as a numbered list.
 func (bot *TipBot) soListHandler(ctx intercept.Context, user *lnbits.User) (intercept.Context, error) {
 	orders, err := bot.ListStandingOrders(user)
 	if err != nil {
@@ -164,6 +180,7 @@ func (bot *TipBot) soListHandler(ctx intercept.Context, user *lnbits.User) (inte
 
 	message := "📅 *Your Standing Orders:*\n\n"
 	for i, order := range orders {
+		// Show last execution date or "never run" if the order hasn't fired yet
 		lastRun := "never run"
 		if order.LastExecutedAt != nil {
 			lastRun = fmt.Sprintf("last run: %s", order.LastExecutedAt.Format("2006-01-02"))
@@ -177,6 +194,8 @@ func (bot *TipBot) soListHandler(ctx intercept.Context, user *lnbits.User) (inte
 	return ctx, nil
 }
 
+// soDeleteHandler handles /so delete <number>.
+// Fetches the user's order list and deletes the entry at the given 1-based index.
 func (bot *TipBot) soDeleteHandler(ctx intercept.Context, user *lnbits.User, arguments []string) (intercept.Context, error) {
 	if len(arguments) < 3 {
 		bot.trySendMessage(ctx.Sender(), "📅 *Usage:* `/so delete <number>`\n\nUse `/so list` to see your list.")
@@ -189,6 +208,7 @@ func (bot *TipBot) soDeleteHandler(ctx intercept.Context, user *lnbits.User, arg
 		return ctx, nil
 	}
 
+	// Re-fetch the list so the index is always accurate
 	orders, err := bot.ListStandingOrders(user)
 	if err != nil {
 		bot.trySendMessage(ctx.Sender(), "❌ Failed to fetch your standing orders.")
