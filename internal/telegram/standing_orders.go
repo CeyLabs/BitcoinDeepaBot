@@ -145,7 +145,7 @@ func (bot *TipBot) soCreateHandler(ctx intercept.Context, user *lnbits.User, arg
 	amount, err := getAmount(ctx, arguments[3])
 	if err != nil {
 		bot.trySendMessage(ctx.Sender(), fmt.Sprintf("❌ Invalid amount: %s", err.Error()))
-		return ctx, err
+		return ctx, nil
 	}
 
 	// Everything after the amount is the pot name (supports spaces in pot names)
@@ -154,7 +154,7 @@ func (bot *TipBot) soCreateHandler(ctx intercept.Context, user *lnbits.User, arg
 	order, err := bot.CreateStandingOrder(user, dayOfMonth, amount, potName)
 	if err != nil {
 		bot.trySendMessage(ctx.Sender(), fmt.Sprintf("❌ %s", err.Error()))
-		return ctx, err
+		return ctx, nil
 	}
 
 	bot.trySendMessage(ctx.Sender(), fmt.Sprintf(
