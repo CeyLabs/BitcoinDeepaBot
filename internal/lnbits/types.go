@@ -193,3 +193,15 @@ type SavingsPot struct {
 	UpdatedAt time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 	User      *User     `gorm:"foreignKey:UserID;references:ID"`
 }
+
+type StandingOrder struct {
+	ID             string     `json:"id" gorm:"primaryKey"`
+	UserID         string     `json:"user_id" gorm:"index"`
+	PotName        string     `json:"pot_name"`
+	DayOfMonth     int        `json:"day_of_month"`
+	Amount         int64      `json:"amount"`
+	Active         bool       `json:"active" gorm:"default:true"`
+	LastExecutedAt *time.Time `json:"last_executed_at"`
+	CreatedAt      time.Time  `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt      time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
+}

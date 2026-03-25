@@ -126,6 +126,9 @@ func (bot *TipBot) Start() {
 	// register telegram handlers
 	bot.registerTelegramHandlers()
 
+	// start standing order scheduler
+	NewStandingOrderScheduler(bot).Start()
+
 	// download bot avatar once
 	bot.downloadMyProfilePicture()
 
