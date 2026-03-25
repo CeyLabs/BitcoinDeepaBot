@@ -312,10 +312,13 @@ func (bot *TipBot) confirmSendBatchHandler(ctx intercept.Context) (intercept.Con
 
 		fromUserStr := GetUserStr(from.Telegram)
 		toUserStr := GetUserStr(to.Telegram)
-		transactionMemo := fmt.Sprintf("📦 Batch send from %s to %s.", fromUserStr, toUserStr)
 
 		t := NewTransaction(bot, from, to, entry.Amount, TransactionType("sendbatch"))
-		t.Memo = transactionMemo
+		if entry.Memo != "" {
+			t.Memo = entry.Memo
+		} else {
+			t.Memo = fmt.Sprintf("📦 Batch send from %s to %s.", fromUserStr, toUserStr)
+		}
 
 		success, err := t.Send()
 		if !success || err != nil {
