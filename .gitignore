@@ -6,3 +6,5 @@ LightningTipBot
 LightningTipBot.exe
 BitcoinDeepaBot
 test_pay_api.sh
+
+.DS_Store
