@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -25,15 +26,30 @@ func NewStandingOrderScheduler(bot *TipBot) *StandingOrderScheduler {
 }
 
 // Start launches the scheduler in a background goroutine.
-func (s *StandingOrderScheduler) Start() {
-	go s.run()
+// The provided context should be cancelled when the bot is shutting down
+// so the scheduler exits cleanly without waiting for the next tick.
+func (s *StandingOrderScheduler) Start(ctx context.Context) {
+	go s.run(ctx)
 }
 
-// run is the main scheduler loop. It processes due orders every CheckInterval.
-func (s *StandingOrderScheduler) run() {
+// run is the main scheduler loop. It processes due orders immediately on start,
+// then repeats every CheckInterval. It exits when ctx is cancelled.
+func (s *StandingOrderScheduler) run(ctx context.Context) {
+	ticker := time.NewTicker(s.CheckInterval)
+	defer ticker.Stop()
+
+	// Run immediately on start so orders due today are not delayed by one interval
+	s.processDueOrders()
+
 	for {
-		s.processDueOrders()
-		time.Sleep(s.CheckInterval)
+		select {
+		case <-ctx.Done():
+			// Bot is shutting down — exit the goroutine cleanly
+			log.Infof("[StandingOrderScheduler] Shutting down.")
+			return
+		case <-ticker.C:
+			s.processDueOrders()
+		}
 	}
 }
 

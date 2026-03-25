@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -126,8 +127,10 @@ func (bot *TipBot) Start() {
 	// register telegram handlers
 	bot.registerTelegramHandlers()
 
-	// start standing order scheduler
-	NewStandingOrderScheduler(bot).Start()
+	// start standing order scheduler with a cancellable context so it stops cleanly on shutdown
+	schedulerCtx, cancelScheduler := context.WithCancel(context.Background())
+	defer cancelScheduler()
+	NewStandingOrderScheduler(bot).Start(schedulerCtx)
 
 	// download bot avatar once
 	bot.downloadMyProfilePicture()
