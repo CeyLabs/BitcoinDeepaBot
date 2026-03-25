@@ -155,7 +155,7 @@ func (bot *TipBot) soCreateHandler(ctx intercept.Context, user *lnbits.User, arg
 	order, err := bot.CreateStandingOrder(user, dayOfMonth, amount, potName)
 	if err != nil {
 		log.Errorf("[/so create] Failed to create standing order for user %s: %v", user.Name, err)
-		bot.trySendMessage(ctx.Sender(), "❌ Failed to create standing order. Please check your input and try again.")
+		bot.trySendMessage(ctx.Sender(), fmt.Sprintf("❌ %s", err.Error()))
 		return ctx, nil
 	}
 
