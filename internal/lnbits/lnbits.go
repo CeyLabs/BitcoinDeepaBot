@@ -136,15 +136,21 @@ func (c Client) Info(w Wallet) (wtx Wallet, err error) {
 	return
 }
 
-// Payments returns wallet payments
+// Payments returns the 60 most recent wallet payments (default behavior).
 func (c Client) Payments(w Wallet) (wtx Payments, err error) {
+	return c.PaymentsWithOptions(w, 60, 0)
+}
+
+// PaymentsWithOptions returns wallet payments with configurable limit and offset.
+func (c Client) PaymentsWithOptions(w Wallet, limit, offset int) (wtx Payments, err error) {
 	// custom header with invoice key
 	invoiceHeader := req.Header{
 		"Content-Type": "application/json",
 		"Accept":       "application/json",
 		"X-Api-Key":    w.Inkey,
 	}
-	resp, err := req.Get(c.url+"/api/v1/payments?limit=60", invoiceHeader, nil)
+	url := fmt.Sprintf("%s/api/v1/payments?limit=%d&offset=%d", c.url, limit, offset)
+	resp, err := req.Get(url, invoiceHeader, nil)
 	if err != nil {
 		return
 	}
