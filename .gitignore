@@ -8,3 +8,8 @@ BitcoinDeepaBot
 test_pay_api.sh
 
 .DS_Store
+.claude/settings.local.json
+analytics_export.py
+analytics_requirements.txt
+ANALYTICS_API.md
+ANALYTICS_QUICKSTART.md

@@ -7,6 +7,20 @@ import (
 	"github.com/imroc/req"
 )
 
+// parseLNbitsError extracts a meaningful error from an LNbits HTTP response.
+func parseLNbitsError(resp *req.Resp) Error {
+	statusCode := resp.Response().StatusCode
+	rawBody := resp.String()
+
+	var reqErr Error
+	resp.ToJSON(&reqErr)
+	reqErr.StatusCode = statusCode
+	if reqErr.Detail == "" && reqErr.Message == "" {
+		reqErr.RawBody = rawBody
+	}
+	return reqErr
+}
+
 // NewClient returns a new lnbits api client. Pass your API key and url here.
 func NewClient(key, url string) *Client {
 	return &Client{
@@ -31,9 +45,7 @@ func (c *Client) GetUser(userId string) (user User, err error) {
 	}
 
 	if resp.Response().StatusCode >= 300 {
-		var reqErr Error
-		resp.ToJSON(&reqErr)
-		err = reqErr
+		err = parseLNbitsError(resp)
 		return
 	}
 
@@ -54,9 +66,7 @@ func (c *Client) CreateUserWithInitialWallet(userName, walletName, adminId strin
 	}
 
 	if resp.Response().StatusCode >= 300 {
-		var reqErr Error
-		resp.ToJSON(&reqErr)
-		err = reqErr
+		err = parseLNbitsError(resp)
 		return
 	}
 	err = resp.ToJSON(&wal)
@@ -75,9 +85,7 @@ func (c *Client) CreateWallet(userId, walletName, adminId string) (wal Wallet, e
 	}
 
 	if resp.Response().StatusCode >= 300 {
-		var reqErr Error
-		resp.ToJSON(&reqErr)
-		err = reqErr
+		err = parseLNbitsError(resp)
 		return
 	}
 	err = resp.ToJSON(&wal)
@@ -98,9 +106,7 @@ func (w Wallet) Invoice(params InvoiceParams, c *Client) (lntx Invoice, err erro
 	}
 
 	if resp.Response().StatusCode >= 300 {
-		var reqErr Error
-		resp.ToJSON(&reqErr)
-		err = reqErr
+		err = parseLNbitsError(resp)
 		return
 	}
 
@@ -122,9 +128,7 @@ func (c Client) Info(w Wallet) (wtx Wallet, err error) {
 	}
 
 	if resp.Response().StatusCode >= 300 {
-		var reqErr Error
-		resp.ToJSON(&reqErr)
-		err = reqErr
+		err = parseLNbitsError(resp)
 		return
 	}
 
@@ -132,23 +136,27 @@ func (c Client) Info(w Wallet) (wtx Wallet, err error) {
 	return
 }
 
-// Payments returns wallet payments
+// Payments returns the 60 most recent wallet payments (default behavior).
 func (c Client) Payments(w Wallet) (wtx Payments, err error) {
+	return c.PaymentsWithOptions(w, 60, 0)
+}
+
+// PaymentsWithOptions returns wallet payments with configurable limit and offset.
+func (c Client) PaymentsWithOptions(w Wallet, limit, offset int) (wtx Payments, err error) {
 	// custom header with invoice key
 	invoiceHeader := req.Header{
 		"Content-Type": "application/json",
 		"Accept":       "application/json",
 		"X-Api-Key":    w.Inkey,
 	}
-	resp, err := req.Get(c.url+"/api/v1/payments?limit=60", invoiceHeader, nil)
+	url := fmt.Sprintf("%s/api/v1/payments?limit=%d&offset=%d", c.url, limit, offset)
+	resp, err := req.Get(url, invoiceHeader, nil)
 	if err != nil {
 		return
 	}
 
 	if resp.Response().StatusCode >= 300 {
-		var reqErr Error
-		resp.ToJSON(&reqErr)
-		err = reqErr
+		err = parseLNbitsError(resp)
 		return
 	}
 
@@ -170,9 +178,7 @@ func (c Client) Payment(w Wallet, payment_hash string) (payment LNbitsPayment, e
 	}
 
 	if resp.Response().StatusCode >= 300 {
-		var reqErr Error
-		resp.ToJSON(&reqErr)
-		err = reqErr
+		err = parseLNbitsError(resp)
 		return
 	}
 
@@ -188,9 +194,7 @@ func (c Client) Wallets(w User) (wtx []Wallet, err error) {
 	}
 
 	if resp.Response().StatusCode >= 300 {
-		var reqErr Error
-		resp.ToJSON(&reqErr)
-		err = reqErr
+		err = parseLNbitsError(resp)
 		return
 	}
 
@@ -214,9 +218,7 @@ func (w Wallet) Pay(params PaymentParams, c *Client) (wtx Invoice, err error) {
 	}
 
 	if resp.Response().StatusCode >= 300 {
-		var reqErr Error
-		resp.ToJSON(&reqErr)
-		err = reqErr
+		err = parseLNbitsError(resp)
 		return
 	}
 
