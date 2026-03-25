@@ -121,6 +121,10 @@ func AutoMigration() *Databases {
 	if err != nil {
 		panic(err)
 	}
+	err = orm.AutoMigrate(&lnbits.StandingOrder{})
+	if err != nil {
+		panic(err)
+	}
 
 	txLogger, err := gorm.Open(sqlite.Open(internal.Configuration.Database.TransactionsPath), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true, FullSaveAssociations: true})
 	if err != nil {
