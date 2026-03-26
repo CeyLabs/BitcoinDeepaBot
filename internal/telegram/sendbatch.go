@@ -368,12 +368,10 @@ func (bot *TipBot) confirmSendBatchHandler(ctx intercept.Context) (intercept.Con
 		// Notify recipient
 		fromUserStrMd := GetUserStrMd(from.Telegram)
 		notifyMsg := fmt.Sprintf("📦 You received %s from %s", thirdparty.FormatSatsWithLKR(entry.Amount), fromUserStrMd)
-		bot.trySendMessage(to.Telegram, notifyMsg)
-
-		// Send memo to recipient if present
 		if entry.Memo != "" {
-			bot.trySendMessage(to.Telegram, fmt.Sprintf("✉️ %s", str.MarkdownEscape(entry.Memo)))
+			notifyMsg += fmt.Sprintf("\n✉️ %s", str.MarkdownEscape(entry.Memo))
 		}
+		bot.trySendMessage(to.Telegram, notifyMsg)
 
 		log.Infof("[📦 sendbatch] Send from %s to %s (%d sat).", fromUserStr, toUserStr, entry.Amount)
 
