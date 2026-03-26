@@ -304,12 +304,13 @@ func (bot *TipBot) confirmSendBatchHandler(ctx intercept.Context) (intercept.Con
 	var failed []string
 	var totalSent int64
 	var progressLines []string
+	totalEntries := len(batchData.Entries)
 
 	for i, entry := range batchData.Entries {
 		to, err := GetLnbitsUser(&tb.User{ID: entry.ToTelegramId, Username: entry.ToUsername}, *bot)
 		if err != nil {
 			log.Errorf("[sendbatch] failed to get user @%s: %s", entry.ToUsername, err.Error())
-			failed = append(failed, fmt.Sprintf("@%s — user error", entry.ToUsername))
+			failed = append(failed, fmt.Sprintf("@%s — user error", str.MarkdownEscape(entry.ToUsername)))
 			// Update message with failure
 			failLine := fmt.Sprintf("❌ Failed to @%s — user error", str.MarkdownEscape(entry.ToUsername))
 			progressLines = append(progressLines, failLine)
@@ -318,7 +319,7 @@ func (bot *TipBot) confirmSendBatchHandler(ctx intercept.Context) (intercept.Con
 			bot.tryEditMessage(progressMessage, progressMsg, &tb.ReplyMarkup{})
 			// Stop on first failure to prevent partial state issues
 			for _, remaining := range batchData.Entries[len(succeeded)+len(failed):] {
-				failed = append(failed, fmt.Sprintf("@%s — skipped", remaining.ToUsername))
+				failed = append(failed, fmt.Sprintf("@%s — skipped", str.MarkdownEscape(remaining.ToUsername)))
 			}
 			break
 		}
@@ -339,7 +340,7 @@ func (bot *TipBot) confirmSendBatchHandler(ctx intercept.Context) (intercept.Con
 			if bot.ErrorLogger != nil {
 				bot.ErrorLogger.LogTransactionError(err, "sendbatch", entry.Amount, from.Telegram, to.Telegram)
 			}
-			failed = append(failed, fmt.Sprintf("@%s — transfer failed", entry.ToUsername))
+			failed = append(failed, fmt.Sprintf("@%s — transfer failed", str.MarkdownEscape(entry.ToUsername)))
 			// Update message with failure
 			failLine := fmt.Sprintf("❌ Failed to @%s — transfer failed", str.MarkdownEscape(entry.ToUsername))
 			progressLines = append(progressLines, failLine)
@@ -348,13 +349,13 @@ func (bot *TipBot) confirmSendBatchHandler(ctx intercept.Context) (intercept.Con
 			bot.tryEditMessage(progressMessage, progressMsg, &tb.ReplyMarkup{})
 			// Stop on failure — remaining are skipped
 			for _, remaining := range batchData.Entries[len(succeeded)+len(failed):] {
-				failed = append(failed, fmt.Sprintf("@%s — skipped", remaining.ToUsername))
+				failed = append(failed, fmt.Sprintf("@%s — skipped", str.MarkdownEscape(remaining.ToUsername)))
 			}
 			break
 		}
 
 		totalSent += entry.Amount
-		succeeded = append(succeeded, fmt.Sprintf("@%s — %s", entry.ToUsername, thirdparty.FormatSatsWithLKR(entry.Amount)))
+		succeeded = append(succeeded, fmt.Sprintf("@%s — %s", str.MarkdownEscape(entry.ToUsername), thirdparty.FormatSatsWithLKR(entry.Amount)))
 
 		// Update message with success
 		successLine := fmt.Sprintf("✅ Sent %s to @%s",
@@ -362,7 +363,7 @@ func (bot *TipBot) confirmSendBatchHandler(ctx intercept.Context) (intercept.Con
 		progressLines = append(progressLines, successLine)
 		progressMsg := fmt.Sprintf("⏳ *%d/%d Processing batch send...*\n\n%s",
 			i+1, totalEntries, strings.Join(progressLines, "\n"))
-		bot.tryEditMessage(ctx.Callback().Message, progressMsg, &tb.ReplyMarkup{})
+		bot.tryEditMessage(progressMessage, progressMsg, &tb.ReplyMarkup{})
 
 		// Notify recipient
 		fromUserStrMd := GetUserStrMd(from.Telegram)
