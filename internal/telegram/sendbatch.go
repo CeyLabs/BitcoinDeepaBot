@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/errors"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
@@ -290,19 +291,31 @@ func (bot *TipBot) confirmSendBatchHandler(ctx intercept.Context) (intercept.Con
 		return ctx, fmt.Errorf("insufficient balance for batch send")
 	}
 
-	// Update message to show processing
-	bot.tryEditMessage(ctx.Callback().Message, "⏳ *Processing batch send...*", &tb.ReplyMarkup{})
+	// Delete the confirmation message and send a new progress message
+	bot.tryDeleteMessage(ctx.Callback().Message)
+	progressMessage := bot.trySendMessage(ctx.Callback().Sender, "⏳ *Processing batch send...*")
+	if progressMessage == nil {
+		log.Errorln("[sendbatch] Failed to send progress message")
+		return ctx, fmt.Errorf("failed to send progress message")
+	}
 
 	// Execute transfers sequentially
 	var succeeded []string
 	var failed []string
 	var totalSent int64
+	var progressLines []string
 
-	for _, entry := range batchData.Entries {
+	for i, entry := range batchData.Entries {
 		to, err := GetLnbitsUser(&tb.User{ID: entry.ToTelegramId, Username: entry.ToUsername}, *bot)
 		if err != nil {
 			log.Errorf("[sendbatch] failed to get user @%s: %s", entry.ToUsername, err.Error())
 			failed = append(failed, fmt.Sprintf("@%s — user error", entry.ToUsername))
+			// Update message with failure
+			failLine := fmt.Sprintf("❌ Failed to @%s — user error", str.MarkdownEscape(entry.ToUsername))
+			progressLines = append(progressLines, failLine)
+			progressMsg := fmt.Sprintf("⏳ *%d/%d Processing batch send...*\n\n%s",
+				i+1, totalEntries, strings.Join(progressLines, "\n"))
+			bot.tryEditMessage(progressMessage, progressMsg, &tb.ReplyMarkup{})
 			// Stop on first failure to prevent partial state issues
 			for _, remaining := range batchData.Entries[len(succeeded)+len(failed):] {
 				failed = append(failed, fmt.Sprintf("@%s — skipped", remaining.ToUsername))
@@ -327,6 +340,12 @@ func (bot *TipBot) confirmSendBatchHandler(ctx intercept.Context) (intercept.Con
 				bot.ErrorLogger.LogTransactionError(err, "sendbatch", entry.Amount, from.Telegram, to.Telegram)
 			}
 			failed = append(failed, fmt.Sprintf("@%s — transfer failed", entry.ToUsername))
+			// Update message with failure
+			failLine := fmt.Sprintf("❌ Failed to @%s — transfer failed", str.MarkdownEscape(entry.ToUsername))
+			progressLines = append(progressLines, failLine)
+			progressMsg := fmt.Sprintf("⏳ *%d/%d Processing batch send...*\n\n%s",
+				i+1, totalEntries, strings.Join(progressLines, "\n"))
+			bot.tryEditMessage(progressMessage, progressMsg, &tb.ReplyMarkup{})
 			// Stop on failure — remaining are skipped
 			for _, remaining := range batchData.Entries[len(succeeded)+len(failed):] {
 				failed = append(failed, fmt.Sprintf("@%s — skipped", remaining.ToUsername))
@@ -336,6 +355,14 @@ func (bot *TipBot) confirmSendBatchHandler(ctx intercept.Context) (intercept.Con
 
 		totalSent += entry.Amount
 		succeeded = append(succeeded, fmt.Sprintf("@%s — %s", entry.ToUsername, thirdparty.FormatSatsWithLKR(entry.Amount)))
+
+		// Update message with success
+		successLine := fmt.Sprintf("✅ Sent %s to @%s",
+			thirdparty.FormatSatsWithLKR(entry.Amount), str.MarkdownEscape(entry.ToUsername))
+		progressLines = append(progressLines, successLine)
+		progressMsg := fmt.Sprintf("⏳ *%d/%d Processing batch send...*\n\n%s",
+			i+1, totalEntries, strings.Join(progressLines, "\n"))
+		bot.tryEditMessage(ctx.Callback().Message, progressMsg, &tb.ReplyMarkup{})
 
 		// Notify recipient
 		fromUserStrMd := GetUserStrMd(from.Telegram)
@@ -348,6 +375,9 @@ func (bot *TipBot) confirmSendBatchHandler(ctx intercept.Context) (intercept.Con
 		}
 
 		log.Infof("[📦 sendbatch] Send from %s to %s (%d sat).", fromUserStr, toUserStr, entry.Amount)
+
+		// Add 1 second delay to avoid hitting Telegram rate limits
+		time.Sleep(1 * time.Second)
 	}
 
 	batchData.Inactivate(batchData, bot.Bunt)
@@ -374,8 +404,8 @@ func (bot *TipBot) confirmSendBatchHandler(ctx intercept.Context) (intercept.Con
 
 	resultMsg := strings.Join(resultLines, "\n")
 
-	bot.tryDeleteMessage(ctx.Callback().Message)
-	bot.trySendMessage(ctx.Callback().Sender, resultMsg)
+	// Edit the progress message to show final summary
+	bot.tryEditMessage(progressMessage, resultMsg, &tb.ReplyMarkup{})
 
 	return ctx, nil
 }
