@@ -293,7 +293,7 @@ func (bot *TipBot) confirmSendBatchHandler(ctx intercept.Context) (intercept.Con
 
 	// Delete the confirmation message and send a new progress message
 	bot.tryDeleteMessage(ctx.Callback().Message)
-	progressMessage := bot.trySendMessage(ctx.Callback().Sender, "⏳ *Processing batch send...*")
+	progressMessage := bot.trySendMessageEditable(ctx.Callback().Sender, "⏳ *Processing batch send...*")
 	if progressMessage == nil {
 		log.Errorln("[sendbatch] Failed to send progress message")
 		return ctx, fmt.Errorf("failed to send progress message")
