@@ -36,8 +36,23 @@ generate:
 nostr:
   private_key: "hex private key here"
 
-# API Send Configuration
+# API Configuration
 api:
+  # Analytics API - HMAC authenticated endpoints for data export
+  # Generate secrets with: openssl rand -hex 32
+  analytics:
+    enabled: true
+    timestamp_tolerance: 300  # seconds (5 minutes)
+    api_keys:
+      data-team:
+        name: "Data Team"
+        hmac_secret: "your-analytics-hmac-secret-here"
+      # Add more keys for different consumers:
+      # dashboard:
+      #   name: "Internal Dashboard"
+      #   hmac_secret: "another-secure-secret-here"
+
+  # Send API - wallet-based HMAC authenticated endpoints
   send:
     enabled: true
     internal_network: "10.0.0.0/24"

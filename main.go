@@ -118,6 +118,15 @@ func startApiServer(bot *telegram.TipBot) {
 	s.AppendAuthorizedRoute(`/api/v1/createinvoice`, api.AuthTypeBasic, api.AccessKeyTypeInvoice, bot.DB.Users, apiService.CreateInvoice, http.MethodPost)
 	s.AppendAuthorizedRoute(`/api/v1/balance`, api.AuthTypeBasic, api.AccessKeyTypeInvoice, bot.DB.Users, apiService.Balance, http.MethodGet)
 
+	// Analytics API endpoints (HMAC authenticated)
+	if internal.IsAPIAnalyticsEnabled() {
+		s.AppendRoute(`/api/v1/analytics/transactions`, api.AnalyticsHMACMiddleware(apiService.GetTransactionAnalytics), http.MethodGet)
+		s.AppendRoute(`/api/v1/analytics/user/{user_id}/transactions`, api.AnalyticsHMACMiddleware(apiService.GetUserTransactionHistory), http.MethodGet)
+		log.Infof("Analytics API endpoints registered with HMAC security")
+	} else {
+		log.Infof("Analytics API endpoints disabled in configuration")
+	}
+
 	// Bot pay HTTP API module with wallet-based HMAC security (only if enabled)
 	if internal.IsAPISendEnabled() {
 		s.AppendRoute(`/api/v1/send`, api.WalletHMACMiddleware(apiService.Send), http.MethodPost)

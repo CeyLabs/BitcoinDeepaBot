@@ -74,7 +74,19 @@ type LnbitsConfiguration struct {
 }
 
 type APIConfiguration struct {
-	Send APISendConfiguration `yaml:"send"`
+	Send      APISendConfiguration      `yaml:"send"`
+	Analytics APIAnalyticsConfiguration `yaml:"analytics"`
+}
+
+type APIAnalyticsConfiguration struct {
+	Enabled            bool                      `yaml:"enabled"`
+	APIKeys            map[string]AnalyticsAPIKey `yaml:"api_keys"`
+	TimestampTolerance int64                      `yaml:"timestamp_tolerance"` // seconds
+}
+
+type AnalyticsAPIKey struct {
+	Name       string `yaml:"name"`        // Descriptive name (e.g. "data-team")
+	HMACSecret string `yaml:"hmac_secret"` // HMAC secret for this key
 }
 
 type APISendConfiguration struct {
@@ -128,6 +140,7 @@ func init() {
 	Configuration.Bot.LNURLHostUrl = hostname
 	checkLnbitsConfiguration()
 	setAPISendDefaults()
+	setAPIAnalyticsDefaults()
 }
 
 // GetWebhookURL returns the appropriate webhook URL
@@ -213,4 +226,39 @@ func setAPISendDefaults() {
 // IsAPISendEnabled returns whether the API Send module is enabled
 func IsAPISendEnabled() bool {
 	return Configuration.API.Send.Enabled
+}
+
+// setAPIAnalyticsDefaults sets default values for API Analytics configuration
+func setAPIAnalyticsDefaults() {
+	if !Configuration.API.Analytics.Enabled {
+		log.Infof("Analytics API disabled in configuration")
+		return
+	}
+
+	if Configuration.API.Analytics.TimestampTolerance == 0 {
+		Configuration.API.Analytics.TimestampTolerance = 300 // 5 minutes
+	}
+
+	if len(Configuration.API.Analytics.APIKeys) == 0 {
+		log.Errorf("Analytics API enabled but no API keys configured. Disabling analytics API.")
+		Configuration.API.Analytics.Enabled = false
+		return
+	}
+
+	// Reject placeholder/insecure secrets
+	for keyID, apiKey := range Configuration.API.Analytics.APIKeys {
+		if strings.Contains(apiKey.HMACSecret, "change-me") || len(apiKey.HMACSecret) < 32 {
+			log.Errorf("Analytics API key '%s' has an insecure HMAC secret (placeholder or too short). "+
+				"Generate a secure secret with: openssl rand -hex 32. Disabling analytics API.", keyID)
+			Configuration.API.Analytics.Enabled = false
+			return
+		}
+	}
+
+	log.Infof("Analytics API enabled with %d API keys", len(Configuration.API.Analytics.APIKeys))
+}
+
+// IsAPIAnalyticsEnabled returns whether the Analytics API is enabled
+func IsAPIAnalyticsEnabled() bool {
+	return Configuration.API.Analytics.Enabled
 }
