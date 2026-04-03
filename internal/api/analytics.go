@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 )
 
 const (
@@ -25,6 +27,10 @@ const (
 	// maxValidTimestamp is 2100-01-01 - reasonable upper bound
 	maxValidTimestamp int64 = 4102444800
 )
+
+// lnbitsRateLimiter enforces a shared rate limit of 150 req/min (safely below LNbits' 200/min limit)
+// across all concurrent analytics requests.
+var lnbitsRateLimiter = rate.NewLimiter(rate.Every(400*time.Millisecond), 1)
 
 // TransactionAnalyticsResponse represents the analytics data response
 type TransactionAnalyticsResponse struct {
@@ -214,13 +220,17 @@ func (s Service) GetTransactionAnalytics(w http.ResponseWriter, r *http.Request)
 	// Fetch external payments from LNbits with configurable limit+offset
 	if includeExternal {
 		for _, user := range targetUsers {
+			if len(response.ExternalPayments) >= limit {
+				break
+			}
+
 			if user.Wallet == nil {
 				continue
 			}
 
 			uniqueUserMap[user.Telegram.ID] = true
 
-			payments, err := s.Bot.Client.PaymentsWithOptions(*user.Wallet, limit+offset, 0)
+			payments, err := fetchPaymentsWithRateLimit(r.Context(), s, user, limit+offset)
 			if err != nil {
 				log.Errorf("[Analytics] Error fetching payments for user %d: %s", user.Telegram.ID, err.Error())
 				continue
@@ -408,7 +418,7 @@ func (s Service) GetUserTransactionHistory(w http.ResponseWriter, r *http.Reques
 
 	// Fetch external payments from LNbits
 	if user.Wallet != nil {
-		payments, err := s.Bot.Client.PaymentsWithOptions(*user.Wallet, limit+offset, 0)
+		payments, err := fetchPaymentsWithRateLimit(r.Context(), s, user, limit+offset)
 		if err != nil {
 			log.Errorf("[Analytics] Error fetching payments for user %d: %s", userID, err.Error())
 		} else {
@@ -495,6 +505,39 @@ func (s Service) GetUserTransactionHistory(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
+}
+
+// fetchPaymentsWithRateLimit waits for the shared LNbits rate limiter token, then fetches
+// payments for the given user. On HTTP 429 it retries up to 3 times with exponential backoff
+// (2s, 4s, 8s) before giving up.
+func fetchPaymentsWithRateLimit(ctx context.Context, s Service, user *lnbits.User, count int) ([]lnbits.Payment, error) {
+	const maxRetries = 3
+	backoff := 2 * time.Second
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if err := lnbitsRateLimiter.Wait(ctx); err != nil {
+			return nil, err
+		}
+
+		payments, err := s.Bot.Client.PaymentsWithOptions(*user.Wallet, count, 0)
+		if err == nil {
+			return payments, nil
+		}
+
+		if !strings.Contains(err.Error(), "429") || attempt == maxRetries {
+			return nil, err
+		}
+
+		log.Warnf("[Analytics] LNbits rate limit hit for user %d, retrying in %s (attempt %d/%d)",
+			user.Telegram.ID, backoff, attempt+1, maxRetries)
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(backoff):
+		}
+		backoff *= 2
+	}
+	return nil, fmt.Errorf("exceeded max retries for user %d", user.Telegram.ID)
 }
 
 // parseDate parses a date string and validates it falls within reasonable bounds.
