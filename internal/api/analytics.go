@@ -19,7 +19,7 @@ import (
 
 const (
 	// maxAnalyticsLimit caps the maximum number of records per request to prevent memory exhaustion
-	maxAnalyticsLimit = 10000
+	maxAnalyticsLimit = 250
 	// maxAnalyticsOffset caps the offset to prevent abuse
 	maxAnalyticsOffset = 100000
 	// minValidTimestamp is 2009-01-03 (Bitcoin genesis block) - no valid data before this
@@ -96,7 +96,7 @@ type TransactionSummary struct {
 //   - payment_type: Filter external payments by type (incoming/outgoing/all)
 //   - include_external: Include external LNbits payments (true/false, default: true)
 //   - include_internal: Include internal bot transactions (true/false, default: true)
-//   - limit: Maximum number of transactions per type (default: 1000)
+//   - limit: Maximum number of transactions per type (default: 100, max: 250)
 //   - offset: Number of transactions to skip for pagination (default: 0)
 //   - format: Response format - "json" (default) or "csv"
 func (s Service) GetTransactionAnalytics(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +115,7 @@ func (s Service) GetTransactionAnalytics(w http.ResponseWriter, r *http.Request)
 	outputFormat := params.Get("format")
 
 	// Set default limit with max cap
-	limit := 1000
+	limit := 100
 	if limitStr != "" {
 		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
 			limit = parsedLimit
@@ -365,7 +365,7 @@ func (s Service) GetTransactionAnalytics(w http.ResponseWriter, r *http.Request)
 // GetUserTransactionHistory retrieves all transactions for a specific user
 // Endpoint: GET /api/v1/analytics/user/{user_id}/transactions
 // Query Parameters:
-//   - limit: Maximum number of transactions per type (default: 1000)
+//   - limit: Maximum number of transactions per type (default: 100, max: 250)
 //   - offset: Number of transactions to skip for pagination (default: 0)
 //   - format: Response format - "json" (default) or "csv"
 func (s Service) GetUserTransactionHistory(w http.ResponseWriter, r *http.Request) {
@@ -375,7 +375,7 @@ func (s Service) GetUserTransactionHistory(w http.ResponseWriter, r *http.Reques
 	outputFormat := params.Get("format")
 
 	// Parse limit and offset with max caps
-	limit := 1000
+	limit := 100
 	if limitStr := params.Get("limit"); limitStr != "" {
 		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
 			limit = parsedLimit
