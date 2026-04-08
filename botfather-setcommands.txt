@@ -18,3 +18,4 @@ faucet - Create a faucet: /faucet 2100 21
 advanced - Advanced help
 lkrsats - Convert LKR to satoshis
 convert - Convert sats to fiat values
+swap - Swap sats to USDT: /swap 10000 TYourTronAddress

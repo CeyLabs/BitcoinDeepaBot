@@ -324,3 +324,25 @@ convertResultMessage = """%.2f LKR is about %s."""
 
 # CONVERT SAT TO FIAT
 convertSatsResultMessage = """%s is about %s USD / %s LKR"""
+
+# BOLTZ SWAP
+swapHelpText                = """📖 Oops, that didn't work. %s
+
+*Usage:* `/swap <amount_sats> <USDT_address>`
+*Example (Tron TRC20):* `/swap 10000 TYourTronAddress`
+*Example (Ethereum ERC20):* `/swap 50000 0xYourEthAddress`"""
+
+swapDisabledMessage         = """🚫 Swap is currently disabled."""
+swapEnterAddressMessage     = """📬 Please enter your USDT destination address.\n\n_Supported: Tron TRC20 (starts with T) or Ethereum/EVM ERC20 (starts with 0x)._"""
+swapConfirmMessage          = """⚡️ *Confirm Swap*\n\n💸 Send: *%d sats*\n🪙 Receive: ~*%.4f USDT*\n📬 To: `%s`\n💰 Fee: ~%d sats\n\nProceed?"""
+swapConfirmSimpleMessage    = """⚡️ *Confirm Swap*\n\n💸 Send: *%d sats* → USDT\n📬 To: `%s`\n\nProceed?"""
+swapConfirmButtonMessage    = """✅ Confirm Swap"""
+swapPayingMessage           = """⏳ Paying Lightning invoice…"""
+swapWaitingOnChainMessage   = """⚡️ Invoice paid! Waiting for USDT to arrive on-chain…"""
+swapCompleteMessage         = """✅ *Swap complete!* USDT has been sent to `%s`."""
+swapFailedMessage           = """❌ *Swap failed:* %s"""
+swapExpiredMessage          = """⏰ *Swap expired* — your sats were not deducted."""
+swapCancelledMessage        = """🚫 Swap cancelled."""
+swapInvalidAddressMessage   = """❌ Invalid USDT address. Use a Tron address (starts with T, 34 chars) or an Ethereum address (starts with 0x, 42 chars)."""
+swapInvalidAmountMessage    = """❌ Invalid amount. Please enter a positive number of satoshis."""
+swapAmountOutOfRangeMessage = """❌ Amount must be between %d and %d sats."""

@@ -21,5 +21,6 @@ func initializeStateCallbackMessage(bot *TipBot) {
 		lnbits.UserStateShopItemSendItemFile: bot.addItemFileHandler,
 		lnbits.UserEnterShopsDescription:     bot.enterShopsDescriptionHandler,
 		lnbits.UserEnterDallePrompt:          bot.confirmGenerateImages,
+		lnbits.UserStateSwapEnterAddress:     bot.enterSwapAddressHandler,
 	}
 }

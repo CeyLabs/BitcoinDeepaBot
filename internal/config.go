@@ -18,6 +18,7 @@ var Configuration = struct {
 	Generate GenerateConfiguration `yaml:"generate"`
 	Nostr    NostrConfiguration    `yaml:"nostr"`
 	API      APIConfiguration      `yaml:"api"`
+	Boltz    BoltzConfiguration    `yaml:"boltz"`
 }{}
 
 type NostrConfiguration struct {
@@ -71,6 +72,16 @@ type LnbitsConfiguration struct {
 	WebhookServerUrl       *url.URL `yaml:"-"`
 	WebhookPublicUrl       string   `yaml:"webhook_public_url"`
 	WebhookPublicUrlParsed *url.URL `yaml:"-"`
+}
+
+type BoltzConfiguration struct {
+	Enabled     bool   `yaml:"enabled"`
+	APIURL      string `yaml:"api_url"`
+	APIKey      string `yaml:"api_key"`
+	APISecret   string `yaml:"api_secret"`
+	WebhookPath string `yaml:"webhook_path"`
+	MinSwapSat  int64  `yaml:"min_swap_sat"`
+	MaxSwapSat  int64  `yaml:"max_swap_sat"`
 }
 
 type APIConfiguration struct {
@@ -141,6 +152,7 @@ func init() {
 	checkLnbitsConfiguration()
 	setAPISendDefaults()
 	setAPIAnalyticsDefaults()
+	setBoltzDefaults()
 }
 
 // GetWebhookURL returns the appropriate webhook URL
@@ -261,4 +273,42 @@ func setAPIAnalyticsDefaults() {
 // IsAPIAnalyticsEnabled returns whether the Analytics API is enabled
 func IsAPIAnalyticsEnabled() bool {
 	return Configuration.API.Analytics.Enabled
+}
+
+// setBoltzDefaults sets default values for the Boltz swap configuration
+func setBoltzDefaults() {
+	if !Configuration.Boltz.Enabled {
+		log.Infof("Boltz swap integration disabled in configuration")
+		return
+	}
+
+	if Configuration.Boltz.APIKey == "" || Configuration.Boltz.APISecret == "" {
+		log.Errorf("Boltz swap enabled but api_key or api_secret is missing. Disabling Boltz integration.")
+		Configuration.Boltz.Enabled = false
+		return
+	}
+
+	if Configuration.Boltz.APIURL == "" {
+		Configuration.Boltz.APIURL = "https://api.boltz.exchange"
+	}
+
+	if Configuration.Boltz.WebhookPath == "" {
+		Configuration.Boltz.WebhookPath = "/boltz/webhook"
+	}
+
+	if Configuration.Boltz.MinSwapSat == 0 {
+		Configuration.Boltz.MinSwapSat = 1000
+	}
+
+	if Configuration.Boltz.MaxSwapSat == 0 {
+		Configuration.Boltz.MaxSwapSat = 25000000
+	}
+
+	log.Infof("Boltz swap integration enabled (url: %s, min: %d, max: %d sats)",
+		Configuration.Boltz.APIURL, Configuration.Boltz.MinSwapSat, Configuration.Boltz.MaxSwapSat)
+}
+
+// IsBoltzEnabled returns whether the Boltz swap integration is enabled
+func IsBoltzEnabled() bool {
+	return Configuration.Boltz.Enabled
 }

@@ -36,6 +36,17 @@ generate:
 nostr:
   private_key: "hex private key here"
 
+# Boltz swap integration (Lightning → USDT)
+# Generate a Boltz API key from https://api.boltz.exchange
+boltz:
+  enabled: false
+  api_url: "https://api.boltz.exchange"  # Boltz REST API v2 base URL
+  api_key: ""                             # Boltz API key
+  api_secret: ""                          # Boltz API secret (for HMAC signing)
+  webhook_path: "/boltz/webhook"          # Path on which this bot receives Boltz callbacks
+  min_swap_sat: 1000                      # Minimum swap size in satoshis
+  max_swap_sat: 25000000                  # Maximum swap size in satoshis
+
 # API Configuration
 api:
   # Analytics API - HMAC authenticated endpoints for data export

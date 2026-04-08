@@ -3,22 +3,19 @@ package webhook
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/LightningTipBot/LightningTipBot/internal"
+	"github.com/LightningTipBot/LightningTipBot/internal/boltz"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
+	"github.com/LightningTipBot/LightningTipBot/internal/storage"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
 	"github.com/LightningTipBot/LightningTipBot/internal/utils"
-
-	log "github.com/sirupsen/logrus"
-	"gorm.io/gorm"
-
-	"net/http"
-
-	"github.com/LightningTipBot/LightningTipBot/internal/storage"
-
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
+	"gorm.io/gorm"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
 )
@@ -26,6 +23,7 @@ import (
 type Server struct {
 	httpServer *http.Server
 	bot        *tb.Bot
+	tipBot     *telegram.TipBot
 	c          *lnbits.Client
 	database   *gorm.DB
 	buntdb     *storage.DB
@@ -57,6 +55,7 @@ func NewServer(bot *telegram.TipBot) *Server {
 		c:          bot.Client,
 		database:   bot.DB.Users,
 		bot:        bot.Telegram,
+		tipBot:     bot,
 		httpServer: srv,
 		buntdb:     bot.Bunt,
 	}
@@ -78,6 +77,12 @@ func (w *Server) GetUserByWalletId(walletId string) (*lnbits.User, error) {
 func (w *Server) newRouter() *mux.Router {
 	router := mux.NewRouter()
 	router.HandleFunc("/", w.receive).Methods(http.MethodPost)
+	// Boltz swap status callbacks
+	boltzPath := internal.Configuration.Boltz.WebhookPath
+	if boltzPath == "" {
+		boltzPath = "/boltz/webhook"
+	}
+	router.HandleFunc(boltzPath, w.receiveBoltz).Methods(http.MethodPost)
 	return router
 }
 
@@ -125,3 +130,41 @@ func (w *Server) receive(writer http.ResponseWriter, request *http.Request) {
 		log.Errorln(err)
 	}
 }
+
+// receiveBoltz handles Boltz swap status update callbacks (POST /boltz/webhook?id=<localID>&token=<hmac>).
+func (w *Server) receiveBoltz(writer http.ResponseWriter, request *http.Request) {
+	if !internal.IsBoltzEnabled() {
+		writer.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	localID := request.URL.Query().Get("id")
+	token := request.URL.Query().Get("token")
+
+	if localID == "" || token == "" {
+		log.Warn("[Boltz webhook] missing id or token query parameters")
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if !telegram.VerifyBoltzWebhookToken(localID, token) {
+		log.Warnf("[Boltz webhook] invalid token for swap local:%s", localID)
+		writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	var payload boltz.BoltzWebhookPayload
+	request.Header.Del("content-length")
+	if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+		log.Errorf("[Boltz webhook] decode payload: %v", err)
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	log.Infof("[Boltz webhook] swap local:%s state:%s", localID, payload.State)
+	writer.WriteHeader(http.StatusOK)
+
+	// Dispatch asynchronously so the HTTP response is returned promptly
+	go w.tipBot.HandleBoltzWebhook(localID, payload)
+}
+

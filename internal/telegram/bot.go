@@ -139,10 +139,14 @@ func (bot *TipBot) Start() {
 	// register callbacks for user state changes
 	initializeStateCallbackMessage(bot)
 
+	// initialize Boltz swap client if enabled
+	initBoltzClient()
+
 	// start the telegram bot
 	go bot.Telegram.Start()
 
 	go bot.restartPersistedTickets()
+	go bot.ResumePendingSwaps()
 	// gracefully shutdown
 	exit := make(chan os.Signal, 1) // we need to reserve to buffer size 1, so the notifier are not blocked
 	// we need to catch SIGTERM and SIGINT
