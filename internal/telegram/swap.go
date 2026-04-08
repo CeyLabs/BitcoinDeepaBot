@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -27,6 +28,11 @@ var (
 	swapConfirmationMenu = &tb.ReplyMarkup{ResizeKeyboard: true}
 	btnCancelSwap        = swapConfirmationMenu.Data("🚫 Cancel", "cancel_swap")
 	btnConfirmSwap       = swapConfirmationMenu.Data("✅ Confirm Swap", "confirm_swap")
+
+	// reEVMAddress matches a valid EVM address: 0x followed by exactly 40 hex chars.
+	reEVMAddress  = regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`)
+	// reTronAddress matches a valid Tron address: T followed by 33 base58 chars (A-Z a-z 1-9).
+	reTronAddress = regexp.MustCompile(`^T[A-Za-z1-9]{33}$`)
 )
 
 // boltzClient is the global Boltz API client, initialized when Boltz is enabled.
@@ -47,11 +53,12 @@ func initBoltzClient() {
 type SwapData struct {
 	*storage.Base
 	From            *lnbits.User `json:"from"`
-	SwapID          string       `json:"swap_id"`           // Boltz-assigned swap ID
+	SwapID          string       `json:"swap_id"`       // Boltz-assigned swap ID
 	Invoice         string       `json:"invoice"`
-	PreimageHashHex string       `json:"preimage_hash"`     // SHA-256(preimage), safe to persist
+	PreimageHashHex string       `json:"preimage_hash"` // SHA-256(preimage), safe to persist
 	AmountSat       int64        `json:"amount_sat"`
 	USDTAddress     string       `json:"usdt_address"`
+	Network         string       `json:"network"`       // boltz.NetworkEVM or boltz.NetworkTRON
 	State           string       `json:"state"`
 	ExpiresAt       int64        `json:"expires_at"`
 	LanguageCode    string       `json:"languagecode"`
@@ -63,21 +70,23 @@ func (s *SwapData) Key() string {
 	return fmt.Sprintf("swap:%s", s.Base.ID)
 }
 
-// validateUSDTAddress performs a basic sanity check on the destination address.
-func validateUSDTAddress(addr string) bool {
+// parseUSDTAddress validates addr using strict regex patterns and returns the
+// detected network (boltz.NetworkEVM or boltz.NetworkTRON).
+// Returns ("", false) if the address does not match any supported format.
+//
+// Patterns:
+//   EVM  — ^0x[0-9a-fA-F]{40}$   (Ethereum and all EVM-compatible chains)
+//   Tron — ^T[A-Za-z1-9]{33}$    (Tron base58, excludes ambiguous chars 0/O/I/l)
+func parseUSDTAddress(addr string) (network string, valid bool) {
 	addr = strings.TrimSpace(addr)
-	if len(addr) == 0 {
-		return false
+	switch {
+	case reEVMAddress.MatchString(addr):
+		return boltz.NetworkEVM, true
+	case reTronAddress.MatchString(addr):
+		return boltz.NetworkTRON, true
+	default:
+		return "", false
 	}
-	// Tron (TRC20): starts with T, 34 chars, base58 characters
-	if strings.HasPrefix(addr, "T") && len(addr) == 34 {
-		return true
-	}
-	// Ethereum / Arbitrum / EVM (ERC20): 0x prefix, 42 chars
-	if strings.HasPrefix(addr, "0x") && len(addr) == 42 {
-		return true
-	}
-	return false
 }
 
 // swapHandler is invoked on "/swap <amount> <address>" command.
@@ -167,7 +176,9 @@ func (bot *TipBot) enterSwapAddressHandler(ctx intercept.Context) (intercept.Con
 
 // processSwapConfirmation validates inputs and shows the confirmation keyboard.
 func (bot *TipBot) processSwapConfirmation(ctx intercept.Context, user *lnbits.User, amountSat int64, address string) (intercept.Context, error) {
-	if !validateUSDTAddress(address) {
+	address = strings.TrimSpace(address)
+	network, valid := parseUSDTAddress(address)
+	if !valid {
 		bot.trySendMessage(ctx.Sender(), Translate(ctx, "swapInvalidAddressMessage"))
 		ResetUserState(user, bot)
 		return ctx, errors.Create(errors.InvalidSyntaxError)
@@ -186,7 +197,7 @@ func (bot *TipBot) processSwapConfirmation(ctx intercept.Context, user *lnbits.U
 		return ctx, errors.Create(errors.InvalidAmountError)
 	}
 
-	confirmText := buildSwapConfirmText(ctx, amountSat, address)
+	confirmText := buildSwapConfirmText(ctx, amountSat, address, network)
 
 	localID := fmt.Sprintf("%d-%d-%s", ctx.Sender().ID, amountSat, RandStringRunes(5))
 
@@ -201,6 +212,7 @@ func (bot *TipBot) processSwapConfirmation(ctx intercept.Context, user *lnbits.U
 		From:            user,
 		AmountSat:       amountSat,
 		USDTAddress:     address,
+		Network:         network,
 		LanguageCode:    ctx.Value("publicLanguageCode").(string),
 		State:           "pending",
 		TelegramMessage: msg,
@@ -211,22 +223,25 @@ func (bot *TipBot) processSwapConfirmation(ctx intercept.Context, user *lnbits.U
 }
 
 // buildSwapConfirmText produces the confirmation message with best-effort fee info.
-func buildSwapConfirmText(ctx intercept.Context, amountSat int64, address string) string {
+// It uses the detected network to look up the correct Boltz pair.
+func buildSwapConfirmText(ctx intercept.Context, amountSat int64, address, network string) string {
+	networkLabel := boltz.NetworkLabel(network)
 	if boltzClient != nil {
 		pairs, err := boltzClient.GetPairs()
 		if err == nil {
-			if info, ok := pairs.Reverse["BTC/USDT"]; ok {
+			pairKey := boltz.BoltzPairKey(network)
+			if info, ok := pairs.Reverse[pairKey]; ok {
 				feeSat := int64(float64(amountSat) * info.Fees.Percentage / 100)
 				if info.Rate > 0 {
 					netSat := amountSat - feeSat
 					usdtApprox := float64(netSat) / 100_000_000 * info.Rate
 					return fmt.Sprintf(Translate(ctx, "swapConfirmMessage"),
-						amountSat, usdtApprox, address, feeSat)
+						networkLabel, amountSat, usdtApprox, address, feeSat)
 				}
 			}
 		}
 	}
-	return fmt.Sprintf(Translate(ctx, "swapConfirmSimpleMessage"), amountSat, address)
+	return fmt.Sprintf(Translate(ctx, "swapConfirmSimpleMessage"), networkLabel, amountSat, address)
 }
 
 // helpSwapUsage returns the usage help message for /swap.
@@ -282,7 +297,7 @@ func (bot *TipBot) confirmSwapHandler(ctx intercept.Context) (intercept.Context,
 
 	swapResp, err := boltzClient.CreateReverseSwap(boltz.ReverseSwapRequest{
 		From:          "BTC",
-		To:            "USDT",
+		To:            boltz.BoltzChain(sd.Network),
 		Address:       sd.USDTAddress,
 		InvoiceAmount: sd.AmountSat,
 		PreimageHash:  preimageHashHex,

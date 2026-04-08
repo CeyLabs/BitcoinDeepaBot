@@ -78,3 +78,41 @@ const (
 	StateInvoiceExpired       = "invoice.expired"
 	StateTransactionFailed    = "transaction.failed"
 )
+
+// Network identifiers used internally to distinguish USDT destination chains.
+const (
+	NetworkEVM  = "EVM"  // Ethereum and EVM-compatible chains (ERC-20 USDT)
+	NetworkTRON = "TRON" // Tron network (TRC-20 USDT)
+)
+
+// BoltzChain returns the Boltz chain identifier for a given internal network name.
+// These values match the identifiers used in Boltz API v2's `to` field.
+func BoltzChain(network string) string {
+	switch network {
+	case NetworkTRON:
+		return "TRX"
+	default: // NetworkEVM
+		return "ETH"
+	}
+}
+
+// BoltzPairKey returns the Boltz pairs map key for a given internal network name,
+// used for fee and limit lookups from GET /v2/pairs.
+func BoltzPairKey(network string) string {
+	switch network {
+	case NetworkTRON:
+		return "BTC/TRX"
+	default: // NetworkEVM
+		return "BTC/ETH"
+	}
+}
+
+// NetworkLabel returns a human-readable network label for display in Telegram messages.
+func NetworkLabel(network string) string {
+	switch network {
+	case NetworkTRON:
+		return "Tron (TRC-20)"
+	default: // NetworkEVM
+		return "Ethereum (ERC-20)"
+	}
+}
