@@ -538,5 +538,5 @@ func (bot *TipBot) ResumePendingSwaps() {
 			return true
 		})
 	})
-log.Infof("[boltz] resumed %d pending swap(s)", count)
+	log.Infof("[boltz] resumed %d pending swap(s)", count)
 }
