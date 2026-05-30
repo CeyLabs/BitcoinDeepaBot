@@ -138,13 +138,14 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		RespondError(w, fmt.Sprintf("Amount must be greater than %s", thirdparty.FormatSatsWithLKR(GetMinAPITransactionAmount())))
 		return
 	}
-	if req.Amount > GetMaxAPITransactionAmount() {
-		RespondError(w, fmt.Sprintf("Amount cannot exceed %s", thirdparty.FormatSatsWithLKR(GetMaxAPITransactionAmount())))
+	walletMaxAmount := GetWalletMaxAmount(walletID)
+	if req.Amount > walletMaxAmount {
+		RespondError(w, fmt.Sprintf("Amount cannot exceed %s", thirdparty.FormatSatsWithLKR(walletMaxAmount)))
 		return
 	}
 
-	// Check if amount requires admin approval
-	requiresApproval := req.Amount > GetAdminApprovalThreshold()
+	// Check if amount requires admin approval (wallet-wise threshold, falls back to global)
+	requiresApproval := req.Amount > GetWalletAdminApprovalThreshold(walletID)
 	if len(req.Memo) > GetMaxMemoLength() {
 		RespondError(w, fmt.Sprintf("Memo cannot exceed %d characters", GetMaxMemoLength()))
 		return
@@ -292,7 +293,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		response := SendResponse{
 			Success: false,
 			Message: fmt.Sprintf("Transaction requires admin approval (amount: %s > threshold: %s). Approval request sent to you via Telegram. Transaction ID: %s",
-				thirdparty.FormatSatsWithLKR(req.Amount), thirdparty.FormatSatsWithLKR(GetAdminApprovalThreshold()), pendingTx.ID),
+				thirdparty.FormatSatsWithLKR(req.Amount), thirdparty.FormatSatsWithLKR(GetWalletAdminApprovalThreshold(walletID)), pendingTx.ID),
 			FromUser:  fromUsername,
 			ToUser:    toIdentifier,
 			Amount:    req.Amount,

@@ -103,8 +103,10 @@ type APISendConfiguration struct {
 }
 
 type WhitelistedWallet struct {
-	Username   string `yaml:"username"`    // Telegram username without @
-	HMACSecret string `yaml:"hmac_secret"` // Unique HMAC secret for this wallet
+	Username               string `yaml:"username"`                 // Telegram username without @
+	HMACSecret             string `yaml:"hmac_secret"`              // Unique HMAC secret for this wallet
+	AdminApprovalThreshold int64  `yaml:"admin_approval_threshold"` // 0 = use global
+	MaxAmount              int64  `yaml:"max_amount"`               // 0 = use global
 }
 
 func init() {

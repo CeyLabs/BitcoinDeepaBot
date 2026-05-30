@@ -65,7 +65,11 @@ api:
       BiccoindeepaDSA:
         username: "BiccoindeepaDSA"
         hmac_secret: "your-unique-bitcoindeepa-secret-here"
+        # admin_approval_threshold: 50000  # override global (0 or omit = use global)
+        # max_amount: 500000               # override global (0 or omit = use global)
       CeycubeBank:
         username: "CeycubeBank"
         hmac_secret: "your-unique-ceycube-secret-here"
+        admin_approval_threshold: 200000   # wallet-specific: override global 100000
+        max_amount: 2000000                # wallet-specific: override global 1000000
     timestamp_tolerance: 300
