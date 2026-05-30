@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/str"
@@ -15,6 +16,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	"github.com/LightningTipBot/LightningTipBot/pkg/lightning"
+	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -368,6 +370,59 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
+}
+
+// SendStatus handles GET /api/v1/send/status/{transaction_id}
+func (s Service) SendStatus(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	txID := vars["transaction_id"]
+	if txID == "" {
+		RespondError(w, "Missing transaction_id")
+		return
+	}
+
+	pt, err := LoadPendingTransaction(txID, s.Bot)
+	if err != nil {
+		log.Warnf("[api/send/status] Transaction not found: %s: %v", txID, err)
+		RespondError(w, fmt.Sprintf("Transaction '%s' not found", txID))
+		return
+	}
+
+	// Auto-mark as expired if past expiry time but still showing pending
+	status := pt.Status
+	if status == StatusPending && pt.IsExpired() {
+		status = StatusExpired
+	}
+
+	type StatusResponse struct {
+		ID               string     `json:"id"`
+		Status           string     `json:"status"`
+		FromUser         string     `json:"from_user"`
+		ToUser           string     `json:"to_user"`
+		Amount           int64      `json:"amount"`
+		AmountLKR        string     `json:"amount_lkr,omitempty"`
+		Memo             string     `json:"memo,omitempty"`
+		RequestTimestamp time.Time  `json:"request_timestamp"`
+		ExpiryTime       time.Time  `json:"expiry_time"`
+		ApprovedBy       string     `json:"approved_by,omitempty"`
+		ApprovalTime     *time.Time `json:"approval_time,omitempty"`
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(StatusResponse{
+		ID:               pt.ID,
+		Status:           status,
+		FromUser:         pt.FromUsername,
+		ToUser:           pt.ToUsername,
+		Amount:           pt.Amount,
+		AmountLKR:        getLKRValue(pt.Amount),
+		Memo:             pt.Memo,
+		RequestTimestamp: pt.RequestTimestamp,
+		ExpiryTime:       pt.ExpiryTime,
+		ApprovedBy:       pt.ApprovedBy,
+		ApprovalTime:     pt.ApprovalTime,
+	})
 }
 
 // sendToLightningAddress handles sending to Lightning addresses

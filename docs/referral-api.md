@@ -5,6 +5,7 @@
 1. [Authentication](#authentication)
 2. [Send API](#send-api)
    - [POST /api/v1/send](#post-apiv1send)
+   - [GET /api/v1/send/status/{transaction_id}](#get-apiv1sendstatustransaction_id)
    - [POST /api/v1/userbalance](#post-apiv1userbalance)
 3. [Referral API](#referral-api)
    - [How referral codes are captured](#how-referral-codes-are-captured)
@@ -151,6 +152,87 @@ curl -X POST "https://bitcoindeepa.com/api/v1/send" \
   -H "X-HMAC-Signature: ${SIGNATURE}" \
   -d "${BODY}"
 ```
+
+---
+
+### GET /api/v1/send/status/{transaction_id}
+
+Returns the current approval status of a pending transaction created by `POST /api/v1/send` when the amount exceeded the `admin_approval_threshold`.
+
+Use the `id` value from the `202 Accepted` response as the `{transaction_id}` path parameter.
+
+#### Path parameter
+
+| Parameter        | Description                                   |
+|------------------|-----------------------------------------------|
+| `transaction_id` | The `id` returned in the `202` send response  |
+
+#### Success response — `200 OK`
+
+```json
+{
+  "id": "pending-myservice-johndoe-150000-1748563200",
+  "status": "pending",
+  "from_user": "myservice",
+  "to_user": "johndoe",
+  "amount": 150000,
+  "amount_lkr": "4,875.00",
+  "memo": "invoice-001",
+  "request_timestamp": "2026-05-31T10:00:00Z",
+  "expiry_time": "2026-06-01T10:00:00Z"
+}
+```
+
+When approved or rejected, additional fields appear:
+
+```json
+{
+  "id": "pending-myservice-johndoe-150000-1748563200",
+  "status": "approved",
+  "from_user": "myservice",
+  "to_user": "johndoe",
+  "amount": 150000,
+  "amount_lkr": "4,875.00",
+  "memo": "invoice-001",
+  "request_timestamp": "2026-05-31T10:00:00Z",
+  "expiry_time": "2026-06-01T10:00:00Z",
+  "approved_by": "admin:127.0.0.1",
+  "approval_time": "2026-05-31T10:05:00Z"
+}
+```
+
+#### Possible `status` values
+
+| Status     | Meaning                                              |
+|------------|------------------------------------------------------|
+| `pending`  | Awaiting admin approval via Telegram                 |
+| `approved` | Admin approved — payment is being executed           |
+| `executed` | Payment executed successfully                        |
+| `rejected` | Admin rejected the transaction                       |
+| `expired`  | Not acted on within 24 hours — transaction discarded |
+
+#### Error responses
+
+| HTTP | `error`                         | Cause                            |
+|------|---------------------------------|----------------------------------|
+| `400` | `Missing transaction_id`       | Path parameter not provided      |
+| `400` | `Transaction 'X' not found`    | ID does not exist in database    |
+
+#### Example request
+
+```bash
+TIMESTAMP=$(date +%s)
+TX_ID="pending-myservice-johndoe-150000-1748563200"
+MESSAGE="GET/api/v1/send/status/${TX_ID}${TIMESTAMP}"
+SIGNATURE=$(echo -n "$MESSAGE" | openssl dgst -sha256 -hmac "your-hmac-secret" | awk '{print $2}')
+
+curl -X GET "https://bitcoindeepa.com/api/v1/send/status/${TX_ID}" \
+  -H "X-Timestamp: ${TIMESTAMP}" \
+  -H "X-HMAC-Signature: ${SIGNATURE}"
+```
+
+> The HMAC message for this endpoint uses an empty query string (no body, no query params):
+> `GET` + `/api/v1/send/status/{id}` + `{timestamp}` + `` (empty)
 
 ---
 
