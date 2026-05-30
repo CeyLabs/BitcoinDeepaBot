@@ -29,6 +29,19 @@ func (bot TipBot) startHandler(ctx intercept.Context) (intercept.Context, error)
 	// WILL RESULT IN AN ENDLESS LOOP OTHERWISE
 	// bot.helpHandler(m)
 	log.Printf("[⭐️ /start] New user: %s (%d)\n", GetUserStr(ctx.Sender()), ctx.Sender().ID)
+
+	if payload := ctx.Message().Payload; payload != "" {
+		entry := ReferralEntry{
+			TelegramID:   ctx.Sender().ID,
+			Username:     ctx.Sender().Username,
+			ReferralCode: payload,
+		}
+		if tx := bot.DB.Referrals.Create(&entry); tx.Error != nil {
+			log.Warnf("[startHandler] failed to save referral entry: %s", tx.Error)
+		} else {
+			log.Infof("[startHandler] referral recorded: user=%d code=%s", ctx.Sender().ID, payload)
+		}
+	}
 	walletCreationMsg := bot.trySendMessageEditable(ctx.Sender(), Translate(ctx, "startSettingWalletMessage"))
 	user, err := bot.initWallet(ctx.Sender())
 	if err != nil {

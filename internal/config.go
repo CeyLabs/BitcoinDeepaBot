@@ -60,6 +60,7 @@ type DatabaseConfiguration struct {
 	BuntDbPath       string `yaml:"buntdb_path"`
 	TransactionsPath string `yaml:"transactions_path"`
 	GroupsDbPath     string `yaml:"groupsdb_path"`
+	ReferralsDbPath  string `yaml:"referrals_path"`
 }
 
 type LnbitsConfiguration struct {

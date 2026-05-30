@@ -135,6 +135,10 @@ func startApiServer(bot *telegram.TipBot) {
 		// User balance endpoint with wallet-based HMAC security
 		s.AppendRoute(`/api/v1/userbalance`, api.WalletHMACMiddleware(apiService.UserBalance), http.MethodPost)
 		log.Infof("API UserBalance endpoint registered at /api/v1/userbalance with wallet-based HMAC security")
+
+		// Referral lookup endpoint with wallet-based HMAC security
+		s.AppendRoute(`/api/v1/referral/lookup`, api.WalletHMACMiddleware(apiService.ReferralLookup), http.MethodGet)
+		log.Infof("API ReferralLookup endpoint registered at /api/v1/referral/lookup with wallet-based HMAC security")
 	} else {
 		log.Infof("API Send endpoint disabled in configuration")
 	}

@@ -33,6 +33,15 @@ type Databases struct {
 	Users        *gorm.DB
 	Transactions *gorm.DB
 	Groups       *gorm.DB
+	Referrals    *gorm.DB
+}
+
+type ReferralEntry struct {
+	ID           uint   `gorm:"primaryKey;autoIncrement"`
+	TelegramID   int64  `gorm:"index"`
+	Username     string
+	ReferralCode string
+	CreatedAt    time.Time
 }
 
 const (
@@ -140,10 +149,24 @@ func AutoMigration() *Databases {
 		panic(err)
 	}
 
+	referralsDbPath := internal.Configuration.Database.ReferralsDbPath
+	if referralsDbPath == "" {
+		referralsDbPath = "data/referrals.db"
+	}
+	referralsDb, err := gorm.Open(sqlite.Open(referralsDbPath), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
+	if err != nil {
+		panic("Initialize referrals orm failed.")
+	}
+	err = referralsDb.AutoMigrate(&ReferralEntry{})
+	if err != nil {
+		panic(err)
+	}
+
 	return &Databases{
 		Users:        orm,
 		Transactions: txLogger,
 		Groups:       groupsDb,
+		Referrals:    referralsDb,
 	}
 }
 
