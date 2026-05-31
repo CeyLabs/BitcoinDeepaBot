@@ -117,6 +117,11 @@ func (bot *TipBot) approveAPITransactionHandler(ctx intercept.Context) (intercep
 
 	approvalData.Inactivate(approvalData, bot.Bunt)
 
+	// Update the PendingTransaction status so /api/v1/send/status reflects the real outcome.
+	if storage.UpdatePendingTxStatusFn != nil {
+		storage.UpdatePendingTxStatusFn(approvalData.TransactionID, "executed", ctx.Callback().Sender.Username)
+	}
+
 	log.Infof("[💸 api_send_approved] Send from %s to %s (%s).", fromUserStr, toUserStr, thirdparty.FormatSatsWithLKR(approvalData.Amount))
 
 	// Notify recipient (same format as API send)
@@ -169,6 +174,11 @@ func (bot *TipBot) cancelAPITransactionHandler(ctx intercept.Context) (intercept
 	bot.tryDeleteMessage(c)
 	bot.trySendMessage(c.Message.Chat, i18n.Translate(approvalData.LanguageCode, "sendCancelledMessage"))
 	approvalData.Inactivate(approvalData, bot.Bunt)
+
+	// Update the PendingTransaction status so /api/v1/send/status reflects the real outcome.
+	if storage.UpdatePendingTxStatusFn != nil {
+		storage.UpdatePendingTxStatusFn(approvalData.TransactionID, "rejected", c.Sender.Username)
+	}
 
 	log.Infof("[cancelAPITransactionHandler] API transaction %s cancelled by @%s", approvalData.TransactionID, c.Sender.Username)
 	return ctx, nil

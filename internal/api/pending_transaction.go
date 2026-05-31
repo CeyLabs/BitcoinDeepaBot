@@ -147,6 +147,28 @@ func LoadPendingTransaction(id string, bot *telegram.TipBot) (*PendingTransactio
 	return pendingTx, nil
 }
 
+// RegisterUpdatePendingTxHook sets the storage-level hook so the telegram
+// package can update PendingTransaction status without an import cycle.
+func RegisterUpdatePendingTxHook(bot *telegram.TipBot) {
+	storage.UpdatePendingTxStatusFn = func(id, status, actor string) {
+		pt := &PendingTransaction{Base: storage.New(storage.ID(id))}
+		sn, err := pt.Get(pt, bot.Bunt)
+		if err != nil {
+			log.Warnf("[pending tx hook] could not load %s: %v", id, err)
+			return
+		}
+		ptx := sn.(*PendingTransaction)
+		now := time.Now()
+		ptx.Status = status
+		ptx.ApprovedBy = actor
+		ptx.ApprovalTime = &now
+		if err := ptx.Set(ptx, bot.Bunt); err != nil {
+			log.Errorf("[pending tx hook] could not save status for %s: %v", id, err)
+		}
+		log.Infof("[pending tx hook] updated %s → status=%s actor=%s", id, status, actor)
+	}
+}
+
 // CleanupExpiredTransactions removes expired pending transactions
 func CleanupExpiredTransactions(bot *telegram.TipBot) error {
 	// This would need to be implemented to iterate through all pending transactions
