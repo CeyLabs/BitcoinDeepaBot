@@ -47,7 +47,7 @@ func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, err
 
 	LKRPerSat, USDPerSat, err := thirdparty.GetSatPrice()
 	if err != nil {
-		log.Infof("[/balance] error fetching price from coingecko\n")
+		log.Errorf("[/balance] error fetching price from coingecko: %v\n", err)
 	}
 
 	potBalance, err := bot.GetUserTotalPotBalance(user)

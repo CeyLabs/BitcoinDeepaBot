@@ -28,6 +28,7 @@ database:
   transactions_path: "data/transactions.db"
   shop_buntdb_path: "data/shop.db"
   groupsdb_path: "data/groups.db"
+  referrals_path: "data/referrals.db"
 generate:
   open_ai_bearer_token: "token_here"
   dalle_key: "asd"
@@ -35,6 +36,12 @@ generate:
   worker: 2
 nostr:
   private_key: "hex private key here"
+
+# Third-party price API configuration
+# Bitcoin price is fetched in parallel from CoinGecko, CoinMarketCap, and Binance.
+# First successful response wins. CoinGecko and Binance require no key.
+third_party:
+  coinmarketcap_api_key: "your-cmc-api-key-here"  # optional — get free key at coinmarketcap.com/api
 
 # API Configuration
 api:

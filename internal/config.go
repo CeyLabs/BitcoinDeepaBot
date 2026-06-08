@@ -11,17 +11,22 @@ import (
 )
 
 var Configuration = struct {
-	Bot      BotConfiguration      `yaml:"bot"`
-	Telegram TelegramConfiguration `yaml:"telegram"`
-	Database DatabaseConfiguration `yaml:"database"`
-	Lnbits   LnbitsConfiguration   `yaml:"lnbits"`
-	Generate GenerateConfiguration `yaml:"generate"`
-	Nostr    NostrConfiguration    `yaml:"nostr"`
-	API      APIConfiguration      `yaml:"api"`
+	Bot        BotConfiguration        `yaml:"bot"`
+	Telegram   TelegramConfiguration   `yaml:"telegram"`
+	Database   DatabaseConfiguration   `yaml:"database"`
+	Lnbits     LnbitsConfiguration     `yaml:"lnbits"`
+	Generate   GenerateConfiguration   `yaml:"generate"`
+	Nostr      NostrConfiguration      `yaml:"nostr"`
+	API        APIConfiguration        `yaml:"api"`
+	ThirdParty ThirdPartyConfiguration `yaml:"third_party"`
 }{}
 
 type NostrConfiguration struct {
 	PrivateKey string `yaml:"private_key"`
+}
+
+type ThirdPartyConfiguration struct {
+	CoinMarketCapAPIKey string `yaml:"coinmarketcap_api_key"`
 }
 
 type GenerateConfiguration struct {
