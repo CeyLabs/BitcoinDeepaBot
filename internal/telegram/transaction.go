@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/LightningTipBot/LightningTipBot/internal/dca"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 )
@@ -73,6 +74,7 @@ func (t *Transaction) Send() (success bool, err error) {
 	success, err = t.SendTransaction(t.Bot, t.From, t.To, t.Amount, t.Memo)
 	if success {
 		t.Success = success
+		go dca.NotifyDeposit(t.ToUser)
 	}
 
 	// save transaction to db

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/LightningTipBot/LightningTipBot/internal"
+	"github.com/LightningTipBot/LightningTipBot/internal/dca"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
 	"github.com/LightningTipBot/LightningTipBot/internal/utils"
@@ -99,6 +100,8 @@ func (w *Server) receive(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	log.Infoln(fmt.Sprintf("[⚡️ WebHook] User %s (%d) received invoice of %d sat.", telegram.GetUserStr(user.Telegram), user.Telegram.ID, webhookEvent.Amount/1000))
+
+	go dca.NotifyDeposit(telegram.GetUserStr(user.Telegram))
 
 	writer.WriteHeader(200)
 

@@ -43,6 +43,11 @@ nostr:
 third_party:
   coinmarketcap_api_key: "your-cmc-api-key-here"  # optional — get free key at coinmarketcap.com/api
 
+# DCA bot integration
+dca:
+  wallet_username: ""  # when sats are received by this Telegram username, reset DCA retry counts
+  api_url: "https://bitcoindeepa-dca-be-production.up.railway.app"
+
 # API Configuration
 api:
   # Analytics API - HMAC authenticated endpoints for data export

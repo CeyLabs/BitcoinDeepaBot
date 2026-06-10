@@ -19,7 +19,13 @@ var Configuration = struct {
 	Nostr      NostrConfiguration      `yaml:"nostr"`
 	API        APIConfiguration        `yaml:"api"`
 	ThirdParty ThirdPartyConfiguration `yaml:"third_party"`
+	DCA        DCAConfiguration        `yaml:"dca"`
 }{}
+
+type DCAConfiguration struct {
+	WalletUsername string `yaml:"wallet_username"`
+	ApiUrl         string `yaml:"api_url"`
+}
 
 type NostrConfiguration struct {
 	PrivateKey string `yaml:"private_key"`
