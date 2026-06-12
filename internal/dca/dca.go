@@ -17,7 +17,13 @@ func NotifyDeposit(toUsername string) {
 		return
 	}
 
-	url := internal.Configuration.DCA.ApiUrl + "/transaction/reset-retry-counts"
+	apiUrl := strings.TrimSuffix(internal.Configuration.DCA.ApiUrl, "/")
+	if apiUrl == "" {
+		log.Errorln("[DCA] dca.api_url is not configured, skipping reset-retry-counts call")
+		return
+	}
+
+	url := apiUrl + "/transaction/reset-retry-counts"
 	req, err := http.NewRequest(http.MethodPost, url, nil)
 	if err != nil {
 		log.Errorf("[DCA] Error creating reset-retry-counts request: %s", err.Error())
