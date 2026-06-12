@@ -2,6 +2,7 @@ package dca
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/LightningTipBot/LightningTipBot/internal"
@@ -11,7 +12,8 @@ import (
 // NotifyDeposit checks whether the given recipient username matches the configured
 // DCA wallet username and, if so, asks the DCA backend to reset its retry counts.
 func NotifyDeposit(toUsername string) {
-	if internal.Configuration.DCA.WalletUsername == "" || toUsername != internal.Configuration.DCA.WalletUsername {
+	wallet := strings.TrimPrefix(internal.Configuration.DCA.WalletUsername, "@")
+	if wallet == "" || strings.TrimPrefix(toUsername, "@") != wallet {
 		return
 	}
 
