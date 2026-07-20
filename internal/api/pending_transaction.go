@@ -20,6 +20,8 @@ type PendingTransaction struct {
 	ToUsername       string       `json:"to_username"`
 	Amount           int64        `json:"amount"`
 	Memo             string       `json:"memo"`
+	PaymentType      string       `json:"payment_type,omitempty"` // "" / "internal" for user transfers, "invoice" for bolt11 payments
+	Invoice          string       `json:"invoice,omitempty"`      // bolt11 payment request when PaymentType == "invoice"
 	RequestTimestamp time.Time    `json:"request_timestamp"`
 	Status           string       `json:"status"` // "pending", "approved", "rejected", "expired"
 	ApprovedBy       string       `json:"approved_by,omitempty"`
@@ -61,6 +63,27 @@ func NewPendingTransaction(req *SendRequest, fromUser, toUser *lnbits.User, clie
 		ExpiryTime:       time.Now().Add(PendingTransactionExpiry),
 		ClientIP:         clientIP,
 		OriginalRequest:  req,
+	}
+}
+
+// NewPendingInvoiceTransaction creates a new pending transaction for an external bolt11 invoice payment
+func NewPendingInvoiceTransaction(fromUsername, invoice, paymentHash string, amount int64, memo string, fromUser *lnbits.User, clientIP string) *PendingTransaction {
+	id := fmt.Sprintf("pending-%s-invoice-%s-%d", fromUsername, paymentHash, time.Now().Unix())
+
+	return &PendingTransaction{
+		Base:             storage.New(storage.ID(id)),
+		ID:               id,
+		FromUser:         fromUser,
+		FromUsername:     fromUsername,
+		ToUsername:       invoice,
+		Amount:           amount,
+		Memo:             memo,
+		PaymentType:      "invoice",
+		Invoice:          invoice,
+		RequestTimestamp: time.Now(),
+		Status:           StatusPending,
+		ExpiryTime:       time.Now().Add(PendingTransactionExpiry),
+		ClientIP:         clientIP,
 	}
 }
 
@@ -136,12 +159,15 @@ func LoadPendingTransaction(id string, bot *telegram.TipBot) (*PendingTransactio
 		pendingTx.FromUser = fromUser
 	}
 
-	toUser, err := telegram.GetUserByTelegramUsername(pendingTx.ToUsername, *bot)
-	if err != nil {
-		log.Warnf("[ADMIN APPROVAL] Could not load to user @%s: %v", pendingTx.ToUsername, err)
-		// Continue with nil user - this will be handled in the calling functions
-	} else {
-		pendingTx.ToUser = toUser
+	// Invoice payments have no internal recipient user, so skip the lookup.
+	if pendingTx.PaymentType != "invoice" {
+		toUser, err := telegram.GetUserByTelegramUsername(pendingTx.ToUsername, *bot)
+		if err != nil {
+			log.Warnf("[ADMIN APPROVAL] Could not load to user @%s: %v", pendingTx.ToUsername, err)
+			// Continue with nil user - this will be handled in the calling functions
+		} else {
+			pendingTx.ToUser = toUser
+		}
 	}
 
 	return pendingTx, nil

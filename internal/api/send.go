@@ -16,6 +16,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	"github.com/LightningTipBot/LightningTipBot/pkg/lightning"
+	decodepay "github.com/fiatjaf/ln-decodepay"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 )
@@ -37,6 +38,8 @@ type SendResponse struct {
 	Amount          int64  `json:"amount"`
 	AmountLKR       string `json:"amount_lkr,omitempty"` // LKR conversion
 	Memo            string `json:"memo,omitempty"`
+	PaymentHash     string `json:"payment_hash,omitempty"` // set for bolt11 invoice payments
+	Fee             int64  `json:"fee,omitempty"`          // routing fee in sats for invoice payments
 }
 
 // InternalNetworkMiddleware restricts access to internal network IPs (configurable)
@@ -136,6 +139,15 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		RespondError(w, "Missing 'to' field")
 		return
 	}
+
+	// Check if 'to' is a bolt11 Lightning invoice — pay it externally.
+	// The amount comes from the invoice itself, so this path handles its own
+	// validation, idempotency, balance and approval checks.
+	if paymentRequest := strings.TrimPrefix(strings.ToLower(req.To), "lightning:"); lightning.IsInvoice(paymentRequest) {
+		s.sendToInvoice(w, r, walletID, fromUsername, paymentRequest, req.Memo)
+		return
+	}
+
 	if req.Amount <= GetMinAPITransactionAmount() {
 		RespondError(w, fmt.Sprintf("Amount must be greater than %s", thirdparty.FormatSatsWithLKR(GetMinAPITransactionAmount())))
 		return
@@ -423,6 +435,149 @@ func (s Service) SendStatus(w http.ResponseWriter, r *http.Request) {
 		ApprovedBy:       pt.ApprovedBy,
 		ApprovalTime:     pt.ApprovalTime,
 	})
+}
+
+// sendToInvoice pays a bolt11 Lightning invoice externally via lnbits.
+// The amount is taken from the invoice; amountless invoices are rejected.
+func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID, fromUsername, paymentRequest, memo string) {
+	// Decode the invoice
+	bolt11, err := decodepay.Decodepay(paymentRequest)
+	if err != nil {
+		log.Errorf("[api/send] Could not decode invoice: %v", err)
+		RespondError(w, "Invalid Lightning invoice")
+		return
+	}
+	amount := int64(bolt11.MSatoshi / 1000)
+	if amount <= 0 {
+		RespondError(w, "Invoice must specify an amount (amountless invoices are not supported)")
+		return
+	}
+
+	// Validate amount against configured limits
+	if amount <= GetMinAPITransactionAmount() {
+		RespondError(w, fmt.Sprintf("Amount must be greater than %s", thirdparty.FormatSatsWithLKR(GetMinAPITransactionAmount())))
+		return
+	}
+	walletMaxAmount := GetWalletMaxAmount(walletID)
+	if amount > walletMaxAmount {
+		RespondError(w, fmt.Sprintf("Amount cannot exceed %s", thirdparty.FormatSatsWithLKR(walletMaxAmount)))
+		return
+	}
+
+	// Idempotency: lock + dedup on the invoice payment hash so the same
+	// invoice cannot be paid twice by concurrent or retried requests.
+	if bolt11.PaymentHash != "" {
+		lockKey := fmt.Sprintf("api_send_invoice_%s", bolt11.PaymentHash)
+		if success := s.MemoCache.SetNX(lockKey, "locked"); !success {
+			log.Warnf("[api/send] Invoice %s is already processing", bolt11.PaymentHash)
+			RespondError(w, "This invoice is already being processed")
+			return
+		}
+		defer s.MemoCache.Delete(lockKey)
+	}
+
+	// Get the sender user
+	fromUser, err := telegram.GetUserByTelegramUsername(fromUsername, *s.Bot)
+	if err != nil {
+		log.Errorf("[api/send] Could not find sender user %s: %v", fromUsername, err)
+		RespondError(w, fmt.Sprintf("Sender '@%s' not found or has no wallet", fromUsername))
+		return
+	}
+
+	// Check available balance with a ~2% routing fee reserve
+	balance, err := s.Bot.GetUserAvailableBalance(fromUser)
+	if err != nil {
+		log.Errorf("[api/send] Could not get available balance for %s: %v", fromUsername, err)
+		RespondError(w, "Could not check sender balance")
+		return
+	}
+	if balance < amount {
+		log.Warnf("[api/send] Insufficient available balance for %s: %d < %d", fromUsername, balance, amount)
+		RespondError(w, fmt.Sprintf("Insufficient balance: %s available, %s required", thirdparty.FormatSatsWithLKR(balance), thirdparty.FormatSatsWithLKR(amount)))
+		return
+	}
+	if float64(amount) > float64(balance)*0.98 {
+		RespondError(w, fmt.Sprintf("Insufficient balance to cover routing fees: %s available, %s required plus a fee reserve", thirdparty.FormatSatsWithLKR(balance), thirdparty.FormatSatsWithLKR(amount)))
+		return
+	}
+
+	// Large invoices go through the same admin approval mechanism as internal sends
+	if amount > GetWalletAdminApprovalThreshold(walletID) {
+		log.Infof("[api/send] Large invoice payment requires admin approval: %s (%d sat(s))", fromUsername, amount)
+		clientIP := getClientIP(r)
+		pendingTx := NewPendingInvoiceTransaction(fromUsername, paymentRequest, bolt11.PaymentHash, amount, memo, fromUser, clientIP)
+		if err := pendingTx.SaveToDB(s.Bot); err != nil {
+			log.Errorf("[api/send] Failed to save pending invoice transaction: %v", err)
+			RespondError(w, "Failed to create pending transaction")
+			return
+		}
+		if err := telegram.CreateAPIInvoiceApprovalRequest(s.Bot, fromUser, paymentRequest, amount, memo, pendingTx.ID, clientIP); err != nil {
+			log.Warnf("[api/send] Failed to send invoice approval request: %v", err)
+		}
+
+		response := SendResponse{
+			Success: false,
+			Message: fmt.Sprintf("Transaction requires admin approval (amount: %s > threshold: %s). Approval request sent to you via Telegram. Transaction ID: %s",
+				thirdparty.FormatSatsWithLKR(amount), thirdparty.FormatSatsWithLKR(GetWalletAdminApprovalThreshold(walletID)), pendingTx.ID),
+			FromUser:  fromUsername,
+			ToUser:    paymentRequest,
+			Amount:    amount,
+			AmountLKR: getLKRValue(amount),
+			Memo:      memo,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Pay the invoice
+	log.Infof("[api/send] Paying invoice for %s (%d sat)", fromUsername, amount)
+	inv, err := fromUser.Wallet.Pay(lnbits.PaymentParams{Out: true, Bolt11: paymentRequest}, s.Bot.Client)
+	if err != nil {
+		log.Errorf("[api/send] Invoice payment failed for %s: %v", fromUsername, err)
+		if s.Bot.ErrorLogger != nil {
+			s.Bot.ErrorLogger.LogPaymentError(err, amount, bolt11.Description, paymentRequest, fromUser.Telegram)
+		}
+		RespondError(w, fmt.Sprintf("Invoice payment failed: %v", err))
+		return
+	}
+
+	// Read the settled payment to report the real routing fee.
+	// lnbits reports fee in millisats, so convert to sats.
+	var fee int64
+	if payment, perr := s.Bot.Client.Payment(*fromUser.Wallet, inv.PaymentHash); perr == nil {
+		fee = payment.Details.Fee / 1000
+		if fee < 0 {
+			fee = -fee
+		}
+	}
+
+	log.Infof("[api/send] ✅ Invoice paid: %s (%d sat, fee %d sat)", fromUsername, amount, fee)
+
+	// Send confirmation to sender
+	senderConfirmationMsg := fmt.Sprintf("✅ Invoice paid successfully!\n\n💸 Amount: %s", thirdparty.FormatSatsWithLKR(amount))
+	if bolt11.Description != "" {
+		senderConfirmationMsg += fmt.Sprintf("\n✉️ %s", str.MarkdownEscape(bolt11.Description))
+	}
+	if _, err := s.Bot.Telegram.Send(fromUser.Telegram, senderConfirmationMsg); err != nil {
+		log.Warnf("[api/send] Could not send confirmation to sender: %v", err)
+	}
+
+	response := SendResponse{
+		Success:     true,
+		Message:     "Invoice paid successfully",
+		FromUser:    fromUsername,
+		ToUser:      paymentRequest,
+		Amount:      amount,
+		AmountLKR:   getLKRValue(amount),
+		Memo:        memo,
+		PaymentHash: inv.PaymentHash,
+		Fee:         fee,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
 }
 
 // sendToLightningAddress handles sending to Lightning addresses
