@@ -20,6 +20,9 @@ type PendingTransaction struct {
 	ToUsername       string       `json:"to_username"`
 	Amount           int64        `json:"amount"`
 	Memo             string       `json:"memo"`
+	PaymentType      string       `json:"payment_type,omitempty"` // "" / "internal" for user transfers, "invoice" for bolt11 payments
+	Invoice          string       `json:"invoice,omitempty"`      // bolt11 payment request when PaymentType == "invoice"
+	PaymentHash      string       `json:"payment_hash,omitempty"` // bolt11 payment hash when PaymentType == "invoice"
 	RequestTimestamp time.Time    `json:"request_timestamp"`
 	Status           string       `json:"status"` // "pending", "approved", "rejected", "expired"
 	ApprovedBy       string       `json:"approved_by,omitempty"`
@@ -62,6 +65,92 @@ func NewPendingTransaction(req *SendRequest, fromUser, toUser *lnbits.User, clie
 		ClientIP:         clientIP,
 		OriginalRequest:  req,
 	}
+}
+
+// NewPendingInvoiceTransaction creates a new pending transaction for an external bolt11 invoice payment
+func NewPendingInvoiceTransaction(fromUsername, invoice, paymentHash string, amount int64, memo string, fromUser *lnbits.User, clientIP string) *PendingTransaction {
+	id := fmt.Sprintf("pending-%s-invoice-%s-%d", fromUsername, paymentHash, time.Now().Unix())
+
+	return &PendingTransaction{
+		Base:             storage.New(storage.ID(id)),
+		ID:               id,
+		FromUser:         fromUser,
+		FromUsername:     fromUsername,
+		ToUsername:       invoice,
+		Amount:           amount,
+		Memo:             memo,
+		PaymentType:      "invoice",
+		Invoice:          invoice,
+		PaymentHash:      paymentHash,
+		RequestTimestamp: time.Now(),
+		Status:           StatusPending,
+		ExpiryTime:       time.Now().Add(PendingTransactionExpiry),
+		ClientIP:         clientIP,
+	}
+}
+
+// InvoiceApprovalLock links a bolt11 payment hash to the approval request it
+// created. PendingTransactions live in Bunt, a key-value store with no
+// secondary indexes, so this record is what makes "does this invoice already
+// have an approval waiting?" answerable.
+//
+// It complements, rather than replaces, the short-lived MemoCache lock taken in
+// sendToInvoice: that one serialises concurrent in-flight requests but expires
+// after 5 minutes, whereas an approval stays actionable for
+// PendingTransactionExpiry (24h). Without this record a caller could re-submit
+// the same invoice minutes later and queue up a second approval for it.
+type InvoiceApprovalLock struct {
+	*storage.Base
+	PaymentHash string `json:"payment_hash"`
+	PendingTxID string `json:"pending_tx_id"`
+}
+
+// invoiceApprovalLockKey is the Bunt key holding the outstanding approval for a
+// bolt11 payment hash.
+func invoiceApprovalLockKey(paymentHash string) string {
+	return fmt.Sprintf("invoice-approval-%s", paymentHash)
+}
+
+// FindPendingInvoiceApproval returns the still-approvable request for this
+// payment hash, or nil when the invoice is free to be submitted. Resolved
+// (approved/rejected/executed) and expired requests do not block a retry.
+func FindPendingInvoiceApproval(bot *telegram.TipBot, paymentHash string) *PendingTransaction {
+	if paymentHash == "" {
+		return nil
+	}
+	lock := &InvoiceApprovalLock{Base: storage.New(storage.ID(invoiceApprovalLockKey(paymentHash)))}
+	sn, err := lock.Get(lock, bot.Bunt)
+	if err != nil {
+		// No record for this hash: nothing outstanding.
+		return nil
+	}
+	existing, ok := sn.(*InvoiceApprovalLock)
+	if !ok || existing.PendingTxID == "" {
+		return nil
+	}
+	pt, err := LoadPendingTransaction(existing.PendingTxID, bot)
+	if err != nil {
+		log.Warnf("[api/send] Invoice approval lock %s points at missing transaction %s: %v", paymentHash, existing.PendingTxID, err)
+		return nil
+	}
+	if !pt.CanBeApproved() {
+		return nil
+	}
+	return pt
+}
+
+// RecordPendingInvoiceApproval records that paymentHash now has an approval
+// request outstanding, so duplicates are rejected for the approval window.
+func RecordPendingInvoiceApproval(bot *telegram.TipBot, paymentHash, pendingTxID string) error {
+	if paymentHash == "" {
+		return nil
+	}
+	lock := &InvoiceApprovalLock{
+		Base:        storage.New(storage.ID(invoiceApprovalLockKey(paymentHash))),
+		PaymentHash: paymentHash,
+		PendingTxID: pendingTxID,
+	}
+	return lock.Set(lock, bot.Bunt)
 }
 
 // IsExpired checks if the pending transaction has expired
@@ -136,12 +225,15 @@ func LoadPendingTransaction(id string, bot *telegram.TipBot) (*PendingTransactio
 		pendingTx.FromUser = fromUser
 	}
 
-	toUser, err := telegram.GetUserByTelegramUsername(pendingTx.ToUsername, *bot)
-	if err != nil {
-		log.Warnf("[ADMIN APPROVAL] Could not load to user @%s: %v", pendingTx.ToUsername, err)
-		// Continue with nil user - this will be handled in the calling functions
-	} else {
-		pendingTx.ToUser = toUser
+	// Invoice payments have no internal recipient user, so skip the lookup.
+	if pendingTx.PaymentType != "invoice" {
+		toUser, err := telegram.GetUserByTelegramUsername(pendingTx.ToUsername, *bot)
+		if err != nil {
+			log.Warnf("[ADMIN APPROVAL] Could not load to user @%s: %v", pendingTx.ToUsername, err)
+			// Continue with nil user - this will be handled in the calling functions
+		} else {
+			pendingTx.ToUser = toUser
+		}
 	}
 
 	return pendingTx, nil

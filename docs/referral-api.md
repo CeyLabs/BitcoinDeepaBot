@@ -72,7 +72,7 @@ Enabled when `api.send.enabled: true` in `config.yaml`.
 
 ### POST /api/v1/send
 
-Sends a Lightning payment from a whitelisted wallet to any bot user, Telegram ID, or Lightning address.
+Sends a Lightning payment from a whitelisted wallet to any bot user, Telegram ID, Lightning address, or bolt11 Lightning invoice.
 
 #### Request body
 
@@ -86,15 +86,28 @@ Sends a Lightning payment from a whitelisted wallet to any bot user, Telegram ID
 
 | Field    | Type   | Required | Description |
 |----------|--------|----------|-------------|
-| `to`     | string | Yes      | Recipient: Telegram username (no `@`), Telegram ID (numeric), or Lightning address |
-| `amount` | int64  | Yes      | Amount in satoshis |
-| `memo`   | string | No       | Optional payment memo (max `max_memo_length` chars, default 280) |
+| `to`     | string | Yes      | Recipient: Telegram username (no `@`), Telegram ID (numeric), Lightning address, or a bolt11 invoice (`lnbc...`, optionally prefixed with `lightning:`) |
+| `amount` | int64  | Yes\*    | Amount in satoshis. **Ignored for bolt11 invoices** — the amount is taken from the invoice itself |
+| `memo`   | string | No       | Optional payment memo (max `max_memo_length` chars, default 280). For invoices it is used only for the sender's confirmation/logging |
+
+\* Not required when `to` is a bolt11 invoice.
 
 #### Recipient resolution order
 
-1. Lightning address (e.g. `user@domain.com`)
-2. Telegram ID (5–15 digit number)
-3. Telegram username
+1. bolt11 Lightning invoice (`lnbc...` / `lightning:lnbc...`)
+2. Lightning address (e.g. `user@domain.com`)
+3. Telegram ID (5–15 digit number)
+4. Telegram username
+
+#### Paying a bolt11 invoice
+
+When `to` is a bolt11 invoice the bot pays it **externally** over Lightning:
+
+- The amount comes from the invoice. **Amountless invoices are rejected.**
+- The invoice amount is validated against `min_amount`, `max_amount`, and `admin_approval_threshold` (same limits and approval flow as internal sends).
+- A ~2% routing-fee reserve is required on top of the amount; if the balance cannot cover it the request is rejected.
+- Idempotency is keyed on the invoice's payment hash, so retrying the same invoice will not double-pay.
+- The success response additionally includes `payment_hash` and `fee` (routing fee in sats).
 
 #### Amount limits
 
@@ -122,6 +135,23 @@ If a `memo` is provided, the API checks whether a transaction with that exact me
   "amount": 1000,
   "amount_lkr": "32.50",
   "memo": "optional memo"
+}
+```
+
+#### Invoice payment success response — `200 OK`
+
+When `to` is a bolt11 invoice, `payment_hash` and `fee` (sats) are included:
+
+```json
+{
+  "success": true,
+  "message": "Invoice paid successfully",
+  "from_user": "myservice",
+  "to_user": "lnbc10u1p...",
+  "amount": 1000,
+  "amount_lkr": "32.50",
+  "payment_hash": "abc123...",
+  "fee": 1
 }
 ```
 

@@ -18,11 +18,29 @@ import (
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 )
 
+// These package-level buttons exist only so the callback handlers can be
+// registered by their unique key. The markup sent to a user is always built
+// per request (see apiApprovalMarkup) because approval requests originate from
+// concurrent HTTP handlers, which are not serialised by the Telegram
+// lockInterceptor.
 var (
 	apiApprovalConfirmationMenu = &tb.ReplyMarkup{ResizeKeyboard: true}
 	btnCancelAPITx              = apiApprovalConfirmationMenu.Data("🚫 Cancel", "cancel_api_tx")
 	btnApproveAPITx             = apiApprovalConfirmationMenu.Data("✅ Approve & Send", "approve_api_tx")
 )
+
+// apiApprovalMarkup builds a fresh inline keyboard carrying the approval id as
+// callback data. A new ReplyMarkup per call keeps concurrent approval requests
+// from overwriting each other's callback data before Send serialises it.
+func apiApprovalMarkup(approveText, id string) *tb.ReplyMarkup {
+	menu := &tb.ReplyMarkup{ResizeKeyboard: true}
+	menu.Inline(
+		menu.Row(
+			menu.Data(approveText, "approve_api_tx", id),
+			menu.Data("🚫 Cancel", "cancel_api_tx", id)),
+	)
+	return menu
+}
 
 // isTelegramID checks if the identifier is a Telegram ID (numeric string)
 func isTelegramID(identifier string) bool {
@@ -39,6 +57,8 @@ type APIApprovalData struct {
 	ToUsername      string       `json:"to_username"`
 	Amount          int64        `json:"amount"`
 	Memo            string       `json:"memo"`
+	PaymentType     string       `json:"payment_type,omitempty"` // "invoice" for bolt11 payments; empty for internal transfers
+	Invoice         string       `json:"invoice,omitempty"`      // bolt11 payment request when PaymentType == "invoice"
 	Message         string       `json:"message"`
 	LanguageCode    string       `json:"language_code"`
 	ClientIP        string       `json:"client_ip"`
@@ -71,6 +91,12 @@ func (bot *TipBot) approveAPITransactionHandler(ctx intercept.Context) (intercep
 	from := LoadUser(ctx)
 	ResetUserState(from, bot)
 
+	// Invoice payment path: pay the bolt11 externally instead of an internal transfer
+	if approvalData.PaymentType == "invoice" {
+		bot.executeApprovedInvoicePayment(ctx, approvalData, from)
+		return ctx, nil
+	}
+
 	// Get recipient user
 	toUser, err := GetUserByTelegramUsername(approvalData.ToUsername, *bot)
 	if err != nil {
@@ -79,8 +105,11 @@ func (bot *TipBot) approveAPITransactionHandler(ctx intercept.Context) (intercep
 		return ctx, err
 	}
 
-	// Check sender's balance again
-	balance, err := bot.GetUserBalance(from)
+	// Check sender's balance again. This must use the *available* balance
+	// (wallet minus pot reservations), matching the check the API performed at
+	// submission time — pot funds never leave the lnbits wallet, so the raw
+	// balance would happily let an approval spend sats reserved in a pot.
+	balance, err := bot.GetUserAvailableBalance(from)
 	if err != nil {
 		log.Errorf("[approveAPITransactionHandler] Could not check sender balance: %v", err)
 		bot.tryEditMessage(ctx.Callback().Message, "❌ Approval failed: could not check balance", &tb.ReplyMarkup{})
@@ -184,6 +213,96 @@ func (bot *TipBot) cancelAPITransactionHandler(ctx intercept.Context) (intercept
 	return ctx, nil
 }
 
+// executeApprovedInvoicePayment pays an approved bolt11 invoice externally via lnbits.
+func (bot *TipBot) executeApprovedInvoicePayment(ctx intercept.Context, approvalData *APIApprovalData, from *lnbits.User) {
+	fromUserStr := GetUserStr(from.Telegram)
+
+	// Re-check balance (with fee reserve) before paying. Uses the *available*
+	// balance so an approval cannot spend sats reserved in a pot: pot balances
+	// are DB-side reservations and stay inside the same lnbits wallet.
+	balance, err := bot.GetUserAvailableBalance(from)
+	if err != nil {
+		log.Errorf("[approveAPITransactionHandler] Could not check sender balance: %v", err)
+		bot.tryEditMessage(ctx.Callback().Message, "❌ Approval failed: could not check balance", &tb.ReplyMarkup{})
+		return
+	}
+	if balance < approvalData.Amount || float64(approvalData.Amount) > float64(balance)*0.98 {
+		log.Warnf("[approveAPITransactionHandler] Insufficient balance for invoice: %d < %d (+fees)", balance, approvalData.Amount)
+		bot.tryEditMessage(ctx.Callback().Message, fmt.Sprintf("❌ Insufficient balance: %s available, %s required (plus fee reserve)", utils.FormatSats(balance), utils.FormatSats(approvalData.Amount)), &tb.ReplyMarkup{})
+		return
+	}
+
+	inv, err := from.Wallet.Pay(lnbits.PaymentParams{Out: true, Bolt11: approvalData.Invoice}, bot.Client)
+	if err != nil {
+		log.Errorf("[approveAPITransactionHandler] Invoice payment failed for %s: %v", fromUserStr, err)
+		if bot.ErrorLogger != nil {
+			bot.ErrorLogger.LogPaymentError(err, approvalData.Amount, approvalData.Memo, approvalData.Invoice, from.Telegram)
+		}
+		bot.tryEditMessage(ctx.Callback().Message, "❌ Invoice payment failed", &tb.ReplyMarkup{})
+		return
+	}
+
+	approvalData.Inactivate(approvalData, bot.Bunt)
+
+	// Update the PendingTransaction status so /api/v1/send/status reflects the real outcome.
+	if storage.UpdatePendingTxStatusFn != nil {
+		storage.UpdatePendingTxStatusFn(approvalData.TransactionID, "executed", ctx.Callback().Sender.Username)
+	}
+
+	log.Infof("[💸 api_send_approved invoice] %s paid invoice %s (%s).", fromUserStr, inv.PaymentHash, thirdparty.FormatSatsWithLKR(approvalData.Amount))
+
+	successMsg := fmt.Sprintf("✅ Invoice approved and paid successfully!\n\n💸 Amount: %s", thirdparty.FormatSatsWithLKR(approvalData.Amount))
+	if approvalData.Memo != "" {
+		successMsg += fmt.Sprintf("\n✉️ Memo: %s", str.MarkdownEscape(approvalData.Memo))
+	}
+	if ctx.Callback().Message.Private() {
+		bot.tryDeleteMessage(ctx.Callback().Message)
+		bot.trySendMessage(ctx.Callback().Sender, successMsg)
+	} else {
+		bot.tryEditMessage(ctx.Callback().Message, successMsg, &tb.ReplyMarkup{})
+	}
+}
+
+// CreateAPIInvoiceApprovalRequest creates an approval request for an external bolt11 invoice payment.
+// It reuses the same approve/cancel callback handlers as internal API transfers.
+func CreateAPIInvoiceApprovalRequest(bot *TipBot, fromUser *lnbits.User, invoice string, amount int64, memo string, transactionID string, clientIP string) error {
+	confirmText := fmt.Sprintf("Do you want to pay this Lightning invoice?\n\n💸 Amount: %s", thirdparty.FormatSatsWithLKR(amount))
+	if memo != "" {
+		confirmText += fmt.Sprintf("\n✉️ %s", str.MarkdownEscape(memo))
+	}
+	confirmText += "\n\n🔔 *Admin Approval Required*\n"
+	confirmText += fmt.Sprintf("This transaction requires approval because the amount (%s) exceeds the threshold.", thirdparty.FormatSatsWithLKR(amount))
+
+	id := fmt.Sprintf("api-%d-%d-%s", fromUser.Telegram.ID, amount, RandStringRunes(5))
+
+	approvalData := &APIApprovalData{
+		Base:          storage.New(storage.ID(id)),
+		TransactionID: transactionID,
+		FromUser:      fromUser,
+		ToUsername:    "invoice",
+		Amount:        amount,
+		Memo:          memo,
+		PaymentType:   "invoice",
+		Invoice:       invoice,
+		Message:       confirmText,
+		LanguageCode:  fromUser.Telegram.LanguageCode,
+		ClientIP:      clientIP,
+	}
+
+	if err := approvalData.Set(approvalData, bot.Bunt); err != nil {
+		log.Errorf("[CreateAPIInvoiceApprovalRequest] Failed to save approval data: %v", err)
+		return err
+	}
+
+	if _, err := bot.Telegram.Send(fromUser.Telegram, confirmText, apiApprovalMarkup("✅ Approve & Pay", id), tb.ModeMarkdown); err != nil {
+		log.Errorf("[CreateAPIInvoiceApprovalRequest] Failed to send approval request: %v", err)
+		return err
+	}
+
+	log.Infof("[CreateAPIInvoiceApprovalRequest] Sent invoice approval request to @%s for transaction %s", fromUser.Telegram.Username, transactionID)
+	return nil
+}
+
 // CreateAPIApprovalRequest creates an approval request for API transaction (similar to send confirmation)
 func CreateAPIApprovalRequest(bot *TipBot, fromUser *lnbits.User, toUsername string, amount int64, memo string, transactionID string, clientIP string) error {
 	// Check if toUsername is actually a user ID and get the actual username
@@ -233,20 +352,8 @@ func CreateAPIApprovalRequest(bot *TipBot, fromUser *lnbits.User, toUsername str
 		return err
 	}
 
-	// Create buttons (same pattern as send confirmation)
-	approveButton := apiApprovalConfirmationMenu.Data("✅ Approve & Send", "approve_api_tx")
-	cancelButton := apiApprovalConfirmationMenu.Data("🚫 Cancel", "cancel_api_tx")
-	approveButton.Data = id
-	cancelButton.Data = id
-
-	apiApprovalConfirmationMenu.Inline(
-		apiApprovalConfirmationMenu.Row(
-			approveButton,
-			cancelButton),
-	)
-
 	// Send approval request to the sender (from user)
-	_, err = bot.Telegram.Send(fromUser.Telegram, confirmText, apiApprovalConfirmationMenu, tb.ModeMarkdown)
+	_, err = bot.Telegram.Send(fromUser.Telegram, confirmText, apiApprovalMarkup("✅ Approve & Send", id), tb.ModeMarkdown)
 	if err != nil {
 		log.Errorf("[CreateAPIApprovalRequest] Failed to send approval request: %v", err)
 		return err
