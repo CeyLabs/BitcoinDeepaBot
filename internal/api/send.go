@@ -484,6 +484,18 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 		return
 	}
 
+	// Serialise the balance-check-then-pay window per sender. lnbits only knows
+	// the raw wallet balance, so without this lock concurrent requests could
+	// each pass the available-balance check and together spend sats that are
+	// reserved in pots.
+	userLockKey := fmt.Sprintf("api_send_user_%d", fromUser.Telegram.ID)
+	if success := s.MemoCache.SetNX(userLockKey, "locked"); !success {
+		log.Warnf("[api/send] Another payment for %s is already in flight", fromUsername)
+		RespondError(w, "Another payment for this wallet is already being processed, please retry shortly")
+		return
+	}
+	defer s.MemoCache.Delete(userLockKey)
+
 	// Check available balance with a ~2% routing fee reserve
 	balance, err := s.Bot.GetUserAvailableBalance(fromUser)
 	if err != nil {
@@ -504,12 +516,26 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 	// Large invoices go through the same admin approval mechanism as internal sends
 	if amount > GetWalletAdminApprovalThreshold(walletID) {
 		log.Infof("[api/send] Large invoice payment requires admin approval: %s (%d sat(s))", fromUsername, amount)
+
+		// The MemoCache lock above only spans 5 minutes, but an approval stays
+		// actionable for 24h. Reject a second request for an invoice that
+		// already has an approval waiting, so the same bolt11 cannot end up
+		// with two approvable requests.
+		if existing := FindPendingInvoiceApproval(s.Bot, bolt11.PaymentHash); existing != nil {
+			log.Warnf("[api/send] Invoice %s already has approval %s awaiting confirmation", bolt11.PaymentHash, existing.ID)
+			RespondError(w, fmt.Sprintf("This invoice already has an approval request awaiting confirmation (transaction ID: %s)", existing.ID))
+			return
+		}
+
 		clientIP := getClientIP(r)
 		pendingTx := NewPendingInvoiceTransaction(fromUsername, paymentRequest, bolt11.PaymentHash, amount, memo, fromUser, clientIP)
 		if err := pendingTx.SaveToDB(s.Bot); err != nil {
 			log.Errorf("[api/send] Failed to save pending invoice transaction: %v", err)
 			RespondError(w, "Failed to create pending transaction")
 			return
+		}
+		if err := RecordPendingInvoiceApproval(s.Bot, bolt11.PaymentHash, pendingTx.ID); err != nil {
+			log.Errorf("[api/send] Could not record invoice approval lock for %s: %v", bolt11.PaymentHash, err)
 		}
 		if err := telegram.CreateAPIInvoiceApprovalRequest(s.Bot, fromUser, paymentRequest, amount, memo, pendingTx.ID, clientIP); err != nil {
 			log.Warnf("[api/send] Failed to send invoice approval request: %v", err)
@@ -539,7 +565,9 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 		if s.Bot.ErrorLogger != nil {
 			s.Bot.ErrorLogger.LogPaymentError(err, amount, bolt11.Description, paymentRequest, fromUser.Telegram)
 		}
-		RespondError(w, fmt.Sprintf("Invoice payment failed: %v", err))
+		// Keep the raw error in the logs only — it can carry the internal
+		// lnbits host/port, which must not reach the API caller.
+		RespondError(w, "Invoice payment failed")
 		return
 	}
 
@@ -558,7 +586,10 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 	// Send confirmation to sender
 	senderConfirmationMsg := fmt.Sprintf("✅ Invoice paid successfully!\n\n💸 Amount: %s", thirdparty.FormatSatsWithLKR(amount))
 	if bolt11.Description != "" {
-		senderConfirmationMsg += fmt.Sprintf("\n✉️ %s", str.MarkdownEscape(bolt11.Description))
+		senderConfirmationMsg += fmt.Sprintf("\n📄 Invoice: %s", str.MarkdownEscape(bolt11.Description))
+	}
+	if memo != "" {
+		senderConfirmationMsg += fmt.Sprintf("\n✉️ Memo: %s", str.MarkdownEscape(memo))
 	}
 	if _, err := s.Bot.Telegram.Send(fromUser.Telegram, senderConfirmationMsg); err != nil {
 		log.Warnf("[api/send] Could not send confirmation to sender: %v", err)

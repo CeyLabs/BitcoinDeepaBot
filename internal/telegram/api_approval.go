@@ -18,11 +18,29 @@ import (
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 )
 
+// These package-level buttons exist only so the callback handlers can be
+// registered by their unique key. The markup sent to a user is always built
+// per request (see apiApprovalMarkup) because approval requests originate from
+// concurrent HTTP handlers, which are not serialised by the Telegram
+// lockInterceptor.
 var (
 	apiApprovalConfirmationMenu = &tb.ReplyMarkup{ResizeKeyboard: true}
 	btnCancelAPITx              = apiApprovalConfirmationMenu.Data("🚫 Cancel", "cancel_api_tx")
 	btnApproveAPITx             = apiApprovalConfirmationMenu.Data("✅ Approve & Send", "approve_api_tx")
 )
+
+// apiApprovalMarkup builds a fresh inline keyboard carrying the approval id as
+// callback data. A new ReplyMarkup per call keeps concurrent approval requests
+// from overwriting each other's callback data before Send serialises it.
+func apiApprovalMarkup(approveText, id string) *tb.ReplyMarkup {
+	menu := &tb.ReplyMarkup{ResizeKeyboard: true}
+	menu.Inline(
+		menu.Row(
+			menu.Data(approveText, "approve_api_tx", id),
+			menu.Data("🚫 Cancel", "cancel_api_tx", id)),
+	)
+	return menu
+}
 
 // isTelegramID checks if the identifier is a Telegram ID (numeric string)
 func isTelegramID(identifier string) bool {
@@ -87,8 +105,11 @@ func (bot *TipBot) approveAPITransactionHandler(ctx intercept.Context) (intercep
 		return ctx, err
 	}
 
-	// Check sender's balance again
-	balance, err := bot.GetUserBalance(from)
+	// Check sender's balance again. This must use the *available* balance
+	// (wallet minus pot reservations), matching the check the API performed at
+	// submission time — pot funds never leave the lnbits wallet, so the raw
+	// balance would happily let an approval spend sats reserved in a pot.
+	balance, err := bot.GetUserAvailableBalance(from)
 	if err != nil {
 		log.Errorf("[approveAPITransactionHandler] Could not check sender balance: %v", err)
 		bot.tryEditMessage(ctx.Callback().Message, "❌ Approval failed: could not check balance", &tb.ReplyMarkup{})
@@ -196,8 +217,10 @@ func (bot *TipBot) cancelAPITransactionHandler(ctx intercept.Context) (intercept
 func (bot *TipBot) executeApprovedInvoicePayment(ctx intercept.Context, approvalData *APIApprovalData, from *lnbits.User) {
 	fromUserStr := GetUserStr(from.Telegram)
 
-	// Re-check balance (with fee reserve) before paying
-	balance, err := bot.GetUserBalance(from)
+	// Re-check balance (with fee reserve) before paying. Uses the *available*
+	// balance so an approval cannot spend sats reserved in a pot: pot balances
+	// are DB-side reservations and stay inside the same lnbits wallet.
+	balance, err := bot.GetUserAvailableBalance(from)
 	if err != nil {
 		log.Errorf("[approveAPITransactionHandler] Could not check sender balance: %v", err)
 		bot.tryEditMessage(ctx.Callback().Message, "❌ Approval failed: could not check balance", &tb.ReplyMarkup{})
@@ -271,18 +294,7 @@ func CreateAPIInvoiceApprovalRequest(bot *TipBot, fromUser *lnbits.User, invoice
 		return err
 	}
 
-	approveButton := apiApprovalConfirmationMenu.Data("✅ Approve & Pay", "approve_api_tx")
-	cancelButton := apiApprovalConfirmationMenu.Data("🚫 Cancel", "cancel_api_tx")
-	approveButton.Data = id
-	cancelButton.Data = id
-
-	apiApprovalConfirmationMenu.Inline(
-		apiApprovalConfirmationMenu.Row(
-			approveButton,
-			cancelButton),
-	)
-
-	if _, err := bot.Telegram.Send(fromUser.Telegram, confirmText, apiApprovalConfirmationMenu, tb.ModeMarkdown); err != nil {
+	if _, err := bot.Telegram.Send(fromUser.Telegram, confirmText, apiApprovalMarkup("✅ Approve & Pay", id), tb.ModeMarkdown); err != nil {
 		log.Errorf("[CreateAPIInvoiceApprovalRequest] Failed to send approval request: %v", err)
 		return err
 	}
@@ -340,20 +352,8 @@ func CreateAPIApprovalRequest(bot *TipBot, fromUser *lnbits.User, toUsername str
 		return err
 	}
 
-	// Create buttons (same pattern as send confirmation)
-	approveButton := apiApprovalConfirmationMenu.Data("✅ Approve & Send", "approve_api_tx")
-	cancelButton := apiApprovalConfirmationMenu.Data("🚫 Cancel", "cancel_api_tx")
-	approveButton.Data = id
-	cancelButton.Data = id
-
-	apiApprovalConfirmationMenu.Inline(
-		apiApprovalConfirmationMenu.Row(
-			approveButton,
-			cancelButton),
-	)
-
 	// Send approval request to the sender (from user)
-	_, err = bot.Telegram.Send(fromUser.Telegram, confirmText, apiApprovalConfirmationMenu, tb.ModeMarkdown)
+	_, err = bot.Telegram.Send(fromUser.Telegram, confirmText, apiApprovalMarkup("✅ Approve & Send", id), tb.ModeMarkdown)
 	if err != nil {
 		log.Errorf("[CreateAPIApprovalRequest] Failed to send approval request: %v", err)
 		return err
