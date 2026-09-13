@@ -33,19 +33,19 @@ type Server struct {
 }
 
 type Webhook struct {
-	CheckingID    string      `json:"checking_id"`
-	Pending       bool        `json:"pending"`
-	Amount        int64       `json:"amount"`
-	Fee           int64       `json:"fee"`
-	Memo          string      `json:"memo"`
-	Time          int64       `json:"time"`
-	Bolt11        string      `json:"bolt11"`
-	Preimage      string      `json:"preimage"`
-	PaymentHash   string      `json:"payment_hash"`
-	Extra         struct{}    `json:"extra"`
-	WalletID      string      `json:"wallet_id"`
-	Webhook       string      `json:"webhook"`
-	WebhookStatus interface{} `json:"webhook_status"`
+	CheckingID    string          `json:"checking_id"`
+	Pending       bool            `json:"pending"`
+	Amount        int64           `json:"amount"`
+	Fee           int64           `json:"fee"`
+	Memo          string          `json:"memo"`
+	Time          lnbits.UnixTime `json:"time"`
+	Bolt11        string          `json:"bolt11"`
+	Preimage      string          `json:"preimage"`
+	PaymentHash   string          `json:"payment_hash"`
+	Extra         struct{}        `json:"extra"`
+	WalletID      string          `json:"wallet_id"`
+	Webhook       string          `json:"webhook"`
+	WebhookStatus interface{}     `json:"webhook_status"`
 }
 
 func NewServer(bot *telegram.TipBot) *Server {
