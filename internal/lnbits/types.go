@@ -15,10 +15,14 @@ import (
 )
 
 type Client struct {
-	header     req.Header
-	url        string
-	AdminKey   string
-	InvoiceKey string
+	header req.Header
+	// adminHeader carries the ACL bearer token for /users/api/v1. It is kept
+	// separate from header so wallet calls cannot present it, and so the token
+	// cannot be used to spend: it is scoped to account management only.
+	adminHeader req.Header
+	url         string
+	AdminKey    string
+	InvoiceKey  string
 }
 
 type User struct {

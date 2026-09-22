@@ -77,6 +77,10 @@ type DatabaseConfiguration struct {
 type LnbitsConfiguration struct {
 	AdminId                string   `yaml:"admin_id"`
 	AdminKey               string   `yaml:"admin_key"`
+	// AdminToken is an lnbits ACL token, scoped to /users/api/v1. Account
+	// management moved behind account-level auth in lnbits 1.x, where a wallet
+	// api key no longer grants it, so creating users needs a bearer token.
+	AdminToken             string   `yaml:"admin_token"`
 	Url                    string   `yaml:"url"`
 	LnbitsPublicUrl        string   `yaml:"lnbits_public_url"`
 	WebhookServer          string   `yaml:"webhook_server"`
