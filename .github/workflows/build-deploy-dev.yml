@@ -23,29 +23,37 @@ jobs:
     
     steps:
       - name: Notify Build Start
-        run: |          
-          curl -s -X POST https://api.telegram.org/bot${{ secrets.DEV_ACTIONS_BOT_TOKEN }}/sendMessage \
-          -d chat_id="${{ secrets.DEV_ACTIONS_GROUP_ID }}" \
-          -d text="
-          ${{ env.PROJECT_NAME }} Build Started 🚀
-          📁 Repository: ${{ github.repository }}
-          👤 Initiator: ${{ github.actor }}
-          🕒 Timestamp: ${{ github.event.head_commit.timestamp}} 
-          📝 Commit Message: ${{ github.event.head_commit.message }}"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.DEV_ACTIONS_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.DEV_ACTIONS_GROUP_ID }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          COMMIT_TIMESTAMP: ${{ github.event.head_commit.timestamp }}
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${PROJECT_NAME} Build Started 🚀
+          📁 Repository: ${GITHUB_REPOSITORY}
+          👤 Initiator: ${GITHUB_ACTOR}
+          🕒 Timestamp: ${COMMIT_TIMESTAMP}
+          📝 Commit Message: ${COMMIT_MESSAGE}"
 
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Notify Build Complete
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.DEV_ACTIONS_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.DEV_ACTIONS_GROUP_ID }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          COMMIT_TIMESTAMP: ${{ github.event.head_commit.timestamp }}
         run: |
-          curl -s -X POST https://api.telegram.org/bot${{ secrets.DEV_ACTIONS_BOT_TOKEN }}/sendMessage \
-            -d chat_id="${{ secrets.DEV_ACTIONS_GROUP_ID }}" \
-            -d text="
-          ${{ env.PROJECT_NAME }} Code Checked Out �
-          📁 Repository: ${{ github.repository }}
-          👤 Initiator: ${{ github.actor }}
-          🕒 Timestamp: ${{ github.event.head_commit.timestamp }}
-          📝 Commit Message: ${{ github.event.head_commit.message }}"
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${PROJECT_NAME} Code Checked Out 📦
+          📁 Repository: ${GITHUB_REPOSITORY}
+          👤 Initiator: ${GITHUB_ACTOR}
+          🕒 Timestamp: ${COMMIT_TIMESTAMP}
+          📝 Commit Message: ${COMMIT_MESSAGE}"
 
       # ✅ Check if .git directory exists remotely
       - name: Check if Git Exists on Server
@@ -148,26 +156,34 @@ jobs:
             sudo systemctl status ${{ env.SERVICE_NAME }} --no-pager
 
       - name: Notify Deploy Complete
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.DEV_ACTIONS_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.DEV_ACTIONS_GROUP_ID }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          COMMIT_TIMESTAMP: ${{ github.event.head_commit.timestamp }}
         run: |
-          curl -s -X POST https://api.telegram.org/bot${{ secrets.DEV_ACTIONS_BOT_TOKEN }}/sendMessage \
-            -d chat_id="${{ secrets.DEV_ACTIONS_GROUP_ID }}" \
-            -d text="
-          ${{ env.PROJECT_NAME }} Deploy Complete ✅
-          📁 Repository: ${{ github.repository }}
-          👤 Initiator: ${{ github.actor }}
-          🕒 Timestamp: ${{ github.event.head_commit.timestamp }}
-          📝 Commit Message: ${{ github.event.head_commit.message }}"
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${PROJECT_NAME} Deploy Complete ✅
+          📁 Repository: ${GITHUB_REPOSITORY}
+          👤 Initiator: ${GITHUB_ACTOR}
+          🕒 Timestamp: ${COMMIT_TIMESTAMP}
+          📝 Commit Message: ${COMMIT_MESSAGE}"
 
       - name: Notify Deploy Failure
         if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.DEV_ACTIONS_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.DEV_ACTIONS_GROUP_ID }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          COMMIT_TIMESTAMP: ${{ github.event.head_commit.timestamp }}
         run: |
-          curl -s -X POST https://api.telegram.org/bot${{ secrets.DEV_ACTIONS_BOT_TOKEN }}/sendMessage \
-            -d chat_id="${{ secrets.DEV_ACTIONS_GROUP_ID }}" \
-            -d text="
-          ❌ ${{ env.PROJECT_NAME }} Deploy Failed!
-          📁 Repository: ${{ github.repository }}
-          👤 Initiator: ${{ github.actor }}
-          🕒 Timestamp: ${{ github.event.head_commit.timestamp }}
-          📝 Commit Message: ${{ github.event.head_commit.message }}
-          
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=❌ ${PROJECT_NAME} Deploy Failed!
+          📁 Repository: ${GITHUB_REPOSITORY}
+          👤 Initiator: ${GITHUB_ACTOR}
+          🕒 Timestamp: ${COMMIT_TIMESTAMP}
+          📝 Commit Message: ${COMMIT_MESSAGE}
+
           Please check the GitHub Actions logs for more details."
