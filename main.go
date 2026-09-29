@@ -148,6 +148,10 @@ func startApiServer(bot *telegram.TipBot) {
 		// Send status endpoint — check approval status of a pending transaction
 		s.AppendRoute(`/api/v1/send/status/{transaction_id}`, api.WalletHMACMiddleware(apiService.SendStatus), http.MethodGet)
 		log.Infof("API SendStatus endpoint registered at /api/v1/send/status/{transaction_id} with wallet-based HMAC security")
+
+		// Payment settlement endpoint — resolve an invoice payment left in flight
+		s.AppendRoute(`/api/v1/send/payment/{payment_hash}`, api.WalletHMACMiddleware(apiService.SendPaymentStatus), http.MethodGet)
+		log.Infof("API SendPaymentStatus endpoint registered at /api/v1/send/payment/{payment_hash} with wallet-based HMAC security")
 	} else {
 		log.Infof("API Send endpoint disabled in configuration")
 	}

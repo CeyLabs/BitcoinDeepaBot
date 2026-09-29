@@ -179,8 +179,13 @@ func (t *UnixTime) UnmarshalJSON(b []byte) error {
 }
 
 type Payment struct {
-	CheckingID    string      `json:"checking_id"`
-	Pending       bool        `json:"pending"`
+	CheckingID string `json:"checking_id"`
+	Pending    bool   `json:"pending"`
+	// Status is reported by lnbits 0.12 and newer ("success"/"pending"/"failed")
+	// and is absent on older versions, which describe a payment with Pending.
+	// omitempty keeps it out of the payloads this type is serialised into, so
+	// adding it does not change any existing API response.
+	Status        string      `json:"status,omitempty"`
 	Amount        int64       `json:"amount"`
 	Fee           int64       `json:"fee"`
 	Memo          string      `json:"memo"`
@@ -195,9 +200,15 @@ type Payment struct {
 }
 
 type LNbitsPayment struct {
-	Paid     bool    `json:"paid"`
-	Preimage string  `json:"preimage"`
-	Details  Payment `json:"details,omitempty"`
+	Paid     bool   `json:"paid"`
+	Preimage string `json:"preimage"`
+	// Status and Fee are populated by lnbits versions that return the payment
+	// itself rather than wrapping it in Details. omitempty keeps them out of
+	// the payloads this type is serialised into (/api/v1/paymentstatus and
+	// /api/v1/invoicestatus), so adding them changes no existing response.
+	Status  string  `json:"status,omitempty"`
+	Fee     int64   `json:"fee,omitempty"`
+	Details Payment `json:"details,omitempty"`
 }
 
 type Payments []Payment
