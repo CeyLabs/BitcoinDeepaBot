@@ -1,5 +1,12 @@
 package storage
 
+import "time"
+
+// PendingTxExpiry is how long an approval request stays approvable. It lives
+// here so the Telegram approve button enforces the same window that
+// /api/v1/send/status reports as expired.
+const PendingTxExpiry = 24 * time.Hour
+
 // UpdatePendingTxStatusFn is set by the api package at startup to allow the
 // telegram approval handlers to update PendingTransaction status without
 // creating an import cycle (api imports telegram, telegram imports storage).

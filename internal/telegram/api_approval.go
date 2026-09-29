@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/LightningTipBot/LightningTipBot/internal"
 	"github.com/LightningTipBot/LightningTipBot/internal/errors"
@@ -65,6 +66,19 @@ type APIApprovalData struct {
 	LanguageCode    string       `json:"language_code"`
 	ClientIP        string       `json:"client_ip"`
 	OriginalRequest interface{}  `json:"original_request" gorm:"-"`
+	// ExpiresAt is the PendingTransaction's expiry time. It is empty on
+	// approvals created before it was added; see expiresAt.
+	ExpiresAt time.Time `json:"expires_at,omitempty"`
+}
+
+// expiresAt returns when this approval stops being approvable. Approvals
+// saved without ExpiresAt fall back to their creation time plus the standard
+// window, so an old approve button cannot stay valid forever.
+func (a *APIApprovalData) expiresAt() time.Time {
+	if !a.ExpiresAt.IsZero() {
+		return a.ExpiresAt
+	}
+	return a.CreatedAt.Add(storage.PendingTxExpiry)
 }
 
 // approveAPITransactionHandler handles the approval of API transactions
@@ -88,6 +102,18 @@ func (bot *TipBot) approveAPITransactionHandler(ctx intercept.Context) (intercep
 		log.Errorf("[approveAPITransactionHandler] approval not active anymore")
 		return ctx, errors.Create(errors.NotActiveError)
 	}
+	// Past its window /api/v1/send/status already reports the request as
+	// expired, and the caller may have resubmitted it. Paying now would move
+	// sats the caller was told were never sent.
+	if time.Now().After(approvalData.expiresAt()) {
+		log.Warnf("[approveAPITransactionHandler] approval %s for transaction %s expired at %s", approvalData.ID, approvalData.TransactionID, approvalData.expiresAt().Format(time.RFC3339))
+		approvalData.Inactivate(approvalData, bot.Bunt)
+		if storage.UpdatePendingTxStatusFn != nil {
+			storage.UpdatePendingTxStatusFn(approvalData.TransactionID, storage.TxStatusExpired, ctx.Callback().Sender.Username)
+		}
+		bot.tryEditMessage(ctx.Callback().Message, "⌛ This approval request has expired. Nothing was sent.", &tb.ReplyMarkup{})
+		return ctx, nil
+	}
 	defer approvalData.Set(approvalData, bot.Bunt)
 
 	from := LoadUser(ctx)
@@ -107,18 +133,21 @@ func (bot *TipBot) approveAPITransactionHandler(ctx intercept.Context) (intercep
 		return ctx, err
 	}
 
-	// Check sender's balance again. This must use the *available* balance
-	// (wallet minus pot reservations), matching the check the API performed at
-	// submission time — pot funds never leave the lnbits wallet, so the raw
-	// balance would happily let an approval spend sats reserved in a pot.
-	balance, err := bot.GetUserAvailableBalance(from)
+	// Check sender's balance again and reserve it until the transfer is done.
+	// This uses the *available* balance (wallet minus pots) less whatever the
+	// sender's other in-flight payments hold, so neither pot funds nor a
+	// concurrent payment's sats can be spent here.
+	reservation, balance, err := bot.ReserveBalance(from, approvalData.Amount)
 	if err != nil {
 		log.Errorf("[approveAPITransactionHandler] Could not check sender balance: %v", err)
 		bot.tryEditMessage(ctx.Callback().Message, "❌ Approval failed: could not check balance", &tb.ReplyMarkup{})
 		return ctx, err
 	}
+	if reservation != nil {
+		defer reservation.Release()
+	}
 
-	if balance < approvalData.Amount {
+	if reservation == nil {
 		log.Warnf("[approveAPITransactionHandler] Insufficient balance: %d < %d", balance, approvalData.Amount)
 		bot.tryEditMessage(ctx.Callback().Message, fmt.Sprintf("❌ Insufficient balance: %s available, %s required", utils.FormatSats(balance), utils.FormatSats(approvalData.Amount)), &tb.ReplyMarkup{})
 		return ctx, errors.Create(errors.UnknownError)
@@ -219,22 +248,27 @@ func (bot *TipBot) cancelAPITransactionHandler(ctx intercept.Context) (intercept
 func (bot *TipBot) executeApprovedInvoicePayment(ctx intercept.Context, approvalData *APIApprovalData, from *lnbits.User) {
 	fromUserStr := GetUserStr(from.Telegram)
 
-	// Re-check balance (with fee reserve) before paying. Uses the *available*
-	// balance so an approval cannot spend sats reserved in a pot: pot balances
-	// are DB-side reservations and stay inside the same lnbits wallet.
-	balance, err := bot.GetUserAvailableBalance(from)
+	// Re-check balance (with fee reserve) and reserve it until lnbits has the
+	// payment. Uses the *available* balance less the sender's other in-flight
+	// payments, so an approval cannot spend sats reserved in a pot or already
+	// held by a concurrent payment.
+	reservation, balance, err := bot.ReserveBalance(from, utils.AmountWithFeeReserve(approvalData.Amount))
 	if err != nil {
 		log.Errorf("[approveAPITransactionHandler] Could not check sender balance: %v", err)
 		bot.tryEditMessage(ctx.Callback().Message, "❌ Approval failed: could not check balance", &tb.ReplyMarkup{})
 		return
 	}
-	if balance < approvalData.Amount || float64(approvalData.Amount) > float64(balance)*0.98 {
+	if reservation == nil {
 		log.Warnf("[approveAPITransactionHandler] Insufficient balance for invoice: %d < %d (+fees)", balance, approvalData.Amount)
 		bot.tryEditMessage(ctx.Callback().Message, fmt.Sprintf("❌ Insufficient balance: %s available, %s required (plus fee reserve)", utils.FormatSats(balance), utils.FormatSats(approvalData.Amount)), &tb.ReplyMarkup{})
 		return
 	}
+	defer reservation.Release()
 
 	inv, err := from.Wallet.Pay(lnbits.PaymentParams{Out: true, Bolt11: approvalData.Invoice}, bot.Client)
+	// lnbits now accounts for the payment in its own balance (or rejected
+	// it), so free the reservation before the long settlement wait.
+	reservation.Release()
 	if err != nil {
 		log.Errorf("[approveAPITransactionHandler] Invoice payment failed for %s: %v", fromUserStr, err)
 		if bot.ErrorLogger != nil {
@@ -309,7 +343,7 @@ func (bot *TipBot) executeApprovedInvoicePayment(ctx intercept.Context, approval
 
 // CreateAPIInvoiceApprovalRequest creates an approval request for an external bolt11 invoice payment.
 // It reuses the same approve/cancel callback handlers as internal API transfers.
-func CreateAPIInvoiceApprovalRequest(bot *TipBot, fromUser *lnbits.User, invoice string, amount int64, memo string, transactionID string, clientIP string) error {
+func CreateAPIInvoiceApprovalRequest(bot *TipBot, fromUser *lnbits.User, invoice string, amount int64, memo string, transactionID string, clientIP string, expiresAt time.Time) error {
 	confirmText := fmt.Sprintf("Do you want to pay this Lightning invoice?\n\n💸 Amount: %s", thirdparty.FormatSatsWithLKR(amount))
 	if memo != "" {
 		confirmText += fmt.Sprintf("\n✉️ %s", str.MarkdownEscape(memo))
@@ -331,6 +365,7 @@ func CreateAPIInvoiceApprovalRequest(bot *TipBot, fromUser *lnbits.User, invoice
 		Message:       confirmText,
 		LanguageCode:  fromUser.Telegram.LanguageCode,
 		ClientIP:      clientIP,
+		ExpiresAt:     expiresAt,
 	}
 
 	if err := approvalData.Set(approvalData, bot.Bunt); err != nil {
@@ -340,6 +375,9 @@ func CreateAPIInvoiceApprovalRequest(bot *TipBot, fromUser *lnbits.User, invoice
 
 	if _, err := bot.Telegram.Send(fromUser.Telegram, confirmText, apiApprovalMarkup("✅ Approve & Pay", id), tb.ModeMarkdown); err != nil {
 		log.Errorf("[CreateAPIInvoiceApprovalRequest] Failed to send approval request: %v", err)
+		// The caller abandons this transaction, so a message that reached the
+		// user despite the error must not be approvable.
+		approvalData.Inactivate(approvalData, bot.Bunt)
 		return err
 	}
 
@@ -348,7 +386,7 @@ func CreateAPIInvoiceApprovalRequest(bot *TipBot, fromUser *lnbits.User, invoice
 }
 
 // CreateAPIApprovalRequest creates an approval request for API transaction (similar to send confirmation)
-func CreateAPIApprovalRequest(bot *TipBot, fromUser *lnbits.User, toUsername string, amount int64, memo string, transactionID string, clientIP string) error {
+func CreateAPIApprovalRequest(bot *TipBot, fromUser *lnbits.User, toUsername string, amount int64, memo string, transactionID string, clientIP string, expiresAt time.Time) error {
 	// Check if toUsername is actually a user ID and get the actual username
 	actualUsername := toUsername
 	if isTelegramID(toUsername) {
@@ -387,6 +425,7 @@ func CreateAPIApprovalRequest(bot *TipBot, fromUser *lnbits.User, toUsername str
 		Message:       confirmText,
 		LanguageCode:  fromUser.Telegram.LanguageCode,
 		ClientIP:      clientIP,
+		ExpiresAt:     expiresAt,
 	}
 
 	// Save approval data to database
@@ -400,6 +439,9 @@ func CreateAPIApprovalRequest(bot *TipBot, fromUser *lnbits.User, toUsername str
 	_, err = bot.Telegram.Send(fromUser.Telegram, confirmText, apiApprovalMarkup("✅ Approve & Send", id), tb.ModeMarkdown)
 	if err != nil {
 		log.Errorf("[CreateAPIApprovalRequest] Failed to send approval request: %v", err)
+		// The caller abandons this transaction, so a message that reached the
+		// user despite the error must not be approvable.
+		approvalData.Inactivate(approvalData, bot.Bunt)
 		return err
 	}
 

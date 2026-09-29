@@ -62,3 +62,10 @@ func FormatSats(amount int64, withPlus ...bool) string {
 
 	return sign + s + unit
 }
+
+// AmountWithFeeReserve returns amount plus a 2% routing fee reserve: the
+// smallest balance from which amount can be paid with 2% left over. Integer
+// math keeps sat amounts exact.
+func AmountWithFeeReserve(amount int64) int64 {
+	return (amount*100 + 97) / 98
+}

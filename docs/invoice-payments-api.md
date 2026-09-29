@@ -341,6 +341,8 @@ These apply to invoice payments via `POST /api/v1/send`.
 | **Admin approval threshold** | Amounts above `admin_approval_threshold` (global default **50,000 sats**; may be per wallet) are held for operator approval and return `202` instead of paying immediately. |
 | **Routing‑fee reserve** | Your available balance must cover the amount **plus ~2%** for routing fees. If `amount > balance * 0.98`, the request is rejected even if `balance >= amount`. |
 | **Idempotency** | Requests are de‑duplicated on the invoice **payment hash**. Concurrent or retried attempts to pay the same invoice will not double‑pay. |
+| **Concurrent payments** | Different invoices can be paid **in parallel** from the same wallet. Each in‑flight payment's amount plus fee reserve is held against your available balance until the Lightning backend accepts it, so parallel requests are rejected with the insufficient‑balance errors once the balance is used up. |
+| **Replay protection** | Each signed request is accepted **once**. Sign every request (including retries) with a fresh `X-Timestamp`; resending an identical signed request returns `401 Request already processed`. |
 | **Settlement confirmation** | A `200` is returned only after the payment **settles**. A payment still routing after `settlement_timeout` (default **60s**) returns `202` with `status: "pending"` — it is not a failure. |
 | **Irreversibility** | A settled Lightning payment cannot be reversed. Validate the invoice/amount before sending. |
 | **Invoice validity** | Expired or malformed invoices are rejected (either at decode time with `400`, or by the Lightning backend at pay time). |
@@ -371,7 +373,8 @@ Errors use a consistent JSON shape:
 | `400` | Duplicate in flight | `This invoice is already being processed` |
 | `400` | Backend rejected the payment | `Invoice payment failed` |
 | `400` | Accepted but did not route — sats **not** sent | `Invoice payment failed: the payment could not be routed to the destination node` |
-| `401` | Missing/expired timestamp, missing/invalid signature | `Invalid signature` / `Request expired` / `Missing timestamp` |
+| `401` | Missing/expired timestamp, missing/invalid signature | `Invalid signature` / `Request expired` / `Missing timestamp` / `Request already processed` |
+| `400` | Telegram approval request could not be delivered — nothing was paid | `Could not deliver the approval request via Telegram. Nothing was paid; please retry.` |
 | `429` | Rate limited | — |
 
 The **routing‑failure** `400` (the last row above) carries the full send body rather than just `error`, so you keep the reconciliation key:

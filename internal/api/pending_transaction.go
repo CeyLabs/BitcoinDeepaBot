@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/storage"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
 	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/buntdb"
 )
 
 // PendingTransaction represents a transaction awaiting admin approval
@@ -33,7 +35,7 @@ type PendingTransaction struct {
 }
 
 const (
-	PendingTransactionExpiry = 24 * time.Hour // Pending transactions expire after 24 hours
+	PendingTransactionExpiry = storage.PendingTxExpiry // Pending transactions expire after 24 hours
 
 	// The canonical values live in the storage package so the telegram approval
 	// handlers, which cannot import this package, write the same vocabulary.
@@ -124,29 +126,48 @@ func invoiceApprovalLockKey(paymentHash string) string {
 // FindPendingInvoiceApproval returns the still-approvable request for this
 // payment hash, or nil when the invoice is free to be submitted. Resolved
 // (approved/rejected/executed) and expired requests do not block a retry.
-func FindPendingInvoiceApproval(bot *telegram.TipBot, paymentHash string) *PendingTransaction {
+//
+// A storage error other than "not found" is returned rather than read as "no
+// approval": failing open would let the same invoice get a second approval.
+func FindPendingInvoiceApproval(bot *telegram.TipBot, paymentHash string) (*PendingTransaction, error) {
 	if paymentHash == "" {
-		return nil
+		return nil, nil
 	}
 	lock := &InvoiceApprovalLock{Base: storage.New(storage.ID(invoiceApprovalLockKey(paymentHash)))}
 	sn, err := lock.Get(lock, bot.Bunt)
-	if err != nil {
+	if errors.Is(err, buntdb.ErrNotFound) {
 		// No record for this hash: nothing outstanding.
-		return nil
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read invoice approval lock: %w", err)
 	}
 	existing, ok := sn.(*InvoiceApprovalLock)
 	if !ok || existing.PendingTxID == "" {
-		return nil
+		return nil, nil
 	}
 	pt, err := LoadPendingTransaction(existing.PendingTxID, bot)
+	if errors.Is(err, buntdb.ErrNotFound) {
+		log.Warnf("[api/send] Invoice approval lock %s points at missing transaction %s", paymentHash, existing.PendingTxID)
+		return nil, nil
+	}
 	if err != nil {
-		log.Warnf("[api/send] Invoice approval lock %s points at missing transaction %s: %v", paymentHash, existing.PendingTxID, err)
-		return nil
+		return nil, fmt.Errorf("load pending transaction %s: %w", existing.PendingTxID, err)
 	}
 	if !pt.CanBeApproved() {
-		return nil
+		return nil, nil
 	}
-	return pt
+	return pt, nil
+}
+
+// abandonPendingTransaction marks a pending transaction failed when its
+// approval request could not be set up, so it cannot be approved later and,
+// for invoices, no longer blocks a resubmission.
+func abandonPendingTransaction(bot *telegram.TipBot, pt *PendingTransaction) {
+	pt.Status = StatusFailed
+	if err := pt.SaveToDB(bot); err != nil {
+		log.Errorf("[api/send] Could not mark pending transaction %s failed: %v", pt.ID, err)
+	}
 }
 
 // RecordPendingInvoiceApproval records that paymentHash now has an approval

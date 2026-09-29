@@ -215,15 +215,20 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check sender's available balance (wallet balance - pot balance)
-	balance, err := s.Bot.GetUserAvailableBalance(fromUser)
+	// Check sender's available balance (wallet balance - pot balance) and
+	// reserve it for this send, so concurrent payments from the same sender
+	// cannot together spend sats reserved in pots.
+	reservation, balance, err := s.Bot.ReserveBalance(fromUser, req.Amount)
 	if err != nil {
 		log.Errorf("[api/send] Could not get available balance for %s: %v", fromUsername, err)
 		RespondError(w, "Could not check sender balance")
 		return
 	}
+	if reservation != nil {
+		defer reservation.Release()
+	}
 
-	if balance < req.Amount {
+	if reservation == nil {
 		log.Warnf("[api/send] Insufficient available balance for %s: %d < %d", fromUsername, balance, req.Amount)
 		RespondError(w, fmt.Sprintf("Insufficient balance: %s available, %s required", thirdparty.FormatSatsWithLKR(balance), thirdparty.FormatSatsWithLKR(req.Amount)))
 		return
@@ -306,9 +311,12 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Send approval request using Telegram callback buttons (same as /send command)
-		err = telegram.CreateAPIApprovalRequest(s.Bot, fromUser, toIdentifier, req.Amount, req.Memo, pendingTx.ID, clientIP)
+		err = telegram.CreateAPIApprovalRequest(s.Bot, fromUser, toIdentifier, req.Amount, req.Memo, pendingTx.ID, clientIP, pendingTx.ExpiryTime)
 		if err != nil {
-			log.Warnf("[api/send] Failed to send approval request: %v", err)
+			log.Errorf("[api/send] Failed to send approval request: %v", err)
+			abandonPendingTransaction(s.Bot, pendingTx)
+			RespondError(w, "Could not deliver the approval request via Telegram. Nothing was sent; please retry.")
+			return
 		}
 
 		response := SendResponse{
@@ -499,31 +507,25 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 		return
 	}
 
-	// Serialise the balance-check-then-pay window per sender. lnbits only knows
-	// the raw wallet balance, so without this lock concurrent requests could
-	// each pass the available-balance check and together spend sats that are
-	// reserved in pots.
-	userLockKey := fmt.Sprintf("api_send_user_%d", fromUser.Telegram.ID)
-	if success := s.MemoCache.SetNX(userLockKey, "locked"); !success {
-		log.Warnf("[api/send] Another payment for %s is already in flight", fromUsername)
-		RespondError(w, "Another payment for this wallet is already being processed, please retry shortly")
-		return
-	}
-	defer s.MemoCache.Delete(userLockKey)
-
-	// Check available balance with a ~2% routing fee reserve
-	balance, err := s.Bot.GetUserAvailableBalance(fromUser)
+	// Check available balance with a ~2% routing fee reserve, and reserve it
+	// until lnbits has the payment. Other payments from this sender may run
+	// concurrently: each one's reservation is subtracted here, so together
+	// they cannot spend sats reserved in pots.
+	reservation, balance, err := s.Bot.ReserveBalance(fromUser, utils.AmountWithFeeReserve(amount))
 	if err != nil {
 		log.Errorf("[api/send] Could not get available balance for %s: %v", fromUsername, err)
 		RespondError(w, "Could not check sender balance")
 		return
+	}
+	if reservation != nil {
+		defer reservation.Release()
 	}
 	if balance < amount {
 		log.Warnf("[api/send] Insufficient available balance for %s: %d < %d", fromUsername, balance, amount)
 		RespondError(w, fmt.Sprintf("Insufficient balance: %s available, %s required", thirdparty.FormatSatsWithLKR(balance), thirdparty.FormatSatsWithLKR(amount)))
 		return
 	}
-	if float64(amount) > float64(balance)*0.98 {
+	if reservation == nil {
 		RespondError(w, fmt.Sprintf("Insufficient balance to cover routing fees: %s available, %s required plus a fee reserve", thirdparty.FormatSatsWithLKR(balance), thirdparty.FormatSatsWithLKR(amount)))
 		return
 	}
@@ -536,7 +538,13 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 		// actionable for 24h. Reject a second request for an invoice that
 		// already has an approval waiting, so the same bolt11 cannot end up
 		// with two approvable requests.
-		if existing := FindPendingInvoiceApproval(s.Bot, bolt11.PaymentHash); existing != nil {
+		existing, err := FindPendingInvoiceApproval(s.Bot, bolt11.PaymentHash)
+		if err != nil {
+			log.Errorf("[api/send] Could not check invoice %s for an outstanding approval: %v", bolt11.PaymentHash, err)
+			RespondError(w, "Failed to create pending transaction")
+			return
+		}
+		if existing != nil {
 			log.Warnf("[api/send] Invoice %s already has approval %s awaiting confirmation", bolt11.PaymentHash, existing.ID)
 			RespondError(w, fmt.Sprintf("This invoice already has an approval request awaiting confirmation (transaction ID: %s)", existing.ID))
 			return
@@ -549,11 +557,19 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 			RespondError(w, "Failed to create pending transaction")
 			return
 		}
+		// Without the durable lock a second approval could be queued for this
+		// invoice once the MemoCache lock lapses, so its failure is fatal.
 		if err := RecordPendingInvoiceApproval(s.Bot, bolt11.PaymentHash, pendingTx.ID); err != nil {
 			log.Errorf("[api/send] Could not record invoice approval lock for %s: %v", bolt11.PaymentHash, err)
+			abandonPendingTransaction(s.Bot, pendingTx)
+			RespondError(w, "Failed to create pending transaction")
+			return
 		}
-		if err := telegram.CreateAPIInvoiceApprovalRequest(s.Bot, fromUser, paymentRequest, amount, memo, pendingTx.ID, clientIP); err != nil {
-			log.Warnf("[api/send] Failed to send invoice approval request: %v", err)
+		if err := telegram.CreateAPIInvoiceApprovalRequest(s.Bot, fromUser, paymentRequest, amount, memo, pendingTx.ID, clientIP, pendingTx.ExpiryTime); err != nil {
+			log.Errorf("[api/send] Failed to send invoice approval request: %v", err)
+			abandonPendingTransaction(s.Bot, pendingTx)
+			RespondError(w, "Could not deliver the approval request via Telegram. Nothing was paid; please retry.")
+			return
 		}
 
 		response := SendResponse{
@@ -577,6 +593,9 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 	log.Infof("[api/send] Paying invoice for %s (%d sat)", fromUsername, amount)
 	payStart := time.Now()
 	inv, err := fromUser.Wallet.Pay(lnbits.PaymentParams{Out: true, Bolt11: paymentRequest}, s.Bot.Client)
+	// lnbits now accounts for the payment in its own balance (or rejected
+	// it), so free the reservation before the long settlement wait.
+	reservation.Release()
 	if err != nil {
 		log.Errorf("[api/send] Invoice payment failed for %s: %v", fromUsername, err)
 		if s.Bot.ErrorLogger != nil {
