@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/LightningTipBot/LightningTipBot/internal"
 	"github.com/LightningTipBot/LightningTipBot/internal/errors"
 	"github.com/LightningTipBot/LightningTipBot/internal/i18n"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
@@ -14,6 +15,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
 	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 	"github.com/LightningTipBot/LightningTipBot/internal/utils"
+	decodepay "github.com/fiatjaf/ln-decodepay"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 )
@@ -148,7 +150,7 @@ func (bot *TipBot) approveAPITransactionHandler(ctx intercept.Context) (intercep
 
 	// Update the PendingTransaction status so /api/v1/send/status reflects the real outcome.
 	if storage.UpdatePendingTxStatusFn != nil {
-		storage.UpdatePendingTxStatusFn(approvalData.TransactionID, "executed", ctx.Callback().Sender.Username)
+		storage.UpdatePendingTxStatusFn(approvalData.TransactionID, storage.TxStatusExecuted, ctx.Callback().Sender.Username)
 	}
 
 	log.Infof("[💸 api_send_approved] Send from %s to %s (%s).", fromUserStr, toUserStr, thirdparty.FormatSatsWithLKR(approvalData.Amount))
@@ -206,7 +208,7 @@ func (bot *TipBot) cancelAPITransactionHandler(ctx intercept.Context) (intercept
 
 	// Update the PendingTransaction status so /api/v1/send/status reflects the real outcome.
 	if storage.UpdatePendingTxStatusFn != nil {
-		storage.UpdatePendingTxStatusFn(approvalData.TransactionID, "rejected", c.Sender.Username)
+		storage.UpdatePendingTxStatusFn(approvalData.TransactionID, storage.TxStatusRejected, c.Sender.Username)
 	}
 
 	log.Infof("[cancelAPITransactionHandler] API transaction %s cancelled by @%s", approvalData.TransactionID, c.Sender.Username)
@@ -242,14 +244,56 @@ func (bot *TipBot) executeApprovedInvoicePayment(ctx intercept.Context, approval
 		return
 	}
 
+	// The approval is spent either way: lnbits has accepted the payment, so the
+	// button must not stay pressable while we wait for it to settle.
 	approvalData.Inactivate(approvalData, bot.Bunt)
+
+	// lnbits does not always echo the payment hash back. Fall back to the one in
+	// the invoice itself so the settlement check still has something to follow.
+	paymentHash := inv.PaymentHash
+	if paymentHash == "" {
+		if decoded, derr := decodepay.Decodepay(approvalData.Invoice); derr == nil {
+			paymentHash = decoded.PaymentHash
+		}
+	}
+
+	// lnbits answers as soon as it has handed the payment to its backend, which
+	// is not the same as the sats reaching the destination node. Follow the
+	// payment to a terminal state before reporting it as paid.
+	settlement := bot.Client.WaitForOutgoingPayment(*from.Wallet, paymentHash, internal.APISendSettlementTimeout())
+
+	switch settlement.State {
+	case lnbits.PaymentStateFailed:
+		log.Errorf("[💸 api_send_approved invoice] %s: payment %s did not settle: %v", fromUserStr, paymentHash, settlement.Err)
+		if bot.ErrorLogger != nil {
+			bot.ErrorLogger.LogPaymentError(fmt.Errorf("payment did not settle: %s", settlement.State), approvalData.Amount, approvalData.Memo, approvalData.Invoice, from.Telegram)
+		}
+		if storage.UpdatePendingTxStatusFn != nil {
+			storage.UpdatePendingTxStatusFn(approvalData.TransactionID, storage.TxStatusFailed, ctx.Callback().Sender.Username)
+		}
+		bot.tryEditMessage(ctx.Callback().Message, fmt.Sprintf("❌ Invoice payment failed — the payment could not be routed and your %s was not sent.", thirdparty.FormatSatsWithLKR(approvalData.Amount)), &tb.ReplyMarkup{})
+		return
+
+	case lnbits.PaymentStatePending, lnbits.PaymentStateUnknown:
+		// The sats may still leave the node, so this is neither a success nor a
+		// failure. Move the transaction to in_flight rather than leaving it
+		// pending: a pending transaction is reported as expired once its 24h
+		// window passes, which would tell the caller a payment that may well
+		// have settled was never sent.
+		log.Warnf("[💸 api_send_approved invoice] %s: payment %s unresolved (state %s): %v", fromUserStr, paymentHash, settlement.State, settlement.Err)
+		if storage.UpdatePendingTxStatusFn != nil {
+			storage.UpdatePendingTxStatusFn(approvalData.TransactionID, storage.TxStatusInFlight, ctx.Callback().Sender.Username)
+		}
+		bot.tryEditMessage(ctx.Callback().Message, fmt.Sprintf("⏳ Invoice payment of %s is still in flight.\n\nIt has not settled yet — check your balance shortly for the final result. Do not retry this invoice.", thirdparty.FormatSatsWithLKR(approvalData.Amount)), &tb.ReplyMarkup{})
+		return
+	}
 
 	// Update the PendingTransaction status so /api/v1/send/status reflects the real outcome.
 	if storage.UpdatePendingTxStatusFn != nil {
-		storage.UpdatePendingTxStatusFn(approvalData.TransactionID, "executed", ctx.Callback().Sender.Username)
+		storage.UpdatePendingTxStatusFn(approvalData.TransactionID, storage.TxStatusExecuted, ctx.Callback().Sender.Username)
 	}
 
-	log.Infof("[💸 api_send_approved invoice] %s paid invoice %s (%s).", fromUserStr, inv.PaymentHash, thirdparty.FormatSatsWithLKR(approvalData.Amount))
+	log.Infof("[💸 api_send_approved invoice] %s paid invoice %s (%s, fee %d sat).", fromUserStr, paymentHash, thirdparty.FormatSatsWithLKR(approvalData.Amount), settlement.Fee)
 
 	successMsg := fmt.Sprintf("✅ Invoice approved and paid successfully!\n\n💸 Amount: %s", thirdparty.FormatSatsWithLKR(approvalData.Amount))
 	if approvalData.Memo != "" {
@@ -317,7 +361,7 @@ func CreateAPIApprovalRequest(bot *TipBot, fromUser *lnbits.User, toUsername str
 			}
 		}
 	}
-	
+
 	// Create confirmation text (same format as /send command)
 	toUserStrMention := fmt.Sprintf("@%s", actualUsername)
 	confirmText := fmt.Sprintf("Do you want to pay to %s?\n\n💸 Amount: %s", toUserStrMention, thirdparty.FormatSatsWithLKR(amount))

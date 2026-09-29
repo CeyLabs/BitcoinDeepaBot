@@ -14,7 +14,6 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/time/rate"
 )
 
 const (
@@ -27,10 +26,6 @@ const (
 	// maxValidTimestamp is 2100-01-01 - reasonable upper bound
 	maxValidTimestamp int64 = 4102444800
 )
-
-// lnbitsRateLimiter enforces a shared rate limit of 150 req/min (safely below LNbits' 200/min limit)
-// across all concurrent analytics requests.
-var lnbitsRateLimiter = rate.NewLimiter(rate.Every(400*time.Millisecond), 1)
 
 // TransactionAnalyticsResponse represents the analytics data response
 type TransactionAnalyticsResponse struct {
@@ -272,7 +267,7 @@ func (s Service) GetTransactionAnalytics(w http.ResponseWriter, r *http.Request)
 					Fee:         payment.Fee,
 					FeeSats:     payment.Fee / 1000,
 					Memo:        payment.Memo,
-					Time:        payment.Time,
+					Time:        int(payment.Time),
 					Timestamp:   paymentTime.Format(time.RFC3339),
 					PaymentType: paymentType,
 					Bolt11:      payment.Bolt11,
@@ -443,7 +438,7 @@ func (s Service) GetUserTransactionHistory(w http.ResponseWriter, r *http.Reques
 					Fee:         payment.Fee,
 					FeeSats:     payment.Fee / 1000,
 					Memo:        payment.Memo,
-					Time:        payment.Time,
+					Time:        int(payment.Time),
 					Timestamp:   paymentTime.Format(time.RFC3339),
 					PaymentType: paymentType,
 					Bolt11:      payment.Bolt11,
@@ -515,7 +510,7 @@ func fetchPaymentsWithRateLimit(ctx context.Context, s Service, user *lnbits.Use
 	backoff := 2 * time.Second
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if err := lnbitsRateLimiter.Wait(ctx); err != nil {
+		if err := lnbits.RateLimiter.Wait(ctx); err != nil {
 			return nil, err
 		}
 

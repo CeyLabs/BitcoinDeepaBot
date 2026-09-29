@@ -3,6 +3,7 @@ package lnbits
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -142,13 +143,49 @@ type Wallet struct {
 	User     string `json:"user"`
 }
 
+// UnixTime is a payment timestamp in unix seconds. lnbits 0.x serialises
+// `time` as a number, 1.x as an RFC3339 string, so decoding accepts either and
+// normalises to seconds. Encoding always emits the number, keeping the API
+// responses this type is serialised into unchanged.
+type UnixTime int64
+
+func (t *UnixTime) UnmarshalJSON(b []byte) error {
+	s := string(b)
+	if s == "null" || s == `""` {
+		return nil
+	}
+	if b[0] != '"' {
+		var n int64
+		if err := json.Unmarshal(b, &n); err != nil {
+			return err
+		}
+		*t = UnixTime(n)
+		return nil
+	}
+	var str string
+	if err := json.Unmarshal(b, &str); err != nil {
+		return err
+	}
+	parsed, err := time.Parse(time.RFC3339, str)
+	if err != nil {
+		return fmt.Errorf("lnbits: unrecognised payment time %q: %w", str, err)
+	}
+	*t = UnixTime(parsed.Unix())
+	return nil
+}
+
 type Payment struct {
-	CheckingID    string      `json:"checking_id"`
-	Pending       bool        `json:"pending"`
+	CheckingID string `json:"checking_id"`
+	Pending    bool   `json:"pending"`
+	// Status is reported by lnbits 0.12 and newer ("success"/"pending"/"failed")
+	// and is absent on older versions, which describe a payment with Pending.
+	// omitempty keeps it out of the payloads this type is serialised into, so
+	// adding it does not change any existing API response.
+	Status        string      `json:"status,omitempty"`
 	Amount        int64       `json:"amount"`
 	Fee           int64       `json:"fee"`
 	Memo          string      `json:"memo"`
-	Time          int         `json:"time"`
+	Time          UnixTime    `json:"time"`
 	Bolt11        string      `json:"bolt11"`
 	Preimage      string      `json:"preimage"`
 	PaymentHash   string      `json:"payment_hash"`
@@ -159,9 +196,15 @@ type Payment struct {
 }
 
 type LNbitsPayment struct {
-	Paid     bool    `json:"paid"`
-	Preimage string  `json:"preimage"`
-	Details  Payment `json:"details,omitempty"`
+	Paid     bool   `json:"paid"`
+	Preimage string `json:"preimage"`
+	// Status and Fee are populated by lnbits versions that return the payment
+	// itself rather than wrapping it in Details. omitempty keeps them out of
+	// the payloads this type is serialised into (/api/v1/paymentstatus and
+	// /api/v1/invoicestatus), so adding them changes no existing response.
+	Status  string  `json:"status,omitempty"`
+	Fee     int64   `json:"fee,omitempty"`
+	Details Payment `json:"details,omitempty"`
 }
 
 type Payments []Payment

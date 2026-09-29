@@ -73,6 +73,11 @@ api:
     admin_approval_threshold: 100000
     max_memo_length: 280
     rate_limit: 60
+    # How long to wait for an outgoing bolt11 payment to actually settle before
+    # answering the caller. lnbits returns as soon as it has handed the payment
+    # to its backend, so without this wait a payment that is still routing (or
+    # never leaves the node) would be reported as a success.
+    settlement_timeout: 60  # seconds
     whitelisted_wallets:
       BiccoindeepaDSA:
         username: "BiccoindeepaDSA"

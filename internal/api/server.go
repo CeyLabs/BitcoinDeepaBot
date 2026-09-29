@@ -19,14 +19,24 @@ type Server struct {
 const (
 	StatusError = "ERROR"
 	StatusOk    = "OK"
+
+	// ServerWriteTimeout bounds how long a handler has to produce a response.
+	// A handler that overruns it has its write fail, leaving the caller with a
+	// dropped connection instead of an answer — so any handler that waits on
+	// something slow must budget against this (see sendToInvoice).
+	ServerWriteTimeout = 90 * time.Second
+
+	// responseWriteMargin is held back from ServerWriteTimeout so there is
+	// always room to serialise and flush the response.
+	responseWriteMargin = 10 * time.Second
 )
 
 func NewServer(address string) *Server {
 	srv := &http.Server{
 		Addr: address,
 		// Good practice: enforce timeouts for servers you create!
-		WriteTimeout: 90 * time.Second,
-		ReadTimeout:  90 * time.Second,
+		WriteTimeout: ServerWriteTimeout,
+		ReadTimeout:  ServerWriteTimeout,
 	}
 	apiServer := &Server{
 		httpServer: srv,

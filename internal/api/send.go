@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/LightningTipBot/LightningTipBot/internal"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/str"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
@@ -30,15 +31,21 @@ type SendRequest struct {
 
 // SendResponse represents the JSON response for the send API
 type SendResponse struct {
-	Success         bool   `json:"success"`
+	Success bool   `json:"success"`
+	Status  string `json:"status,omitempty"` // settlement state for invoice payments: settled/pending/failed/unknown
+	// Error carries the same message as an ErrorResponse so a failed payment
+	// can keep the documented {"error": ...} shape while still returning the
+	// payment_hash the caller needs to reconcile.
+	Error           string `json:"error,omitempty"`
 	TransactionHash string `json:"transaction_hash,omitempty"`
 	Message         string `json:"message"`
 	FromUser        string `json:"from_user"`
-	ToUser          string `json:"to_user"`
-	Amount          int64  `json:"amount"`
+	ToUser          string `json:"to_user,omitempty"`
+	Amount          int64  `json:"amount,omitempty"`
 	AmountLKR       string `json:"amount_lkr,omitempty"` // LKR conversion
 	Memo            string `json:"memo,omitempty"`
 	PaymentHash     string `json:"payment_hash,omitempty"` // set for bolt11 invoice payments
+	Preimage        string `json:"preimage,omitempty"`     // proof of payment, set once settled
 	Fee             int64  `json:"fee,omitempty"`          // routing fee in sats for invoice payments
 }
 
@@ -306,6 +313,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 
 		response := SendResponse{
 			Success: false,
+			Status:  StatusAwaitingApproval,
 			Message: fmt.Sprintf("Transaction requires admin approval (amount: %s > threshold: %s). Approval request sent to you via Telegram. Transaction ID: %s",
 				thirdparty.FormatSatsWithLKR(req.Amount), thirdparty.FormatSatsWithLKR(GetWalletAdminApprovalThreshold(walletID)), pendingTx.ID),
 			FromUser:  fromUsername,
@@ -400,7 +408,10 @@ func (s Service) SendStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Auto-mark as expired if past expiry time but still showing pending
+	// Auto-mark as expired if past expiry time but still awaiting approval.
+	// Only StatusPending is expirable: StatusInFlight means the payment was
+	// approved and accepted by the node, so reporting it as expired would tell
+	// the caller sats that may already have settled were never sent.
 	status := pt.Status
 	if status == StatusPending && pt.IsExpired() {
 		status = StatusExpired
@@ -414,6 +425,7 @@ func (s Service) SendStatus(w http.ResponseWriter, r *http.Request) {
 		Amount           int64      `json:"amount"`
 		AmountLKR        string     `json:"amount_lkr,omitempty"`
 		Memo             string     `json:"memo,omitempty"`
+		PaymentHash      string     `json:"payment_hash,omitempty"`
 		RequestTimestamp time.Time  `json:"request_timestamp"`
 		ExpiryTime       time.Time  `json:"expiry_time"`
 		ApprovedBy       string     `json:"approved_by,omitempty"`
@@ -422,6 +434,8 @@ func (s Service) SendStatus(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	// PaymentHash is set for invoice transactions, so a caller that sees
+	// in_flight can resolve the outcome via /api/v1/send/payment/{payment_hash}.
 	json.NewEncoder(w).Encode(StatusResponse{
 		ID:               pt.ID,
 		Status:           status,
@@ -430,6 +444,7 @@ func (s Service) SendStatus(w http.ResponseWriter, r *http.Request) {
 		Amount:           pt.Amount,
 		AmountLKR:        getLKRValue(pt.Amount),
 		Memo:             pt.Memo,
+		PaymentHash:      pt.PaymentHash,
 		RequestTimestamp: pt.RequestTimestamp,
 		ExpiryTime:       pt.ExpiryTime,
 		ApprovedBy:       pt.ApprovedBy,
@@ -543,6 +558,7 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 
 		response := SendResponse{
 			Success: false,
+			Status:  StatusAwaitingApproval,
 			Message: fmt.Sprintf("Transaction requires admin approval (amount: %s > threshold: %s). Approval request sent to you via Telegram. Transaction ID: %s",
 				thirdparty.FormatSatsWithLKR(amount), thirdparty.FormatSatsWithLKR(GetWalletAdminApprovalThreshold(walletID)), pendingTx.ID),
 			FromUser:  fromUsername,
@@ -559,6 +575,7 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 
 	// Pay the invoice
 	log.Infof("[api/send] Paying invoice for %s (%d sat)", fromUsername, amount)
+	payStart := time.Now()
 	inv, err := fromUser.Wallet.Pay(lnbits.PaymentParams{Out: true, Bolt11: paymentRequest}, s.Bot.Client)
 	if err != nil {
 		log.Errorf("[api/send] Invoice payment failed for %s: %v", fromUsername, err)
@@ -571,17 +588,88 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 		return
 	}
 
-	// Read the settled payment to report the real routing fee.
-	// lnbits reports fee in millisats, so convert to sats.
-	var fee int64
-	if payment, perr := s.Bot.Client.Payment(*fromUser.Wallet, inv.PaymentHash); perr == nil {
-		fee = payment.Details.Fee / 1000
-		if fee < 0 {
-			fee = -fee
+	// lnbits answers as soon as it has handed the payment to its backend, which
+	// is not the same as the sats reaching the destination node. Follow the
+	// payment to a terminal state before telling anyone it succeeded.
+	paymentHash := inv.PaymentHash
+	if paymentHash == "" {
+		paymentHash = bolt11.PaymentHash
+	}
+	// lnbits itself blocks for a while before answering, so spend only what is
+	// left of the server's write budget on waiting. Overrunning it would drop
+	// the connection and leave the caller with exactly the ambiguous outcome
+	// this check exists to remove.
+	//
+	// The budget is measured from when the request entered the handler chain,
+	// not from the Pay call: the server's write deadline is already ticking
+	// through HMAC verification, the user lookup and the balance check.
+	elapsedSince := payStart
+	if start, ok := RequestStart(r.Context()); ok {
+		elapsedSince = start
+	}
+	settlementBudget := internal.APISendSettlementTimeout()
+	if available := ServerWriteTimeout - responseWriteMargin - time.Since(elapsedSince); settlementBudget > available {
+		settlementBudget = available
+	}
+	settlement := s.Bot.Client.WaitForOutgoingPayment(*fromUser.Wallet, paymentHash, settlementBudget)
+
+	switch settlement.State {
+	case lnbits.PaymentStateFailed:
+		log.Errorf("[api/send] ❌ Invoice payment did not settle for %s (%d sat, hash %s): %v", fromUsername, amount, paymentHash, settlement.Err)
+		if s.Bot.ErrorLogger != nil {
+			s.Bot.ErrorLogger.LogPaymentError(fmt.Errorf("payment did not settle: %s", settlement.State), amount, bolt11.Description, paymentRequest, fromUser.Telegram)
 		}
+		failureMsg := fmt.Sprintf("❌ Invoice payment failed — the payment could not be routed and your %s was not sent.", thirdparty.FormatSatsWithLKR(amount))
+		if _, serr := s.Bot.Telegram.Send(fromUser.Telegram, failureMsg); serr != nil {
+			log.Warnf("[api/send] Could not send failure notice to sender: %v", serr)
+		}
+		// Answer with the full SendResponse rather than a bare error: the
+		// caller still needs the payment_hash to reconcile this attempt, and
+		// `status` tells it apart from the pending case. `error` keeps the
+		// documented error-body shape intact for existing clients.
+		const failureReason = "Invoice payment failed: the payment could not be routed to the destination node"
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(SendResponse{
+			Success:     false,
+			Status:      lnbits.PaymentStateFailed.String(),
+			Error:       failureReason,
+			Message:     failureReason,
+			FromUser:    fromUsername,
+			ToUser:      paymentRequest,
+			Amount:      amount,
+			AmountLKR:   getLKRValue(amount),
+			Memo:        memo,
+			PaymentHash: paymentHash,
+		})
+		return
+
+	case lnbits.PaymentStatePending, lnbits.PaymentStateUnknown:
+		// The sats may still leave the node, so this is neither a success nor a
+		// failure. Report it as unresolved and let the caller poll the hash.
+		log.Warnf("[api/send] ⏳ Invoice payment unresolved for %s (%d sat, hash %s, state %s): %v", fromUsername, amount, paymentHash, settlement.State, settlement.Err)
+		pendingMsg := fmt.Sprintf("⏳ Invoice payment of %s is still in flight. You will not be charged twice — check back shortly for the final result.", thirdparty.FormatSatsWithLKR(amount))
+		if _, serr := s.Bot.Telegram.Send(fromUser.Telegram, pendingMsg); serr != nil {
+			log.Warnf("[api/send] Could not send pending notice to sender: %v", serr)
+		}
+		response := SendResponse{
+			Success:     false,
+			Status:      settlement.State.String(),
+			Message:     "Invoice payment is still in flight and has not settled yet. Poll /api/v1/send/payment/{payment_hash} for the final result. Do not retry this invoice.",
+			FromUser:    fromUsername,
+			ToUser:      paymentRequest,
+			Amount:      amount,
+			AmountLKR:   getLKRValue(amount),
+			Memo:        memo,
+			PaymentHash: paymentHash,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		json.NewEncoder(w).Encode(response)
+		return
 	}
 
-	log.Infof("[api/send] ✅ Invoice paid: %s (%d sat, fee %d sat)", fromUsername, amount, fee)
+	log.Infof("[api/send] ✅ Invoice settled: %s (%d sat, fee %d sat)", fromUsername, amount, settlement.Fee)
 
 	// Send confirmation to sender
 	senderConfirmationMsg := fmt.Sprintf("✅ Invoice paid successfully!\n\n💸 Amount: %s", thirdparty.FormatSatsWithLKR(amount))
@@ -597,18 +685,67 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 
 	response := SendResponse{
 		Success:     true,
+		Status:      lnbits.PaymentStateSettled.String(),
 		Message:     "Invoice paid successfully",
 		FromUser:    fromUsername,
 		ToUser:      paymentRequest,
 		Amount:      amount,
 		AmountLKR:   getLKRValue(amount),
 		Memo:        memo,
-		PaymentHash: inv.PaymentHash,
-		Fee:         fee,
+		PaymentHash: paymentHash,
+		Preimage:    settlement.Preimage,
+		Fee:         settlement.Fee,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
+}
+
+// SendPaymentStatus handles GET /api/v1/send/payment/{payment_hash}. It resolves
+// an outgoing invoice payment that /api/v1/send left unsettled, so a caller that
+// got a 202 can find out whether the sats eventually left the node.
+func (s Service) SendPaymentStatus(w http.ResponseWriter, r *http.Request) {
+	// The hash is placed in an lnbits URL, so accept only a real payment hash.
+	paymentHash := strings.ToLower(mux.Vars(r)["payment_hash"])
+	if !lnbits.ValidPaymentHash(paymentHash) {
+		RespondError(w, "Invalid payment_hash: expected 64 hex characters")
+		return
+	}
+
+	authenticatedWallet := r.Context().Value("authenticated_wallet")
+	if authenticatedWallet == nil {
+		log.Error("[api/send/payment] No authenticated wallet found in request context")
+		RespondError(w, "Authentication failed")
+		return
+	}
+	wallet, exists := GetWhitelistedWallets()[authenticatedWallet.(string)]
+	if !exists {
+		log.Errorf("[api/send/payment] Authenticated wallet %s not found in configuration", authenticatedWallet.(string))
+		RespondError(w, "Invalid wallet configuration")
+		return
+	}
+
+	fromUser, err := telegram.GetUserByTelegramUsername(wallet.Username, *s.Bot)
+	if err != nil {
+		log.Errorf("[api/send/payment] Could not find user %s: %v", wallet.Username, err)
+		RespondError(w, fmt.Sprintf("Sender '@%s' not found or has no wallet", wallet.Username))
+		return
+	}
+
+	// A single lookup, no waiting: the caller polls this endpoint itself.
+	settlement := s.Bot.Client.WaitForOutgoingPayment(*fromUser.Wallet, paymentHash, 0)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(SendResponse{
+		Success:     settlement.State == lnbits.PaymentStateSettled,
+		Status:      settlement.State.String(),
+		Message:     fmt.Sprintf("Payment is %s", settlement.State),
+		FromUser:    wallet.Username,
+		PaymentHash: paymentHash,
+		Preimage:    settlement.Preimage,
+		Fee:         settlement.Fee,
+	})
 }
 
 // sendToLightningAddress handles sending to Lightning addresses

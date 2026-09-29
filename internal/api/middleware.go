@@ -12,6 +12,7 @@ import (
 	"net/http/httputil"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/LightningTipBot/LightningTipBot/internal"
@@ -133,10 +134,56 @@ func dump(r *http.Request) string {
 	return string(x)
 }
 
+// ctxKey is an unexported context key type, so values stored under it cannot
+// collide with keys set by other packages.
+type ctxKey string
+
+// requestStartKey carries the time a request entered the handler chain.
+const requestStartKey ctxKey = "request_start"
+
+// RequestStart returns when the request entered the handler chain, and whether
+// the middleware recorded it. Handlers use it to budget a slow wait against the
+// server's WriteTimeout, which starts before the handler is called.
+func RequestStart(ctx context.Context) (time.Time, bool) {
+	start, ok := ctx.Value(requestStartKey).(time.Time)
+	return start, ok
+}
+
+// signatureSet remembers HMAC signatures that were already accepted, so each
+// signed request can be used only once.
+type signatureSet struct {
+	mu   sync.Mutex
+	seen map[string]time.Time // signature -> when it can be forgotten
+}
+
+var usedSignatures = &signatureSet{seen: make(map[string]time.Time)}
+
+// claim records sig and reports whether it was unused. ttl must cover the whole
+// timestamp window the signature is valid for; after that the timestamp check
+// rejects it anyway.
+func (s *signatureSet) claim(sig string, ttl time.Duration) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now()
+	for k, expiry := range s.seen {
+		if now.After(expiry) {
+			delete(s.seen, k)
+		}
+	}
+	if _, used := s.seen[sig]; used {
+		return false
+	}
+	s.seen[sig] = now.Add(ttl)
+	return true
+}
+
 // WalletHMACMiddleware validates HMAC signatures for wallet-based API endpoints
 // It identifies the sending wallet by validating the signature against each whitelisted wallet's secret
 func WalletHMACMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		requestStart := time.Now()
+
 		// Get timestamp from header for replay attack prevention
 		timestampStr := r.Header.Get("X-Timestamp")
 		if timestampStr == "" {
@@ -160,8 +207,10 @@ func WalletHMACMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			tolerance = 300 // Default 5 minutes
 		}
 
-		if now-timestamp > tolerance {
-			log.Warnf("Request timestamp too old (age: %d seconds, tolerance: %d)", now-timestamp, tolerance)
+		// Reject timestamps too far in either direction: a future timestamp
+		// would keep a captured request replayable until it came due.
+		if age := now - timestamp; age > tolerance || age < -tolerance {
+			log.Warnf("Request timestamp outside tolerance (age: %d seconds, tolerance: %d)", age, tolerance)
 			http.Error(w, "Request expired", http.StatusUnauthorized)
 			return
 		}
@@ -205,8 +254,21 @@ func WalletHMACMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Add authenticated wallet info to request context
+		// A valid signature is single use. Without this, a captured /send
+		// request could be replayed inside the tolerance window to move the
+		// same sats again.
+		if !usedSignatures.claim(signature, time.Duration(2*tolerance)*time.Second) {
+			log.Warnf("Replayed HMAC signature rejected for wallet: %s", authenticatedWallet)
+			http.Error(w, "Request already processed", http.StatusUnauthorized)
+			return
+		}
+
+		// Add authenticated wallet info to request context, along with the time
+		// the request entered the handler chain. Handlers that wait on
+		// something slow budget against the server's WriteTimeout, which is
+		// already ticking by the time they run (see sendToInvoice).
 		ctx := context.WithValue(r.Context(), "authenticated_wallet", authenticatedWallet)
+		ctx = context.WithValue(ctx, requestStartKey, requestStart)
 		r = r.WithContext(ctx)
 
 		log.Debugf("Wallet API request authenticated for wallet: %s", authenticatedWallet)

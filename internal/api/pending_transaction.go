@@ -34,11 +34,21 @@ type PendingTransaction struct {
 
 const (
 	PendingTransactionExpiry = 24 * time.Hour // Pending transactions expire after 24 hours
-	StatusPending            = "pending"
-	StatusApproved           = "approved"
-	StatusRejected           = "rejected"
-	StatusExpired            = "expired"
-	StatusExecuted           = "executed"
+
+	// The canonical values live in the storage package so the telegram approval
+	// handlers, which cannot import this package, write the same vocabulary.
+	StatusPending  = storage.TxStatusPending
+	StatusApproved = storage.TxStatusApproved
+	StatusRejected = storage.TxStatusRejected
+	StatusExpired  = storage.TxStatusExpired
+	StatusExecuted = storage.TxStatusExecuted
+	StatusFailed   = storage.TxStatusFailed
+	StatusInFlight = storage.TxStatusInFlight
+
+	// StatusAwaitingApproval is a SendResponse status only. It distinguishes a
+	// 202 that is waiting on an operator from a 202 whose payment is already in
+	// flight, which the caller has to handle very differently.
+	StatusAwaitingApproval = "awaiting_approval"
 )
 
 // NewPendingTransaction creates a new pending transaction
