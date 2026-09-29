@@ -51,7 +51,11 @@ func NewBot() TipBot {
 
 	bot := TipBot{
 		DB:       dbs,
-		Client:   lnbits.NewClient(internal.Configuration.Lnbits.AdminKey, internal.Configuration.Lnbits.Url),
+		Client: lnbits.NewClient(
+			internal.Configuration.Lnbits.AdminKey,
+			internal.Configuration.Lnbits.AdminToken,
+			internal.Configuration.Lnbits.Url,
+		),
 		Bunt:     createBunt(internal.Configuration.Database.BuntDbPath),
 		ShopBunt: createBunt(internal.Configuration.Database.ShopBuntDbPath),
 		Telegram: newTelegramBot(),

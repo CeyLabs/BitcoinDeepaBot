@@ -18,7 +18,11 @@ telegram:
 lnbits:
   url: "http://127.0.0.1:5000"
   admin_key: "1234"
-  admin_id: "1234"
+  admin_id: "1234"  # unused on lnbits 1.x, kept for older deployments
+  # ACL token scoped to /users/api/v1, required on lnbits 1.x to create users.
+  # Mint one under your lnbits account's access-control settings; a wallet api
+  # key does not grant account management there.
+  admin_token: "1234"
   webhook_server: "http://0.0.0.0:5588"  # Local webhook server address
   webhook_public_url: "https://yourdomain.com/webhook"  # Public URL for webhooks (for reverse proxy)
   lnbits_public_url: "link.mylnurl.com"
