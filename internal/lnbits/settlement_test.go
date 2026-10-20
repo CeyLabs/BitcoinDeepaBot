@@ -2,7 +2,14 @@ package lnbits
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
+
+	decodepay "github.com/fiatjaf/ln-decodepay"
 )
 
 // The payloads below are the response shapes lnbits returns from
@@ -136,5 +143,85 @@ func TestValidPaymentHash(t *testing.T) {
 		if got := ValidPaymentHash(in); got != want {
 			t.Errorf("ValidPaymentHash(%q) = %v, want %v", in, got, want)
 		}
+	}
+}
+
+func TestInvoiceExpired(t *testing.T) {
+	now := int(time.Now().Unix())
+	tests := []struct {
+		name string
+		inv  decodepay.Bolt11
+		want bool
+	}{
+		{name: "fresh", inv: decodepay.Bolt11{CreatedAt: now, Expiry: 3600}, want: false},
+		{name: "past expiry", inv: decodepay.Bolt11{CreatedAt: now - 7200, Expiry: 3600}, want: true},
+		{name: "zero expiry", inv: decodepay.Bolt11{CreatedAt: now - 1, Expiry: 0}, want: true},
+	}
+	for _, tt := range tests {
+		if got := InvoiceExpired(tt.inv); got != tt.want {
+			t.Errorf("%s: InvoiceExpired() = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestIsPaymentRejected(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "lnbits 400", err: Error{StatusCode: 400, Detail: "Insufficient balance."}, want: true},
+		{name: "lnbits 404", err: Error{StatusCode: 404}, want: true},
+		{name: "lnbits 500", err: Error{StatusCode: 500}, want: false},
+		{name: "lnbits 520 payment error", err: Error{StatusCode: 520}, want: false},
+		{name: "transport error", err: errors.New("connection reset by peer"), want: false},
+		{name: "wrapped 400", err: fmt.Errorf("pay: %w", Error{StatusCode: 400}), want: true},
+	}
+	for _, tt := range tests {
+		if got := IsPaymentRejected(tt.err); got != tt.want {
+			t.Errorf("%s: IsPaymentRejected() = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestPriorPayment(t *testing.T) {
+	const hash = "0f3a9c1e2b4d5f6a7b8c9d0e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c"
+	tests := []struct {
+		name      string
+		status    int
+		body      string
+		wantFound bool
+		wantState PaymentState
+		wantErr   bool
+	}{
+		{name: "never paid", status: 404, body: `{"detail":"Payment does not exist."}`},
+		{name: "settled", status: 200, body: `{"paid":true,"preimage":"6f1a2b"}`, wantFound: true, wantState: PaymentStateSettled},
+		{name: "in flight", status: 200, body: `{"paid":false,"status":"pending"}`, wantFound: true, wantState: PaymentStatePending},
+		{name: "failed", status: 200, body: `{"paid":false,"status":"failed"}`, wantFound: true, wantState: PaymentStateFailed},
+		{name: "lnbits down", status: 502, body: `bad gateway`, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/api/v1/payments/"+hash {
+					t.Errorf("path = %s", r.URL.Path)
+				}
+				w.WriteHeader(tt.status)
+				w.Write([]byte(tt.body))
+			}))
+			defer srv.Close()
+
+			got, found, err := Client{url: srv.URL}.PriorPayment(Wallet{Inkey: "k"}, hash)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
+			}
+			if found != tt.wantFound || got.State != tt.wantState {
+				t.Errorf("got (%s, found=%v), want (%s, found=%v)", got.State, found, tt.wantState, tt.wantFound)
+			}
+		})
+	}
+
+	if _, _, err := (Client{}).PriorPayment(Wallet{}, "../wallet"); err == nil {
+		t.Error("PriorPayment accepted an invalid payment hash")
 	}
 }

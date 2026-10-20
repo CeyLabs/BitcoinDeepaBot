@@ -244,51 +244,89 @@ func (bot *TipBot) cancelAPITransactionHandler(ctx intercept.Context) (intercept
 	return ctx, nil
 }
 
+// setPendingTxStatus records an approval outcome so /api/v1/send/status
+// reflects it.
+func setPendingTxStatus(transactionID, status, actor string) {
+	if storage.UpdatePendingTxStatusFn != nil {
+		storage.UpdatePendingTxStatusFn(transactionID, status, actor)
+	}
+}
+
 // executeApprovedInvoicePayment pays an approved bolt11 invoice externally via lnbits.
 func (bot *TipBot) executeApprovedInvoicePayment(ctx intercept.Context, approvalData *APIApprovalData, from *lnbits.User) {
 	fromUserStr := GetUserStr(from.Telegram)
+	approver := ctx.Callback().Sender.Username
+
+	// An approval can outlive its invoice: approvals created before the
+	// window was capped at the invoice expiry stay open for 24h. Paying now
+	// could only fail, so close it with a clear answer instead.
+	decoded, err := decodepay.Decodepay(approvalData.Invoice)
+	if err != nil || lnbits.InvoiceExpired(decoded) {
+		log.Warnf("[approveAPITransactionHandler] Invoice for transaction %s is expired or unreadable: %v", approvalData.TransactionID, err)
+		approvalData.Inactivate(approvalData, bot.Bunt)
+		setPendingTxStatus(approvalData.TransactionID, storage.TxStatusFailed, approver)
+		bot.tryEditMessage(ctx.Callback().Message, "⌛ This invoice has expired and can no longer be paid. Nothing was sent.", &tb.ReplyMarkup{})
+		return
+	}
 
 	// Re-check balance (with fee reserve) and reserve it until lnbits has the
 	// payment. Uses the *available* balance less the sender's other in-flight
 	// payments, so an approval cannot spend sats reserved in a pot or already
 	// held by a concurrent payment.
+	//
+	// Nothing has been sent if this fails, and the cause is usually temporary,
+	// so the buttons stay: the operator can top up and approve again, or
+	// cancel. The transaction stays pending, which is still accurate.
+	retryMarkup := apiApprovalMarkup("✅ Approve & Pay", approvalData.ID)
 	reservation, balance, err := bot.ReserveBalance(from, utils.AmountWithFeeReserve(approvalData.Amount))
 	if err != nil {
 		log.Errorf("[approveAPITransactionHandler] Could not check sender balance: %v", err)
-		bot.tryEditMessage(ctx.Callback().Message, "❌ Approval failed: could not check balance", &tb.ReplyMarkup{})
+		bot.tryEditMessage(ctx.Callback().Message, "❌ Could not check your balance. Nothing was sent.\n\nPress Approve to try again, or Cancel.", retryMarkup)
 		return
 	}
 	if reservation == nil {
 		log.Warnf("[approveAPITransactionHandler] Insufficient balance for invoice: %d < %d (+fees)", balance, approvalData.Amount)
-		bot.tryEditMessage(ctx.Callback().Message, fmt.Sprintf("❌ Insufficient balance: %s available, %s required (plus fee reserve)", utils.FormatSats(balance), utils.FormatSats(approvalData.Amount)), &tb.ReplyMarkup{})
+		bot.tryEditMessage(ctx.Callback().Message, fmt.Sprintf("❌ Insufficient balance: %s available, %s required (plus fee reserve). Nothing was sent.\n\nTop up and press Approve again, or Cancel.", utils.FormatSats(balance), utils.FormatSats(approvalData.Amount)), retryMarkup)
 		return
 	}
 	defer reservation.Release()
+
+	// From here the sats may leave the node whatever Pay returns, so the
+	// approval is spent and the transaction leaves pending. A pending
+	// transaction is reported as expired after its window, which would tell
+	// the caller a payment that may have settled was never sent.
+	approvalData.Inactivate(approvalData, bot.Bunt)
+	setPendingTxStatus(approvalData.TransactionID, storage.TxStatusApproved, approver)
 
 	inv, err := from.Wallet.Pay(lnbits.PaymentParams{Out: true, Bolt11: approvalData.Invoice}, bot.Client)
 	// lnbits now accounts for the payment in its own balance (or rejected
 	// it), so free the reservation before the long settlement wait.
 	reservation.Release()
 	if err != nil {
-		log.Errorf("[approveAPITransactionHandler] Invoice payment failed for %s: %v", fromUserStr, err)
-		if bot.ErrorLogger != nil {
-			bot.ErrorLogger.LogPaymentError(err, approvalData.Amount, approvalData.Memo, approvalData.Invoice, from.Telegram)
+		if lnbits.IsPaymentRejected(err) {
+			log.Errorf("[approveAPITransactionHandler] Invoice payment rejected for %s: %v", fromUserStr, err)
+			if bot.ErrorLogger != nil {
+				bot.ErrorLogger.LogPaymentError(err, approvalData.Amount, approvalData.Memo, approvalData.Invoice, from.Telegram)
+			}
+			setPendingTxStatus(approvalData.TransactionID, storage.TxStatusFailed, approver)
+			bot.tryEditMessage(ctx.Callback().Message, "❌ Invoice payment failed. Nothing was sent.", &tb.ReplyMarkup{})
+			return
 		}
-		bot.tryEditMessage(ctx.Callback().Message, "❌ Invoice payment failed", &tb.ReplyMarkup{})
-		return
+		// A dropped connection or an lnbits restart does not mean the payment
+		// was never started. Follow the hash and let the settlement check decide.
+		log.Warnf("[approveAPITransactionHandler] Invoice payment for %s returned an unclear error, checking settlement: %v", fromUserStr, err)
 	}
 
-	// The approval is spent either way: lnbits has accepted the payment, so the
-	// button must not stay pressable while we wait for it to settle.
-	approvalData.Inactivate(approvalData, bot.Bunt)
+	// lnbits has the payment, or may have it. Mark it in_flight before the
+	// settlement wait, so a restart during the wait leaves a status that
+	// points the caller at /send/payment/{payment_hash}.
+	setPendingTxStatus(approvalData.TransactionID, storage.TxStatusInFlight, approver)
 
 	// lnbits does not always echo the payment hash back. Fall back to the one in
 	// the invoice itself so the settlement check still has something to follow.
 	paymentHash := inv.PaymentHash
 	if paymentHash == "" {
-		if decoded, derr := decodepay.Decodepay(approvalData.Invoice); derr == nil {
-			paymentHash = decoded.PaymentHash
-		}
+		paymentHash = decoded.PaymentHash
 	}
 
 	// lnbits answers as soon as it has handed the payment to its backend, which
@@ -302,30 +340,19 @@ func (bot *TipBot) executeApprovedInvoicePayment(ctx intercept.Context, approval
 		if bot.ErrorLogger != nil {
 			bot.ErrorLogger.LogPaymentError(fmt.Errorf("payment did not settle: %s", settlement.State), approvalData.Amount, approvalData.Memo, approvalData.Invoice, from.Telegram)
 		}
-		if storage.UpdatePendingTxStatusFn != nil {
-			storage.UpdatePendingTxStatusFn(approvalData.TransactionID, storage.TxStatusFailed, ctx.Callback().Sender.Username)
-		}
+		setPendingTxStatus(approvalData.TransactionID, storage.TxStatusFailed, approver)
 		bot.tryEditMessage(ctx.Callback().Message, fmt.Sprintf("❌ Invoice payment failed — the payment could not be routed and your %s was not sent.", thirdparty.FormatSatsWithLKR(approvalData.Amount)), &tb.ReplyMarkup{})
 		return
 
 	case lnbits.PaymentStatePending, lnbits.PaymentStateUnknown:
 		// The sats may still leave the node, so this is neither a success nor a
-		// failure. Move the transaction to in_flight rather than leaving it
-		// pending: a pending transaction is reported as expired once its 24h
-		// window passes, which would tell the caller a payment that may well
-		// have settled was never sent.
+		// failure. The transaction stays in_flight.
 		log.Warnf("[💸 api_send_approved invoice] %s: payment %s unresolved (state %s): %v", fromUserStr, paymentHash, settlement.State, settlement.Err)
-		if storage.UpdatePendingTxStatusFn != nil {
-			storage.UpdatePendingTxStatusFn(approvalData.TransactionID, storage.TxStatusInFlight, ctx.Callback().Sender.Username)
-		}
 		bot.tryEditMessage(ctx.Callback().Message, fmt.Sprintf("⏳ Invoice payment of %s is still in flight.\n\nIt has not settled yet — check your balance shortly for the final result. Do not retry this invoice.", thirdparty.FormatSatsWithLKR(approvalData.Amount)), &tb.ReplyMarkup{})
 		return
 	}
 
-	// Update the PendingTransaction status so /api/v1/send/status reflects the real outcome.
-	if storage.UpdatePendingTxStatusFn != nil {
-		storage.UpdatePendingTxStatusFn(approvalData.TransactionID, storage.TxStatusExecuted, ctx.Callback().Sender.Username)
-	}
+	setPendingTxStatus(approvalData.TransactionID, storage.TxStatusExecuted, approver)
 
 	log.Infof("[💸 api_send_approved invoice] %s paid invoice %s (%s, fee %d sat).", fromUserStr, paymentHash, thirdparty.FormatSatsWithLKR(approvalData.Amount), settlement.Fee)
 

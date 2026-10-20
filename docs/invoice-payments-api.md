@@ -200,7 +200,7 @@ If the invoice amount exceeds the wallet's admin‑approval threshold, the payme
 }
 ```
 
-Extract the transaction ID from `message` (or track it yourself) and poll `GET /api/v1/send/status/{transaction_id}` until it resolves. The invoice must still be valid (unexpired) at the time of approval, or the payment will fail when executed.
+Extract the transaction ID from `message` (or track it yourself) and poll `GET /api/v1/send/status/{transaction_id}` until it resolves. The approval closes when the invoice expires, or after 24 hours if that comes first.
 
 > Both 202 responses mean "not done yet", but they need different handling. Switch on `status`: `awaiting_approval` waits on an operator (poll `/send/status/{id}`), `pending` is already in flight (poll `/send/payment/{payment_hash}`).
 
@@ -247,14 +247,16 @@ The `{transaction_id}` is the ID from the `202` response `message`.
 | Status      | Meaning |
 |-------------|---------|
 | `pending`   | Awaiting operator approval |
-| `approved`  | Approved, execution in progress |
+| `approved`  | Approved; the payment is being handed to the node. If it stays `approved` longer than `settlement_timeout`, resolve it with `/send/payment/{payment_hash}` |
 | `executed`  | Invoice paid and **settled** |
 | `in_flight` | Approved and accepted by the node, but not settled within `settlement_timeout`. **Neither paid nor failed** |
-| `failed`    | Approved and attempted, but the payment did not route. The sats were not sent |
+| `failed`    | Approved, but not paid: the invoice had expired, the node rejected it, or it did not route. The sats were not sent |
 | `rejected`  | Operator declined the payment |
-| `expired`   | Not approved within the 24‑hour window |
+| `expired`   | Not approved within the 24‑hour window, or before the invoice expired |
 
-Poll at a modest interval (e.g. every 5–15s). Transactions awaiting approval expire after **24 hours**.
+Poll at a modest interval (e.g. every 5–15s). Transactions awaiting approval expire after **24 hours**, or when the invoice expires if that is sooner.
+
+If the operator approves but the balance is too low (or cannot be checked), nothing is sent and the request stays `pending`. The operator can top up and approve again, or cancel.
 
 If an approved payment is accepted by the node but has not settled within `settlement_timeout`, the transaction moves to `in_flight`. This is deliberately a distinct status from `pending`: only `pending` transactions expire, so an in‑flight payment is never reported as `expired`. Resolve it with `GET /api/v1/send/payment/{payment_hash}` using the `payment_hash` from this response.
 
@@ -345,7 +347,7 @@ These apply to invoice payments via `POST /api/v1/send`.
 | **Replay protection** | Each signed request is accepted **once**. Sign every request (including retries) with a fresh `X-Timestamp`; resending an identical signed request returns `401 Request already processed`. |
 | **Settlement confirmation** | A `200` is returned only after the payment **settles**. A payment still routing after `settlement_timeout` (default **60s**) returns `202` with `status: "pending"` — it is not a failure. |
 | **Irreversibility** | A settled Lightning payment cannot be reversed. Validate the invoice/amount before sending. |
-| **Invoice validity** | Expired or malformed invoices are rejected (either at decode time with `400`, or by the Lightning backend at pay time). |
+| **Invoice validity** | Malformed and expired invoices are rejected with `400` before anything is paid. An approved invoice that expired while waiting ends as `failed`. |
 | **Memo** | Cosmetic for invoice payments; capped at `max_memo_length` (default 280). |
 | **Rate limiting** | The API is rate limited; back off on `429`/repeated failures. |
 | **Amounts unit** | All amounts are integer **satoshis**. |
@@ -370,7 +372,9 @@ Errors use a consistent JSON shape:
 | `400` | Above maximum | `Amount cannot exceed 1,000,000 sats` |
 | `400` | Insufficient funds | `Insufficient balance: 500 sats available, 1,000 sats required` |
 | `400` | Fee reserve not covered | `Insufficient balance to cover routing fees: 1,000 sats available, 1,000 sats required plus a fee reserve` |
+| `400` | Expired invoice | `Invoice has expired` |
 | `400` | Duplicate in flight | `This invoice is already being processed` |
+| `400` | Could not check for an earlier payment of this invoice — nothing was paid | `Could not check whether this invoice was already paid. Nothing was paid by this request; retry the same invoice.` |
 | `400` | Backend rejected the payment | `Invoice payment failed` |
 | `400` | Accepted but did not route — sats **not** sent | `Invoice payment failed: the payment could not be routed to the destination node` |
 | `401` | Missing/expired timestamp, missing/invalid signature | `Invalid signature` / `Request expired` / `Missing timestamp` / `Request already processed` |
@@ -394,7 +398,7 @@ The **routing‑failure** `400` (the last row above) carries the full send body 
 
 `error` is present on every `400`, so clients that read only `error` keep working unchanged.
 
-**Ambiguous failures:** if `POST /api/v1/send` times out or returns a network error, **do not blindly retry** — the payment may have gone through. Because idempotency is keyed on the invoice payment hash, retrying the *same invoice* is safe (it will not double‑pay), but a fresh/different invoice for the same order could double‑pay. Prefer to reconcile using the `payment_hash` via `GET /api/v1/send/payment/{payment_hash}`.
+**Ambiguous failures:** if `POST /api/v1/send` times out or returns a network error, **do not blindly retry** — the payment may have gone through. Because idempotency is keyed on the invoice payment hash, retrying the *same invoice* is safe: if this wallet already paid it, or is still paying it, you get that payment's result (`200 settled` or `202 pending`) and it is not paid again. But a fresh/different invoice for the same order could double‑pay. Prefer to reconcile using the `payment_hash` via `GET /api/v1/send/payment/{payment_hash}`.
 
 A `400` for a payment failure means the sats were **not** sent and are back in the wallet — it is safe to pay a different invoice for the same order. That guarantee does not extend to `202 pending` or `unknown`, which are unresolved rather than failed.
 

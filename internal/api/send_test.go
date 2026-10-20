@@ -104,6 +104,25 @@ func TestSendRejectsInvoiceUnderMinAmount(t *testing.T) {
 	}
 }
 
+// The spec invoice is within limits here, so only its expiry stops it.
+func TestSendRejectsExpiredInvoice(t *testing.T) {
+	withTestWallets(t)
+	internal.Configuration.API.Send.MinAmount = 1
+	internal.Configuration.API.Send.MaxAmount = 1_000_000
+
+	r := authenticated(httptest.NewRequest("POST", "/api/v1/send",
+		strings.NewReader(`{"to":"`+testInvoice250k+`"}`)), "testwallet")
+	rec := httptest.NewRecorder()
+	Service{}.Send(rec, r)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "Invoice has expired") {
+		t.Errorf("body = %q, want an expired invoice error", rec.Body.String())
+	}
+}
+
 func TestSendPaymentStatusRejectsBadRequests(t *testing.T) {
 	withTestWallets(t)
 	validHash := strings.Repeat("ab", 32)

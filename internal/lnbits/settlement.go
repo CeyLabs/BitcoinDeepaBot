@@ -3,10 +3,12 @@ package lnbits
 import (
 	"context"
 	"errors"
+	"net/http"
 	"regexp"
 	"strings"
 	"time"
 
+	decodepay "github.com/fiatjaf/ln-decodepay"
 	"golang.org/x/time/rate"
 )
 
@@ -24,6 +26,26 @@ var paymentHashPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 // Anything else must not reach an lnbits URL.
 func ValidPaymentHash(s string) bool {
 	return paymentHashPattern.MatchString(s)
+}
+
+// InvoiceExpiresAt returns when a decoded bolt11 invoice stops being payable.
+func InvoiceExpiresAt(inv decodepay.Bolt11) time.Time {
+	return time.Unix(int64(inv.CreatedAt)+int64(inv.Expiry), 0)
+}
+
+// InvoiceExpired reports whether a decoded bolt11 invoice is past its expiry.
+// Decodepay accepts expired invoices, so callers have to check this themselves.
+func InvoiceExpired(inv decodepay.Bolt11) bool {
+	return time.Now().After(InvoiceExpiresAt(inv))
+}
+
+// IsPaymentRejected reports whether a Pay error is lnbits refusing the payment
+// with a 4xx, which means it never left the wallet. A transport error or a 5xx
+// does not say that: the connection may have dropped after lnbits started the
+// payment, so the payment hash has to be checked before calling it failed.
+func IsPaymentRejected(err error) bool {
+	var lerr Error
+	return errors.As(err, &lerr) && lerr.StatusCode >= 400 && lerr.StatusCode < 500
 }
 
 // PaymentState describes what lnbits knows about an outgoing payment.
@@ -110,17 +132,9 @@ func (c Client) WaitForOutgoingPayment(w Wallet, paymentHash string, timeout tim
 			// the payment. Stay unsure rather than claim a refund.
 			last = PaymentSettlement{State: PaymentStateUnknown, Err: err}
 		} else {
-			switch state := classifyPayment(payment); state {
-			case PaymentStateSettled:
-				return PaymentSettlement{
-					State:    PaymentStateSettled,
-					Fee:      settlementFeeSats(payment),
-					Preimage: settlementPreimage(payment),
-				}
-			case PaymentStateFailed:
-				return PaymentSettlement{State: PaymentStateFailed}
-			default:
-				last = PaymentSettlement{State: state}
+			last = settlementOf(payment)
+			if last.State == PaymentStateSettled || last.State == PaymentStateFailed {
+				return last
 			}
 		}
 
@@ -135,6 +149,45 @@ func (c Client) WaitForOutgoingPayment(w Wallet, paymentHash string, timeout tim
 		if interval = time.Duration(float64(interval) * settlementPollFactor); interval > settlementPollMax {
 			interval = settlementPollMax
 		}
+	}
+}
+
+// PriorPayment looks paymentHash up in w once, so a caller can tell whether the
+// wallet already paid (or is still paying) an invoice before paying it again.
+// found is false only when lnbits answers 404, i.e. the wallet has no payment
+// for this hash. Any other lookup error is returned: it says nothing about
+// whether a payment exists.
+func (c Client) PriorPayment(w Wallet, paymentHash string) (settlement PaymentSettlement, found bool, err error) {
+	if !ValidPaymentHash(paymentHash) {
+		return PaymentSettlement{}, false, errors.New("no valid payment hash to check")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), rateLimitGrace)
+	defer cancel()
+	if err := RateLimiter.Wait(ctx); err != nil {
+		return PaymentSettlement{}, false, err
+	}
+
+	payment, err := c.Payment(w, paymentHash)
+	var lerr Error
+	if errors.As(err, &lerr) && lerr.StatusCode == http.StatusNotFound {
+		return PaymentSettlement{}, false, nil
+	}
+	if err != nil {
+		return PaymentSettlement{}, false, err
+	}
+	return settlementOf(payment), true, nil
+}
+
+// settlementOf turns one lnbits payment lookup into a PaymentSettlement.
+func settlementOf(p LNbitsPayment) PaymentSettlement {
+	state := classifyPayment(p)
+	if state != PaymentStateSettled {
+		return PaymentSettlement{State: state}
+	}
+	return PaymentSettlement{
+		State:    PaymentStateSettled,
+		Fee:      settlementFeeSats(p),
+		Preimage: settlementPreimage(p),
 	}
 }
 

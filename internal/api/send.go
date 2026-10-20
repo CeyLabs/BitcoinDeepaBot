@@ -486,6 +486,12 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 		RespondError(w, fmt.Sprintf("Amount cannot exceed %s", thirdparty.FormatSatsWithLKR(walletMaxAmount)))
 		return
 	}
+	// Decodepay does not reject expired invoices. Catch them here so an
+	// approval is never queued for an invoice that can no longer be paid.
+	if lnbits.InvoiceExpired(bolt11) {
+		RespondError(w, "Invoice has expired")
+		return
+	}
 
 	// Idempotency: lock + dedup on the invoice payment hash so the same
 	// invoice cannot be paid twice by concurrent or retried requests.
@@ -506,6 +512,32 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 	if err != nil {
 		log.Errorf("[api/send] Could not find sender user %s: %v", fromUsername, err)
 		RespondError(w, fmt.Sprintf("Sender '@%s' not found or has no wallet", fromUsername))
+		return
+	}
+
+	invoiceResponse := SendResponse{
+		FromUser:    fromUsername,
+		ToUser:      paymentRequest,
+		Amount:      amount,
+		AmountLKR:   getLKRValue(amount),
+		Memo:        memo,
+		PaymentHash: bolt11.PaymentHash,
+	}
+
+	// The MemoCache lock is released as soon as a request returns, so a retry
+	// of an invoice this wallet already paid, or is still paying, would reach
+	// Pay again. lnbits rejects the duplicate, and that rejection would read as
+	// "not sent". Answer from the existing payment instead. A failed one may
+	// be retried.
+	prior, found, err := s.Bot.Client.PriorPayment(*fromUser.Wallet, bolt11.PaymentHash)
+	if err != nil {
+		log.Errorf("[api/send] Could not look up invoice %s before paying: %v", bolt11.PaymentHash, err)
+		RespondError(w, "Could not check whether this invoice was already paid. Nothing was paid by this request; retry the same invoice.")
+		return
+	}
+	if found && prior.State != lnbits.PaymentStateFailed {
+		log.Warnf("[api/send] Invoice %s was already submitted by %s (state %s); not paying it again", bolt11.PaymentHash, fromUsername, prior.State)
+		writeInvoiceResult(w, prior, invoiceResponse)
 		return
 	}
 
@@ -554,6 +586,12 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 
 		clientIP := getClientIP(r)
 		pendingTx := NewPendingInvoiceTransaction(fromUsername, paymentRequest, bolt11.PaymentHash, amount, memo, fromUser, clientIP)
+		// Invoices usually expire well inside the 24h approval window. Close
+		// the approval with the invoice, so an operator is never asked to
+		// approve a payment that can no longer succeed.
+		if invoiceExpiry := lnbits.InvoiceExpiresAt(bolt11); invoiceExpiry.Before(pendingTx.ExpiryTime) {
+			pendingTx.ExpiryTime = invoiceExpiry
+		}
 		if err := pendingTx.SaveToDB(s.Bot); err != nil {
 			log.Errorf("[api/send] Failed to save pending invoice transaction: %v", err)
 			RespondError(w, "Failed to create pending transaction")
@@ -599,14 +637,20 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 	// it), so free the reservation before the long settlement wait.
 	reservation.Release()
 	if err != nil {
-		log.Errorf("[api/send] Invoice payment failed for %s: %v", fromUsername, err)
-		if s.Bot.ErrorLogger != nil {
-			s.Bot.ErrorLogger.LogPaymentError(err, amount, bolt11.Description, paymentRequest, fromUser.Telegram)
+		if lnbits.IsPaymentRejected(err) {
+			log.Errorf("[api/send] Invoice payment rejected for %s: %v", fromUsername, err)
+			if s.Bot.ErrorLogger != nil {
+				s.Bot.ErrorLogger.LogPaymentError(err, amount, bolt11.Description, paymentRequest, fromUser.Telegram)
+			}
+			// Keep the raw error in the logs only — it can carry the internal
+			// lnbits host/port, which must not reach the API caller.
+			RespondError(w, "Invoice payment failed")
+			return
 		}
-		// Keep the raw error in the logs only — it can carry the internal
-		// lnbits host/port, which must not reach the API caller.
-		RespondError(w, "Invoice payment failed")
-		return
+		// A dropped connection or an lnbits restart does not mean the payment
+		// was never started. Follow the hash like an accepted payment and let
+		// the settlement check decide.
+		log.Warnf("[api/send] Invoice payment for %s returned an unclear error, checking settlement: %v", fromUsername, err)
 	}
 
 	// lnbits answers as soon as it has handed the payment to its backend, which
@@ -616,6 +660,7 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 	if paymentHash == "" {
 		paymentHash = bolt11.PaymentHash
 	}
+	invoiceResponse.PaymentHash = paymentHash
 	// lnbits itself blocks for a while before answering, so spend only what is
 	// left of the server's write budget on waiting. Overrunning it would drop
 	// the connection and leave the caller with exactly the ambiguous outcome
@@ -644,82 +689,64 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 		if _, serr := s.Bot.Telegram.Send(fromUser.Telegram, failureMsg); serr != nil {
 			log.Warnf("[api/send] Could not send failure notice to sender: %v", serr)
 		}
-		// Answer with the full SendResponse rather than a bare error: the
-		// caller still needs the payment_hash to reconcile this attempt, and
-		// `status` tells it apart from the pending case. `error` keeps the
-		// documented error-body shape intact for existing clients.
-		const failureReason = "Invoice payment failed: the payment could not be routed to the destination node"
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(SendResponse{
-			Success:     false,
-			Status:      lnbits.PaymentStateFailed.String(),
-			Error:       failureReason,
-			Message:     failureReason,
-			FromUser:    fromUsername,
-			ToUser:      paymentRequest,
-			Amount:      amount,
-			AmountLKR:   getLKRValue(amount),
-			Memo:        memo,
-			PaymentHash: paymentHash,
-		})
-		return
 
 	case lnbits.PaymentStatePending, lnbits.PaymentStateUnknown:
-		// The sats may still leave the node, so this is neither a success nor a
-		// failure. Report it as unresolved and let the caller poll the hash.
 		log.Warnf("[api/send] ⏳ Invoice payment unresolved for %s (%d sat, hash %s, state %s): %v", fromUsername, amount, paymentHash, settlement.State, settlement.Err)
 		pendingMsg := fmt.Sprintf("⏳ Invoice payment of %s is still in flight. You will not be charged twice — check back shortly for the final result.", thirdparty.FormatSatsWithLKR(amount))
 		if _, serr := s.Bot.Telegram.Send(fromUser.Telegram, pendingMsg); serr != nil {
 			log.Warnf("[api/send] Could not send pending notice to sender: %v", serr)
 		}
-		response := SendResponse{
-			Success:     false,
-			Status:      settlement.State.String(),
-			Message:     "Invoice payment is still in flight and has not settled yet. Poll /api/v1/send/payment/{payment_hash} for the final result. Do not retry this invoice.",
-			FromUser:    fromUsername,
-			ToUser:      paymentRequest,
-			Amount:      amount,
-			AmountLKR:   getLKRValue(amount),
-			Memo:        memo,
-			PaymentHash: paymentHash,
+
+	default:
+		log.Infof("[api/send] ✅ Invoice settled: %s (%d sat, fee %d sat)", fromUsername, amount, settlement.Fee)
+		senderConfirmationMsg := fmt.Sprintf("✅ Invoice paid successfully!\n\n💸 Amount: %s", thirdparty.FormatSatsWithLKR(amount))
+		if bolt11.Description != "" {
+			senderConfirmationMsg += fmt.Sprintf("\n📄 Invoice: %s", str.MarkdownEscape(bolt11.Description))
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusAccepted)
-		json.NewEncoder(w).Encode(response)
-		return
+		if memo != "" {
+			senderConfirmationMsg += fmt.Sprintf("\n✉️ Memo: %s", str.MarkdownEscape(memo))
+		}
+		if _, err := s.Bot.Telegram.Send(fromUser.Telegram, senderConfirmationMsg); err != nil {
+			log.Warnf("[api/send] Could not send confirmation to sender: %v", err)
+		}
 	}
 
-	log.Infof("[api/send] ✅ Invoice settled: %s (%d sat, fee %d sat)", fromUsername, amount, settlement.Fee)
+	writeInvoiceResult(w, settlement, invoiceResponse)
+}
 
-	// Send confirmation to sender
-	senderConfirmationMsg := fmt.Sprintf("✅ Invoice paid successfully!\n\n💸 Amount: %s", thirdparty.FormatSatsWithLKR(amount))
-	if bolt11.Description != "" {
-		senderConfirmationMsg += fmt.Sprintf("\n📄 Invoice: %s", str.MarkdownEscape(bolt11.Description))
-	}
-	if memo != "" {
-		senderConfirmationMsg += fmt.Sprintf("\n✉️ Memo: %s", str.MarkdownEscape(memo))
-	}
-	if _, err := s.Bot.Telegram.Send(fromUser.Telegram, senderConfirmationMsg); err != nil {
-		log.Warnf("[api/send] Could not send confirmation to sender: %v", err)
-	}
+// invoiceRoutingFailure is the error for an invoice payment that lnbits
+// accepted but resolved without a preimage.
+const invoiceRoutingFailure = "Invoice payment failed: the payment could not be routed to the destination node"
 
-	response := SendResponse{
-		Success:     true,
-		Status:      lnbits.PaymentStateSettled.String(),
-		Message:     "Invoice paid successfully",
-		FromUser:    fromUsername,
-		ToUser:      paymentRequest,
-		Amount:      amount,
-		AmountLKR:   getLKRValue(amount),
-		Memo:        memo,
-		PaymentHash: paymentHash,
-		Preimage:    settlement.Preimage,
-		Fee:         settlement.Fee,
+// writeInvoiceResult answers a direct invoice payment from its settlement:
+// 200 when settled, 400 when failed and 202 while unresolved. resp carries the
+// request fields; status, message and the settlement details are filled here.
+func writeInvoiceResult(w http.ResponseWriter, settlement lnbits.PaymentSettlement, resp SendResponse) {
+	resp.Status = settlement.State.String()
+	code := http.StatusAccepted
+	switch settlement.State {
+	case lnbits.PaymentStateSettled:
+		code = http.StatusOK
+		resp.Success = true
+		resp.Message = "Invoice paid successfully"
+		resp.Preimage = settlement.Preimage
+		resp.Fee = settlement.Fee
+	case lnbits.PaymentStateFailed:
+		// Answer with the full SendResponse rather than a bare error: the
+		// caller still needs the payment_hash to reconcile this attempt, and
+		// `status` tells it apart from the pending case. `error` keeps the
+		// documented error-body shape intact for existing clients.
+		code = http.StatusBadRequest
+		resp.Error = invoiceRoutingFailure
+		resp.Message = invoiceRoutingFailure
+	default:
+		// The sats may still leave the node, so this is neither a success nor
+		// a failure. Report it as unresolved and let the caller poll the hash.
+		resp.Message = "Invoice payment is still in flight and has not settled yet. Poll /api/v1/send/payment/{payment_hash} for the final result. Do not retry this invoice."
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(resp)
 }
 
 // paymentStatusWait is how long SendPaymentStatus polls lnbits before answering.
