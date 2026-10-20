@@ -12,9 +12,16 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// RateLimiter enforces a shared rate limit of 150 req/min (safely below LNbits'
-// 200/min limit) across every caller that polls lnbits in a loop.
-var RateLimiter = rate.NewLimiter(rate.Every(400*time.Millisecond), 1)
+// LNbits allows 200 requests a minute. The callers that poll it in a loop get
+// separate budgets that together stay below that, so heavy analytics traffic
+// cannot starve a settlement check into reporting a settled payment as unknown.
+var (
+	// RateLimiter is the analytics budget: 120 req/min.
+	RateLimiter = rate.NewLimiter(rate.Every(500*time.Millisecond), 1)
+	// settlementLimiter is the payment settlement budget: 60 req/min, with a
+	// small burst so a new payment's first checks do not queue.
+	settlementLimiter = rate.NewLimiter(rate.Every(time.Second), 3)
+)
 
 // rateLimitGrace lets a settlement check wait this long for a rate limit slot
 // past its own deadline, so a zero-timeout lookup still gets its one check.
@@ -115,7 +122,7 @@ func (c Client) WaitForOutgoingPayment(w Wallet, paymentHash string, timeout tim
 	interval := settlementPollInitial
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Until(deadline)+rateLimitGrace)
-		err := RateLimiter.Wait(ctx)
+		err := settlementLimiter.Wait(ctx)
 		cancel()
 		if err != nil {
 			if last.Err == nil {
@@ -163,7 +170,7 @@ func (c Client) PriorPayment(w Wallet, paymentHash string) (settlement PaymentSe
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), rateLimitGrace)
 	defer cancel()
-	if err := RateLimiter.Wait(ctx); err != nil {
+	if err := settlementLimiter.Wait(ctx); err != nil {
 		return PaymentSettlement{}, false, err
 	}
 

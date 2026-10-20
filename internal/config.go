@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -159,7 +158,7 @@ func init() {
 		panic(err)
 	}
 	Configuration.Bot.LNURLHostUrl = hostname
-	checkLnbitsConfiguration()
+	normalizeLnbitsConfiguration()
 	setAPISendDefaults()
 	setAPIAnalyticsDefaults()
 }
@@ -179,37 +178,19 @@ func GetWebhookURLParsed() *url.URL {
 	return Configuration.Lnbits.WebhookPublicUrlParsed
 }
 
-// underTest reports whether this binary is a `go test` binary.
-//
-// Package init runs before the testing package registers its flags, so
-// flag.Lookup("test.v") is not yet usable here and os.Args is the only
-// reliable signal. This exists because most packages reach this one through
-// the import graph (lnbits -> satdress -> network -> internal), so without it
-// a unit test that never talks to lnbits still cannot run unless a full
-// operator config.yaml sits in its package directory.
-func underTest() bool {
-	if strings.HasSuffix(os.Args[0], ".test") || strings.HasSuffix(os.Args[0], ".test.exe") {
-		return true
-	}
-	for _, arg := range os.Args[1:] {
-		if strings.HasPrefix(arg, "-test.") {
-			return true
-		}
-	}
-	return false
-}
-
-// checkLnbitsConfiguration validates the lnbits configuration
-func checkLnbitsConfiguration() {
+// CheckLnbitsConfiguration panics when no lnbits url is configured: the bot
+// cannot move sats without one. main calls it at startup. It is not run from
+// init because most packages import this one (lnbits -> satdress -> network ->
+// internal), and a unit test that never talks to lnbits must not need a full
+// operator config.yaml to load.
+func CheckLnbitsConfiguration() {
 	if Configuration.Lnbits.Url == "" {
-		// A missing lnbits url stays fatal in production: the bot cannot move
-		// sats without it. Under `go test` there is no wallet to talk to, so
-		// refusing to link would only make the package untestable.
-		if underTest() {
-			return
-		}
 		panic(fmt.Errorf("please configure a lnbits url"))
 	}
+}
+
+// normalizeLnbitsConfiguration fills in derived lnbits settings.
+func normalizeLnbitsConfiguration() {
 	if Configuration.Lnbits.LnbitsPublicUrl == "" {
 		log.Warnf("Please specify a lnbits public url otherwise users won't be able to")
 	} else {
