@@ -192,11 +192,11 @@ If the invoice amount exceeds the wallet's admin‑approval threshold, the payme
 {
   "success": false,
   "status": "awaiting_approval",
-  "message": "Transaction requires admin approval (amount: 60000 > threshold: 50000). Approval request sent to you via Telegram. Transaction ID: pending-yourprovider-invoice-3d2f...-1699999999",
+  "message": "Transaction requires admin approval (amount: 150000 > threshold: 100000). Approval request sent to you via Telegram. Transaction ID: pending-yourprovider-invoice-3d2f...-1699999999",
   "from_user": "yourprovider",
   "to_user": "lnbc10u1p3xyz...",
-  "amount": 60000,
-  "amount_lkr": "1,950.00"
+  "amount": 150000,
+  "amount_lkr": "4,875.00"
 }
 ```
 
@@ -229,8 +229,8 @@ The `{transaction_id}` is the ID from the `202` response `message`.
   "status": "executed",
   "from_user": "yourprovider",
   "to_user": "lnbc10u1p3xyz...",
-  "amount": 60000,
-  "amount_lkr": "1,950.00",
+  "amount": 150000,
+  "amount_lkr": "4,875.00",
   "memo": "order-12345",
   "payment_hash": "3d2f...e91a",
   "request_timestamp": "2026-07-17T10:00:00Z",
@@ -340,7 +340,7 @@ These apply to invoice payments via `POST /api/v1/send`.
 | **Amountless invoices** | **Not supported** — rejected with `400`. The invoice must encode an amount. |
 | **Minimum amount** | Invoice amount must be greater than `min_amount` (default **1 sat**). |
 | **Maximum amount** | Invoice amount must not exceed the wallet's `max_amount` (global default **1,000,000 sats**; may be set lower per wallet). |
-| **Admin approval threshold** | Amounts above `admin_approval_threshold` (global default **50,000 sats**; may be per wallet) are held for operator approval and return `202` instead of paying immediately. |
+| **Admin approval threshold** | Amounts above `admin_approval_threshold` (global default **100,000 sats**; may be per wallet) are held for operator approval and return `202` instead of paying immediately. |
 | **Routing‑fee reserve** | Your available balance must cover the amount **plus ~2%** for routing fees. If `amount > balance * 0.98`, the request is rejected even if `balance >= amount`. |
 | **Idempotency** | Requests are de‑duplicated on the invoice **payment hash**. Concurrent or retried attempts to pay the same invoice will not double‑pay. |
 | **Concurrent payments** | Different invoices can be paid **in parallel** from the same wallet. Each in‑flight payment's amount plus fee reserve is held against your available balance until the Lightning backend accepts it, so parallel requests are rejected with the insufficient‑balance errors once the balance is used up. |
