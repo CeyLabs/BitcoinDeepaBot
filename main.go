@@ -38,6 +38,7 @@ func setLogger() {
 func main() {
 	// set logger
 	setLogger()
+	internal.CheckLnbitsConfiguration()
 
 	// Create bot first
 	bot := telegram.NewBot()
