@@ -39,7 +39,11 @@ func getDefaultAfterInterceptor(bot TipBot) []intercept.Func {
 
 // registerHandlerWithInterceptor will register a ctx with all the predefined interceptors, based on the interceptor type
 func (bot TipBot) registerHandlerWithInterceptor(h InterceptionWrapper) {
-	h.Interceptor.Before = append(getDefaultBeforeInterceptor(bot), h.Interceptor.Before...)
+	before := getDefaultBeforeInterceptor(bot)
+	if !worksWithoutLNbits(h.Endpoints) {
+		before = append(before, bot.lnbitsAvailableInterceptor)
+	}
+	h.Interceptor.Before = append(before, h.Interceptor.Before...)
 	//h.Interceptor.After = append(h.Interceptor.After, getDefaultAfterInterceptor(bot)...)
 	//h.Interceptor.OnDefer = append(h.Interceptor.OnDefer, getDefaultDeferInterceptor(bot)...)
 	for _, endpoint := range h.Endpoints {

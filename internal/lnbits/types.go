@@ -22,8 +22,12 @@ type Client struct {
 	// cannot be used to spend: it is scoped to account management only.
 	adminHeader req.Header
 	url         string
-	AdminKey    string
-	InvoiceKey  string
+	// health tracks LNbits reachability; http and payHTTP report into it.
+	health     *Health
+	http       *req.Req
+	payHTTP    *req.Req
+	AdminKey   string
+	InvoiceKey string
 }
 
 type User struct {

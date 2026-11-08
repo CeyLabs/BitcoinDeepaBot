@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -126,6 +127,10 @@ func (bot *TipBot) Start() {
 	if err != nil {
 		log.Errorf("Could not initialize bot wallet: %s", err.Error())
 	}
+
+	// watch LNbits so the bot can switch to maintenance mode while it is down
+	bot.startLNbitsAlerts()
+	bot.Client.StartHealthCheck(context.Background())
 
 	// register telegram handlers
 	bot.registerTelegramHandlers()
