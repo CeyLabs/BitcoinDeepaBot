@@ -42,6 +42,32 @@ func TestHealthTracksRequests(t *testing.T) {
 	}
 }
 
+func TestHealthRailwayFallbackMeansDown(t *testing.T) {
+	var fallback int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.LoadInt32(&fallback) == 1 {
+			w.Header().Set("X-Railway-Fallback", "true")
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	c := NewClient("key", "token", srv.URL)
+	w := Wallet{Inkey: "k"}
+
+	atomic.StoreInt32(&fallback, 1)
+	c.Info(w)
+	if c.Available() {
+		t.Fatal("Railway fallback 404: Available() = true, want false")
+	}
+
+	atomic.StoreInt32(&fallback, 0)
+	c.Info(w)
+	if !c.Available() {
+		t.Fatal("plain 404 from LNbits: Available() = false, want true")
+	}
+}
+
 func TestHealthMarksDownWhenUnreachable(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	url := srv.URL

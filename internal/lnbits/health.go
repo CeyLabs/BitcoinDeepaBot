@@ -91,8 +91,16 @@ func isOutageStatus(code int) bool {
 		code == http.StatusGatewayTimeout
 }
 
+// isOutage reports whether a response means LNbits is down. Railway, which
+// hosts LNbits, answers with its own 404 and an X-Railway-Fallback: true
+// header when the app is stopped, so that 404 does not come from LNbits.
+func isOutage(resp *http.Response) bool {
+	return isOutageStatus(resp.StatusCode) || resp.Header.Get("X-Railway-Fallback") == "true"
+}
+
 // healthTransport records the outcome of every LNbits request in Health.
-// Connection errors, timeouts and gateway errors mark LNbits as down; any
+// Connection errors, timeouts, gateway errors and Railway fallback pages
+// mark LNbits as down; any
 // other response means LNbits answered, so it is up.
 type healthTransport struct {
 	next   http.RoundTripper
@@ -104,7 +112,7 @@ func (t *healthTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	switch {
 	case err != nil:
 		t.health.markDown(err.Error())
-	case isOutageStatus(resp.StatusCode):
+	case isOutage(resp):
 		t.health.markDown(resp.Status)
 	default:
 		t.health.markUp()
@@ -149,7 +157,8 @@ func (c *Client) StartHealthCheck(ctx context.Context) {
 		defer t.Stop()
 		for {
 			// The transport records the result; the response itself is unused.
-			// Any non-gateway answer, even a 404, proves LNbits is up.
+			// Any answer from LNbits itself, even a 404, proves it is up.
+			// Gateway errors and Railway's fallback 404 do not, see isOutage.
 			if resp, err := probe.Get(c.url + "/api/v1/health"); err == nil {
 				resp.Response().Body.Close()
 			}
