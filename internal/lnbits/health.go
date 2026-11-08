@@ -31,6 +31,9 @@ type Health struct {
 	down      bool
 	downSince time.Time
 	lastErr   string
+	// onChange is called on every switch between up and down, see
+	// Client.OnHealthChange.
+	onChange func(down bool, reason string, since time.Time)
 }
 
 // Available reports whether LNbits is currently reachable. A nil Health is
@@ -57,6 +60,9 @@ func (h *Health) markDown(reason string) {
 	h.down = true
 	h.downSince = time.Now()
 	log.Errorf("[lnbits] LNbits is unreachable, entering maintenance mode: %s", reason)
+	if h.onChange != nil {
+		h.onChange(true, reason, h.downSince)
+	}
 }
 
 func (h *Health) markUp() {
@@ -71,6 +77,9 @@ func (h *Health) markUp() {
 	log.Warnf("[lnbits] LNbits is reachable again after %s, leaving maintenance mode", time.Since(h.downSince).Round(time.Second))
 	h.down = false
 	h.lastErr = ""
+	if h.onChange != nil {
+		h.onChange(false, "", h.downSince)
+	}
 }
 
 // isOutageStatus reports whether an HTTP status means LNbits itself is down,
@@ -116,6 +125,19 @@ func newHTTP(health *Health, timeout time.Duration) *req.Req {
 // Available reports whether LNbits is currently reachable.
 func (c *Client) Available() bool {
 	return c.health.Available()
+}
+
+// OnHealthChange registers fn to be called each time LNbits goes down
+// (down=true, with the error) or comes back up (down=false). since is when
+// the outage started. fn runs under the health lock, so calls arrive in
+// order, but it must return quickly and must not call back into the client.
+func (c *Client) OnHealthChange(fn func(down bool, reason string, since time.Time)) {
+	if c.health == nil {
+		return
+	}
+	c.health.mu.Lock()
+	defer c.health.mu.Unlock()
+	c.health.onChange = fn
 }
 
 // StartHealthCheck pings LNbits in the background until ctx is done, so the

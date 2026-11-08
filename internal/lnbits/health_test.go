@@ -85,3 +85,20 @@ func TestZeroClientIsAvailable(t *testing.T) {
 		t.Fatal("a Client without health tracking should report available")
 	}
 }
+
+func TestHealthChangeCallback(t *testing.T) {
+	c := NewClient("key", "token", "http://unused")
+	var events []bool
+	c.OnHealthChange(func(down bool, reason string, since time.Time) {
+		events = append(events, down)
+	})
+
+	c.health.markDown("a")
+	c.health.markDown("b") // already down: no new event
+	c.health.markUp()
+	c.health.markUp() // already up: no new event
+
+	if len(events) != 2 || events[0] != true || events[1] != false {
+		t.Fatalf("events = %v, want [true false]", events)
+	}
+}

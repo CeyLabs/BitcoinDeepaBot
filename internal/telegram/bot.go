@@ -129,6 +129,7 @@ func (bot *TipBot) Start() {
 	}
 
 	// watch LNbits so the bot can switch to maintenance mode while it is down
+	bot.startLNbitsAlerts()
 	bot.Client.StartHealthCheck(context.Background())
 
 	// register telegram handlers
