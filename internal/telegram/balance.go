@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/errors"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
@@ -15,8 +16,12 @@ import (
 
 func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, error) {
 	m := ctx.Message()
-	// check and print all commands
-	if len(m.Text) > 0 {
+	if strings.HasPrefix(m.Text, MainMenuCommandBalance) {
+		// Balance button: just remove the button press. anyTextHandler would
+		// route it back here and the balance would be sent twice.
+		bot.tryDeleteMessage(m)
+	} else if len(m.Text) > 0 {
+		// check and print all commands
 		bot.anyTextHandler(ctx)
 	}
 

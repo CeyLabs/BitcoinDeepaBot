@@ -44,6 +44,12 @@ func (bot TipBot) lnbitsAvailableInterceptor(ctx intercept.Context) (intercept.C
 	if bot.Client.Available() {
 		return ctx, nil
 	}
+	// The balance button's text includes the balance, so it usually arrives
+	// as plain text. Let it through: balanceHandler shows the maintenance
+	// message together with the last known balance.
+	if m := ctx.Message(); m != nil && strings.HasPrefix(m.Text, MainMenuCommandBalance) {
+		return ctx, nil
+	}
 	ctx, _ = bot.localizerInterceptor(ctx)
 	bot.sendMaintenanceNotice(ctx)
 	return ctx, errLNbitsUnavailable
