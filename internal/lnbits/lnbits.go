@@ -2,7 +2,6 @@ package lnbits
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/imroc/req"
 )
@@ -24,8 +23,12 @@ func parseLNbitsError(resp *req.Resp) Error {
 // NewClient returns a new lnbits api client. Pass your API key, the ACL token
 // used for account management, and the url here.
 func NewClient(key, adminToken, url string) *Client {
+	health := &Health{}
 	return &Client{
-		url: url,
+		url:     url,
+		health:  health,
+		http:    newHTTP(health, requestTimeout),
+		payHTTP: newHTTP(health, paymentTimeout),
 		// info: this header holds the ADMIN key for the entire API
 		// it can be used to create wallets for example
 		// if you want to check the balance of a user, use w.Inkey
@@ -45,7 +48,7 @@ func NewClient(key, adminToken, url string) *Client {
 
 // GetUser returns user information
 func (c *Client) GetUser(userId string) (user User, err error) {
-	resp, err := req.Get(c.url+"/users/api/v1/user/"+userId, c.adminHeader, nil)
+	resp, err := c.httpClient().Get(c.url+"/users/api/v1/user/"+userId, c.adminHeader, nil)
 	if err != nil {
 		return
 	}
@@ -71,7 +74,7 @@ func (c *Client) GetUser(userId string) (user User, err error) {
 func (c *Client) CreateUserWithInitialWallet(userName, walletName, adminId string, email string) (wal User, err error) {
 	// email is deliberately not sent: the bot passes a telegram handle here,
 	// which lnbits 1.x rejects via is_valid_email_address.
-	resp, err := req.Post(c.url+"/users/api/v1/user", c.adminHeader, req.BodyJSON(struct {
+	resp, err := c.httpClient().Post(c.url+"/users/api/v1/user", c.adminHeader, req.BodyJSON(struct {
 		UserName string `json:"username"`
 	}{userName}))
 	if err != nil {
@@ -107,7 +110,7 @@ func (c *Client) CreateUserWithInitialWallet(userName, walletName, adminId strin
 // renameWallet sets a wallet's name. It authenticates with the wallet's own
 // admin key rather than the ACL token, so it stays outside that token's scope.
 func (c *Client) renameWallet(w Wallet, name string) error {
-	resp, err := req.Patch(c.url+"/api/v1/wallet", req.Header{
+	resp, err := c.httpClient().Patch(c.url+"/api/v1/wallet", req.Header{
 		"Content-Type": "application/json",
 		"Accept":       "application/json",
 		"X-Api-Key":    w.Adminkey,
@@ -127,7 +130,7 @@ func (c *Client) renameWallet(w Wallet, name string) error {
 //
 // adminId is unused, see CreateUserWithInitialWallet.
 func (c *Client) CreateWallet(userId, walletName, adminId string) (wal Wallet, err error) {
-	resp, err := req.Post(c.url+"/users/api/v1/user/"+userId+"/wallet", c.adminHeader,
+	resp, err := c.httpClient().Post(c.url+"/users/api/v1/user/"+userId+"/wallet", c.adminHeader,
 		req.BodyJSON(struct {
 			Name string `json:"name"`
 		}{walletName}))
@@ -151,7 +154,7 @@ func (w Wallet) Invoice(params InvoiceParams, c *Client) (lntx Invoice, err erro
 		"Accept":       "application/json",
 		"X-Api-Key":    w.Inkey,
 	}
-	resp, err := req.Post(c.url+"/api/v1/payments", invoiceHeader, req.BodyJSON(&params))
+	resp, err := c.httpClient().Post(c.url+"/api/v1/payments", invoiceHeader, req.BodyJSON(&params))
 	if err != nil {
 		return
 	}
@@ -173,7 +176,7 @@ func (c Client) Info(w Wallet) (wtx Wallet, err error) {
 		"Accept":       "application/json",
 		"X-Api-Key":    w.Inkey,
 	}
-	resp, err := req.Get(c.url+"/api/v1/wallet", invoiceHeader, nil)
+	resp, err := c.httpClient().Get(c.url+"/api/v1/wallet", invoiceHeader, nil)
 	if err != nil {
 		return
 	}
@@ -201,7 +204,7 @@ func (c Client) PaymentsWithOptions(w Wallet, limit, offset int) (wtx Payments, 
 		"X-Api-Key":    w.Inkey,
 	}
 	url := fmt.Sprintf("%s/api/v1/payments?limit=%d&offset=%d", c.url, limit, offset)
-	resp, err := req.Get(url, invoiceHeader, nil)
+	resp, err := c.httpClient().Get(url, invoiceHeader, nil)
 	if err != nil {
 		return
 	}
@@ -223,7 +226,7 @@ func (c Client) Payment(w Wallet, payment_hash string) (payment LNbitsPayment, e
 		"Accept":       "application/json",
 		"X-Api-Key":    w.Inkey,
 	}
-	resp, err := req.Get(c.url+fmt.Sprintf("/api/v1/payments/%s", payment_hash), invoiceHeader, nil)
+	resp, err := c.httpClient().Get(c.url+fmt.Sprintf("/api/v1/payments/%s", payment_hash), invoiceHeader, nil)
 	if err != nil {
 		return
 	}
@@ -239,7 +242,7 @@ func (c Client) Payment(w Wallet, payment_hash string) (payment LNbitsPayment, e
 
 // Wallets returns all wallets belonging to an user
 func (c Client) Wallets(w User) (wtx []Wallet, err error) {
-	resp, err := req.Get(c.url+"/users/api/v1/user/"+w.ID+"/wallet", c.adminHeader, nil)
+	resp, err := c.httpClient().Get(c.url+"/users/api/v1/user/"+w.ID+"/wallet", c.adminHeader, nil)
 	if err != nil {
 		return
 	}
@@ -261,9 +264,7 @@ func (w Wallet) Pay(params PaymentParams, c *Client) (wtx Invoice, err error) {
 		"Accept":       "application/json",
 		"X-Api-Key":    w.Adminkey,
 	}
-	r := req.New()
-	r.SetTimeout(time.Hour * 24)
-	resp, err := r.Post(c.url+"/api/v1/payments", adminHeader, req.BodyJSON(&params))
+	resp, err := c.payClient().Post(c.url+"/api/v1/payments", adminHeader, req.BodyJSON(&params))
 	if err != nil {
 		return
 	}

@@ -190,6 +190,9 @@ confirmSendMessage         = """Do you want to pay to %s?\n\n💸 Amount: %s"""
 confirmSendAppendMemo      = """\n✉️ %s"""
 sendCancelledMessage       = """🚫 Send cancelled."""
 errorTryLaterMessage       = """🚫 Error. Please try again later."""
+maintenanceTitle           = """🛠 Under maintenance"""
+maintenanceMessage         = """🛠 BitcoinDeepa is under maintenance. Your funds are safe. Please try again in a few minutes."""
+maintenanceLastBalanceMessage = """Last known balance: %s"""
 sendSyntaxErrorMessage     = """Did you enter an amount and a recipient? You can use the /send command to either send to Telegram users like %s or to a Lightning address like BitcoinDeepaBot@bitcoindeepa.com."""
 sendHelpText               = """📖 Oops, that didn't work. %s
 
