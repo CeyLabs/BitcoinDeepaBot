@@ -7,13 +7,16 @@ toolchain go1.27.4
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/PuerkitoBio/goquery v1.8.0
+	github.com/btcsuite/btcd v0.24.2-beta.rc1.0.20240403021926-ae5533602c46
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2
+	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
 	github.com/eko/gocache v1.2.0
 	github.com/fiatjaf/go-lnurl v1.11.3-0.20220819192234-5c5819dd0aa7
 	github.com/fiatjaf/ln-decodepay v1.1.0
 	github.com/gorilla/mux v1.8.0
 	github.com/imroc/req v0.3.0
 	github.com/jinzhu/configor v1.2.1
+	github.com/lightningnetwork/lnd v0.17.5-beta
 	github.com/makiuchi-d/gozxing v0.0.2
 	github.com/nbd-wtf/go-nostr v0.13.0
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
@@ -44,10 +47,8 @@ require (
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/bradfitz/gomemcache v0.0.0-20190913173617-a41fca850d0b // indirect
-	github.com/btcsuite/btcd v0.24.2-beta.rc1.0.20240403021926-ae5533602c46 // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.5 // indirect
 	github.com/btcsuite/btcd/btcutil/psbt v1.1.8 // indirect
-	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0 // indirect
 	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f // indirect
 	github.com/btcsuite/btcwallet v0.16.10-0.20240127010340-16b422a2e8bf // indirect
 	github.com/btcsuite/btcwallet/wallet/txauthor v1.3.2 // indirect
@@ -74,7 +75,6 @@ require (
 	github.com/lightninglabs/gozmq v0.0.0-20191113021534-d20a764486bf // indirect
 	github.com/lightninglabs/neutrino v0.16.0 // indirect
 	github.com/lightninglabs/neutrino/cache v1.1.1 // indirect
-	github.com/lightningnetwork/lnd v0.17.5-beta // indirect
 	github.com/lightningnetwork/lnd/clock v1.1.1 // indirect
 	github.com/lightningnetwork/lnd/queue v1.1.1 // indirect
 	github.com/lightningnetwork/lnd/ticker v1.1.1 // indirect

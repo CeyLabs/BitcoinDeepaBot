@@ -10,6 +10,10 @@ bot:
   lnurl_server: "http://127.0.0.1:5454" # or http://0.0.0.0:5454 depending on your configuration
   lnurl_image: true
   admin_api_host: localhost:6060
+  # Where /donate pays, and where /send or /tip to the bot itself is routed:
+  # a lightning address (name@domain) or an https LNURL-pay URL. Leave empty to
+  # turn /donate off; sends to the bot then go to the bot's own wallet.
+  donate_address: ""
 telegram:
   message_dispose_duration: 10
   api_key: "1234"
