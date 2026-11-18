@@ -246,6 +246,12 @@ func WalletHMACMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		// Try to validate signature against each whitelisted wallet
 		var authenticatedWallet string
 		for walletID, wallet := range internal.Configuration.API.Send.WhitelistedWallets {
+			// Startup validation disables the API for weak secrets. This guards
+			// against a weak secret getting in some other way: an empty secret
+			// in particular would let anyone compute a matching signature.
+			if internal.WeakHMACSecret(wallet.HMACSecret) {
+				continue
+			}
 			expectedSignature := calculateHMAC(message, wallet.HMACSecret)
 			if hmac.Equal([]byte(signature), []byte(expectedSignature)) {
 				authenticatedWallet = walletID

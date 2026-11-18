@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/LightningTipBot/LightningTipBot/internal"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
+	"github.com/LightningTipBot/LightningTipBot/internal/netutil"
 	"github.com/LightningTipBot/LightningTipBot/internal/str"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
 	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
@@ -49,59 +49,30 @@ type SendResponse struct {
 	Fee             int64  `json:"fee,omitempty"`          // routing fee in sats for invoice payments
 }
 
-// InternalNetworkMiddleware restricts access to internal network IPs (configurable)
-func InternalNetworkMiddleware(next http.HandlerFunc) http.HandlerFunc {
+// NetworkAllowlistMiddleware limits the send API to api.send.allowed_networks.
+// With no networks configured it lets everything through and the HMAC check
+// is the only gate. The client address comes from netutil.ClientIP, which only
+// believes forwarding headers from bot.trusted_proxies.
+func NetworkAllowlistMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		clientIP := getClientIP(r)
-
-		// Parse the client IP
-		ip := net.ParseIP(clientIP)
-		if ip == nil {
-			log.Warnf("[api/send] Invalid client IP: %s", clientIP)
-			http.Error(w, "Invalid client IP", http.StatusForbidden)
+		allowed := internal.Configuration.API.Send.AllowedNets
+		if len(allowed) == 0 {
+			next.ServeHTTP(w, r)
 			return
 		}
-
-		// Check if IP is in the internal network range defined in config
-		_, internalNet, err := net.ParseCIDR(GetInternalNetworkCIDR())
-		if err != nil {
-			log.Errorf("[api/send] Invalid internal network CIDR configuration: %s, error: %v", GetInternalNetworkCIDR(), err)
-			http.Error(w, "Internal server configuration error", http.StatusInternalServerError)
+		ip := netutil.ClientIP(r, internal.Configuration.Bot.TrustedProxyNets)
+		if !netutil.Contains(allowed, ip) {
+			log.Warnf("[api/send] Access denied for IP %v (not in allowed_networks)", ip)
+			http.Error(w, "Access denied", http.StatusForbidden)
 			return
 		}
-
-		if !internalNet.Contains(ip) {
-			log.Warnf("[api/send] Access denied for IP: %s (not in internal network %s)", clientIP, GetInternalNetworkCIDR())
-			http.Error(w, "Access denied: Internal network only", http.StatusForbidden)
-			return
-		}
-
-		log.Debugf("[api/send] Access granted for internal IP: %s", clientIP)
 		next.ServeHTTP(w, r)
 	}
 }
 
-// getClientIP extracts the real client IP from the request
+// getClientIP returns the request's client address for logs and records.
 func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header first
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// X-Forwarded-For can contain multiple IPs, take the first one
-		if ips := strings.Split(xff, ","); len(ips) > 0 {
-			return strings.TrimSpace(ips[0])
-		}
-	}
-
-	// Check X-Real-IP header
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
-
-	// Fall back to RemoteAddr
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return ip
+	return netutil.ClientIPString(r, internal.Configuration.Bot.TrustedProxyNets)
 }
 
 // isTelegramID checks if the given string is a valid Telegram ID (numeric)

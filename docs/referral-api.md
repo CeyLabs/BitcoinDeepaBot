@@ -413,8 +413,10 @@ api:
   send:
     enabled: true
 
-    # Only IPs in this CIDR can reach the send endpoints
-    internal_network: "127.0.0.0/24"
+    # Optional: only these IPs/CIDRs can reach the send endpoints.
+    # Empty means no network restriction (HMAC still applies).
+    # (internal_network was never enforced and is now ignored.)
+    allowed_networks: ["127.0.0.1"]
 
     # Satoshi limits
     max_amount: 1000000       # 1M sats
