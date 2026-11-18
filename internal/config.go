@@ -87,7 +87,7 @@ const DefaultAdminAPIHost = "127.0.0.1:6060"
 // and token. The admin API can ban users and dump process memory, so it only
 // runs unauthenticated on loopback.
 func AdminAPIAllowed(host, token string) error {
-	if token != "" && WeakSecret(token) {
+	if token != "" && WeakHMACSecret(token) {
 		return fmt.Errorf("bot.admin_api_token is a placeholder or shorter than 32 characters; generate one with: openssl rand -hex 32")
 	}
 	if token == "" && !IsLoopbackAddress(host) {
@@ -108,12 +108,6 @@ func IsLoopbackAddress(addr string) bool {
 	}
 	ip := net.ParseIP(strings.Trim(host, "[]"))
 	return ip != nil && ip.IsLoopback()
-}
-
-// WeakSecret reports whether a secret is a placeholder or too short to trust.
-func WeakSecret(secret string) bool {
-	return len(secret) < 32 || strings.Contains(strings.ToLower(secret), "change-me")
-
 }
 
 // DonationEndpoint turns a lightning address (name@domain) or an https
