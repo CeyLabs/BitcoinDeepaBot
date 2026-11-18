@@ -52,7 +52,7 @@ func (legacyReferralEntry) TableName() string { return "referral_entries" }
 
 // A database written by the old code has duplicate rows. Migrating it must
 // keep the most recent row per (user, code), then enforce uniqueness.
-func TestMigrateReferralsCollapsesExistingDuplicates(t *testing.T) {
+func TestReferralMigrationCollapsesExistingDuplicates(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "referrals_legacy.db")
 	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
 	if err != nil {
