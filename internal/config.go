@@ -197,6 +197,7 @@ type APIConfiguration struct {
 	// bot.trusted_proxies.
 	AllowedNetworks []string     `yaml:"allowed_networks"`
 	AllowedNets     []*net.IPNet `yaml:"-"`
+	P2P       APIP2PConfiguration       `yaml:"p2p"`
 }
 
 type APIAnalyticsConfiguration struct {
@@ -298,6 +299,7 @@ func init() {
 	}
 	setAPISendDefaults()
 	setAPIAnalyticsDefaults()
+	setAPIP2PDefaults(&Configuration.API.P2P)
 }
 
 // WebhookSecretParam is the query parameter that carries the webhook secret.
@@ -567,4 +569,41 @@ func setAPIAnalyticsDefaults() {
 // IsAPIAnalyticsEnabled returns whether the Analytics API is enabled
 func IsAPIAnalyticsEnabled() bool {
 	return Configuration.API.Analytics.Enabled
+}
+
+// APIP2PConfiguration configures sending from the Telegram Mini App
+// (/api/v1/p2p/*). The sender is always the Telegram user in the Mini App's
+// signed init data. Amounts are in sats.
+type APIP2PConfiguration struct {
+	Enabled            bool  `yaml:"enabled"`
+	MaxAmount          int64 `yaml:"max_amount"`            // per transfer
+	DailyLimit         int64 `yaml:"daily_limit"`           // per sender, per UTC day
+	ConfirmThreshold   int64 `yaml:"confirm_threshold"`     // above this, the sender confirms in the bot chat
+	RateLimitPerMinute int   `yaml:"rate_limit_per_minute"` // sends and invoice payments per sender
+	InitDataMaxAge     int64 `yaml:"init_data_max_age"`     // seconds
+	MaxMemoLength      int   `yaml:"max_memo_length"`
+}
+
+func setAPIP2PDefaults(c *APIP2PConfiguration) {
+	if c.MaxAmount <= 0 {
+		c.MaxAmount = 100000
+	}
+	if c.DailyLimit <= 0 {
+		c.DailyLimit = 500000
+	}
+	if c.ConfirmThreshold <= 0 {
+		c.ConfirmThreshold = 50000
+	}
+	if c.RateLimitPerMinute <= 0 {
+		c.RateLimitPerMinute = 10
+	}
+	if c.InitDataMaxAge <= 0 {
+		c.InitDataMaxAge = 3600
+	}
+	if c.MaxMemoLength <= 0 {
+		c.MaxMemoLength = 280
+	}
+	if c.Enabled {
+		log.Infof("P2P API enabled: max %d sat per transfer, %d sat per day, confirm above %d sat", c.MaxAmount, c.DailyLimit, c.ConfirmThreshold)
+	}
 }

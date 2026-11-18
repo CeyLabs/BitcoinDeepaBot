@@ -78,6 +78,16 @@ api:
   # only answers these IPs/CIDRs. Behind a reverse proxy, the proxy must be in
   # bot.trusted_proxies and pass the real client IP in X-Forwarded-For.
   allowed_networks: []
+  # Telegram Mini App sending (/api/v1/p2p/*). Off by default. The sender is
+  # always the user in the Mini App's signed initData. See docs/p2p-api.md.
+  p2p:
+    enabled: false
+    max_amount: 100000        # sats per transfer
+    daily_limit: 500000       # sats per sender per UTC day
+    confirm_threshold: 50000  # above this, the sender confirms in the bot chat
+    rate_limit_per_minute: 10
+    init_data_max_age: 3600   # seconds
+    max_memo_length: 280
   # Analytics API - HMAC authenticated endpoints for data export
   # Generate secrets with: openssl rand -hex 32
   analytics:

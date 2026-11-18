@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -78,6 +79,81 @@ func (db *DB) Set(object Storable) error {
 		return err
 	})
 	return err
+}
+
+// GetOrSet returns the value stored under key, or stores value there if the
+// key is free. created reports which happened. Check and write are one
+// transaction, so concurrent callers with the same key all get the same value.
+func (db *DB) GetOrSet(key, value string, ttl time.Duration) (stored string, created bool, err error) {
+	err = db.Update(func(tx *buntdb.Tx) error {
+		if v, err := tx.Get(key); err == nil {
+			stored = v
+			return nil
+		} else if err != buntdb.ErrNotFound {
+			return err
+		}
+		if _, _, err := tx.Set(key, value, &buntdb.SetOptions{Expires: true, TTL: ttl}); err != nil {
+			return err
+		}
+		stored, created = value, true
+		return nil
+	})
+	return stored, created, err
+}
+
+// AddWithinLimit adds amount to the counter under key if the new total stays
+// at or below limit, and returns the total after the call. The counter
+// expires after ttl. Check and update are one transaction, so concurrent
+// callers cannot together exceed the limit. A negative amount gives sats back.
+func (db *DB) AddWithinLimit(key string, amount, limit int64, ttl time.Duration) (ok bool, total int64, err error) {
+	err = db.Update(func(tx *buntdb.Tx) error {
+		var current int64
+		if v, err := tx.Get(key); err == nil {
+			current, _ = strconv.ParseInt(v, 10, 64)
+		} else if err != buntdb.ErrNotFound {
+			return err
+		}
+		next := current + amount
+		if next < 0 {
+			next = 0
+		}
+		if amount > 0 && next > limit {
+			total = current
+			return nil
+		}
+		if _, _, err := tx.Set(key, strconv.FormatInt(next, 10), &buntdb.SetOptions{Expires: true, TTL: ttl}); err != nil {
+			return err
+		}
+		ok, total = true, next
+		return nil
+	})
+	return ok, total, err
+}
+
+// CounterValue reads a counter written by AddWithinLimit; a missing key is 0.
+func (db *DB) CounterValue(key string) (int64, error) {
+	var n int64
+	err := db.View(func(tx *buntdb.Tx) error {
+		v, err := tx.Get(key)
+		if err == buntdb.ErrNotFound {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		n, _ = strconv.ParseInt(v, 10, 64)
+		return nil
+	})
+	return n, err
+}
+
+// DeleteKey removes key if present. A missing key is not an error.
+func (db *DB) DeleteKey(key string) error {
+	return db.Update(func(tx *buntdb.Tx) error {
+		if _, err := tx.Delete(key); err != nil && err != buntdb.ErrNotFound {
+			return err
+		}
+		return nil
+	})
 }
 
 // ClaimOnce records key and reports whether this call was the first to do so
