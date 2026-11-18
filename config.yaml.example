@@ -40,6 +40,11 @@ lnbits:
   admin_token: "1234"
   webhook_server: "http://0.0.0.0:5588"  # Local webhook server address
   webhook_public_url: "https://yourdomain.com/webhook"  # Public URL for webhooks (for reverse proxy)
+  # Optional but recommended. Added to every webhook URL handed to lnbits and
+  # required on incoming webhooks. Generate with: openssl rand -hex 32
+  # Invoices created before you set it will not trigger callbacks, so set it
+  # right after a restart. Every webhook is also verified with lnbits either way.
+  webhook_secret: ""
   lnbits_public_url: "link.mylnurl.com"
 database:
   db_path: "data/bot.db"

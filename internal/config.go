@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net"
 	"net/url"
@@ -181,6 +182,10 @@ type LnbitsConfiguration struct {
 	WebhookServerUrl       *url.URL `yaml:"-"`
 	WebhookPublicUrl       string   `yaml:"webhook_public_url"`
 	WebhookPublicUrlParsed *url.URL `yaml:"-"`
+	// WebhookSecret, when set, is added to every webhook URL the bot hands to
+	// lnbits and is required on every incoming webhook. Requests without it are
+	// dropped before they are parsed. Generate one with: openssl rand -hex 32
+	WebhookSecret string `yaml:"webhook_secret"`
 }
 
 type APIConfiguration struct {
@@ -237,6 +242,9 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	if err := checkWebhookSecret(Configuration.Lnbits.WebhookSecret); err != nil {
+		panic(err)
+	}
 	Configuration.Lnbits.WebhookServerUrl = webhookUrl
 
 	// Parse webhook public URL if provided, otherwise use webhook server URL
@@ -272,14 +280,73 @@ func init() {
 	setAPIAnalyticsDefaults()
 }
 
-// GetWebhookURL returns the appropriate webhook URL
+// WebhookSecretParam is the query parameter that carries the webhook secret.
+// A query parameter rather than a path segment keeps working behind reverse
+// proxies that rewrite or strip paths.
+const WebhookSecretParam = "s"
+
+// GetWebhookURL returns the URL lnbits should call for payment webhooks.
 // If webhook_public_url is configured, it returns that (for reverse proxy scenarios)
 // Otherwise, it returns the webhook_server URL (for direct access)
+// When webhook_secret is set, it is appended as a query parameter.
 func GetWebhookURL() string {
+	return withWebhookSecret(webhookBaseURL(), Configuration.Lnbits.WebhookSecret)
+}
+
+// GetWebhookURLRedacted is GetWebhookURL with the secret masked, for logs.
+func GetWebhookURLRedacted() string {
+	if Configuration.Lnbits.WebhookSecret == "" {
+		return webhookBaseURL()
+	}
+	return withWebhookSecret(webhookBaseURL(), "REDACTED")
+}
+
+func webhookBaseURL() string {
 	if Configuration.Lnbits.WebhookPublicUrl != "" {
 		return Configuration.Lnbits.WebhookPublicUrl
 	}
 	return Configuration.Lnbits.WebhookServer
+}
+
+func withWebhookSecret(base, secret string) string {
+	if secret == "" {
+		return base
+	}
+	u, err := url.Parse(base)
+	if err != nil {
+		return base
+	}
+	q := u.Query()
+	q.Set(WebhookSecretParam, secret)
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+// WebhookSecretMatches reports whether a webhook request carries the configured
+// secret, comparing in constant time. With no secret configured every request
+// passes this check and still has to pass payment verification.
+func WebhookSecretMatches(got string) bool {
+	return secretMatches(got, Configuration.Lnbits.WebhookSecret)
+}
+
+func secretMatches(got, want string) bool {
+	if want == "" {
+		return true
+	}
+	return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
+}
+
+// checkWebhookSecret refuses to start with a placeholder or short secret. An
+// empty secret is allowed (webhooks are still verified against lnbits), but a
+// weak one would only give false confidence.
+func checkWebhookSecret(secret string) error {
+	if secret == "" {
+		return nil
+	}
+	if strings.Contains(secret, "change-me") || len(secret) < 32 {
+		return fmt.Errorf("lnbits.webhook_secret is a placeholder or shorter than 32 characters; generate one with: openssl rand -hex 32")
+	}
+	return nil
 }
 
 // GetWebhookURLParsed returns the parsed webhook URL

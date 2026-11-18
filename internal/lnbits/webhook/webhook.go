@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -63,7 +64,7 @@ func NewServer(bot *telegram.TipBot) *Server {
 	}
 	apiServer.httpServer.Handler = apiServer.newRouter()
 	go apiServer.httpServer.ListenAndServe()
-	log.Infof("[Webhook] Server started at %s (public URL: %s)", internal.Configuration.Lnbits.WebhookServerUrl, internal.GetWebhookURL())
+	log.Infof("[Webhook] Server started at %s (public URL: %s)", internal.Configuration.Lnbits.WebhookServerUrl, internal.GetWebhookURLRedacted())
 	return apiServer
 }
 
@@ -82,8 +83,30 @@ func (w *Server) newRouter() *mux.Router {
 	return router
 }
 
+const (
+	// maxWebhookBody bounds what an unauthenticated caller can make us read.
+	maxWebhookBody = 64 << 10
+	// processedTTL is how long a handled payment hash is remembered, so a
+	// replayed webhook cannot trigger its callback a second time.
+	processedTTL = 90 * 24 * time.Hour
+	// verifyBudget bounds how long payment verification may keep retrying.
+	verifyBudget = 8 * time.Second
+)
+
+// receive handles a payment webhook from lnbits.
+//
+// Nothing in the request is trusted. Anyone who can reach this port can post a
+// body that names a wallet and a payment hash, so the payment is confirmed with
+// lnbits before anything happens, the amount lnbits reports is used instead of
+// the one in the body, and each payment hash is acted on once.
 func (w *Server) receive(writer http.ResponseWriter, request *http.Request) {
+	if !internal.WebhookSecretMatches(request.URL.Query().Get(internal.WebhookSecretParam)) {
+		log.Warnf("[Webhook] Rejected request without a valid secret from %s", request.RemoteAddr)
+		writer.WriteHeader(http.StatusNotFound)
+		return
+	}
 	log.Debugln("[Webhook] Received request")
+	request.Body = http.MaxBytesReader(writer, request.Body, maxWebhookBody)
 	webhookEvent := Webhook{}
 	// need to delete the header otherwise the Decode will fail
 	request.Header.Del("content-length")
@@ -93,13 +116,45 @@ func (w *Server) receive(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(400)
 		return
 	}
-	user, err := w.GetUserByWalletId(webhookEvent.WalletID)
-	if err != nil {
-		log.Errorf("[Webhook] Error getting user: %s", err.Error())
+	if webhookEvent.WalletID == "" || !lnbits.ValidPaymentHash(webhookEvent.PaymentHash) {
+		log.Warnf("[Webhook] Rejected request with missing wallet id or malformed payment hash from %s", request.RemoteAddr)
 		writer.WriteHeader(400)
 		return
 	}
-	log.Infoln(fmt.Sprintf("[⚡️ WebHook] User %s (%d) received invoice of %d sat.", telegram.GetUserStr(user.Telegram), user.Telegram.ID, webhookEvent.Amount/1000))
+	user, err := w.GetUserByWalletId(webhookEvent.WalletID)
+	if err != nil || user.Wallet == nil {
+		log.Errorf("[Webhook] Error getting user for wallet: %v", err)
+		writer.WriteHeader(400)
+		return
+	}
+
+	// Confirm with lnbits, using the receiving wallet's own key.
+	// Retried briefly on transport errors: lnbits never resends a failed
+	// webhook. The budget stays under the server's 15 s write timeout.
+	amountMsat, err := w.c.VerifyIncomingPaymentWithRetry(*user.Wallet, webhookEvent.PaymentHash, verifyBudget)
+	if err != nil {
+		if errors.Is(err, lnbits.ErrPaymentNotVerified) {
+			log.Warnf("[Webhook] Rejected unverified payment %s for user %d from %s: %v", webhookEvent.PaymentHash, user.Telegram.ID, request.RemoteAddr, err)
+			writer.WriteHeader(http.StatusForbidden)
+			return
+		}
+		log.Errorf("[Webhook] Could not verify payment %s with lnbits: %v", webhookEvent.PaymentHash, err)
+		writer.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
+	claimed, err := w.buntdb.ClaimOnce("webhook-processed:"+webhookEvent.PaymentHash, processedTTL)
+	if err != nil {
+		log.Errorf("[Webhook] Could not record payment %s: %v", webhookEvent.PaymentHash, err)
+		writer.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+	if !claimed {
+		log.Infof("[Webhook] Ignoring repeated webhook for payment %s", webhookEvent.PaymentHash)
+		writer.WriteHeader(200)
+		return
+	}
+	log.Infoln(fmt.Sprintf("[⚡️ WebHook] User %s (%d) received invoice of %d sat.", telegram.GetUserStr(user.Telegram), user.Telegram.ID, amountMsat/1000))
 
 	go dca.NotifyDeposit(telegram.GetUserStr(user.Telegram))
 
@@ -123,7 +178,7 @@ func (w *Server) receive(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	// fallback: send a message to the user if there is no callback for this invoice
-	_, err = w.bot.Send(user.Telegram, fmt.Sprintf(i18n.Translate(user.Telegram.LanguageCode, "invoiceReceivedMessage"), utils.FormatSats(webhookEvent.Amount/1000)))
+	_, err = w.bot.Send(user.Telegram, fmt.Sprintf(i18n.Translate(user.Telegram.LanguageCode, "invoiceReceivedMessage"), utils.FormatSats(amountMsat/1000)))
 	if err != nil {
 		log.Errorln(err)
 	}
