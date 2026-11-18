@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -67,6 +68,28 @@ func NetworkAllowlistMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		next.ServeHTTP(w, r)
+	}
+}
+
+// PathAllowlistMiddleware limits every request whose path starts with prefix
+// to the given networks. It runs on the whole router, so it also covers routes
+// added later. With no networks it lets everything through.
+func PathAllowlistMiddleware(prefix string, allowed func() []*net.IPNet) mux.MiddlewareFunc {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nets := allowed()
+			if len(nets) == 0 || !strings.HasPrefix(r.URL.Path, prefix) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			ip := netutil.ClientIP(r, internal.Configuration.Bot.TrustedProxyNets)
+			if !netutil.Contains(nets, ip) {
+				log.Warnf("[api] Access to %s denied for IP %v (not in api.allowed_networks)", r.URL.Path, ip)
+				http.Error(w, "Access denied", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
 	}
 }
 

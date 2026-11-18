@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net"
 	"net/http"
 	"runtime/debug"
 	"strings"
@@ -82,6 +83,8 @@ func startApiServer(bot *telegram.TipBot) {
 	webhook.NewServer(bot)
 	// start external api server
 	s := api.NewServer(internal.Configuration.Bot.LNURLServerUrl.Host)
+	// api.allowed_networks applies to every /api/v1/ route on this server.
+	s.Use(api.PathAllowlistMiddleware("/api/v1/", func() []*net.IPNet { return internal.Configuration.API.AllowedNets }))
 
 	s.AppendRoute("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

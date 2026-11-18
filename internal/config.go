@@ -191,6 +191,12 @@ type LnbitsConfiguration struct {
 type APIConfiguration struct {
 	Send      APISendConfiguration      `yaml:"send"`
 	Analytics APIAnalyticsConfiguration `yaml:"analytics"`
+	// AllowedNetworks, when set, limits every /api/v1/ endpoint to these IPs
+	// or CIDRs: the send API, analytics and the per-user wallet API. Empty
+	// means no restriction. The client address is resolved through
+	// bot.trusted_proxies.
+	AllowedNetworks []string     `yaml:"allowed_networks"`
+	AllowedNets     []*net.IPNet `yaml:"-"`
 }
 
 type APIAnalyticsConfiguration struct {
@@ -278,6 +284,14 @@ func init() {
 	checkLnbitsConfiguration()
 	setAPISendDefaults()
 	setAPIAnalyticsDefaults()
+	// An unreadable allowlist must stop the bot rather than leave the API open.
+	Configuration.API.AllowedNets, err = netutil.ParseNetworks(Configuration.API.AllowedNetworks)
+	if err != nil {
+		panic(fmt.Errorf("api.allowed_networks: %w", err))
+	}
+	if len(Configuration.API.AllowedNets) > 0 {
+		log.Infof("/api/v1/ restricted to: %s", strings.Join(Configuration.API.AllowedNetworks, ", "))
+	}
 }
 
 // WebhookSecretParam is the query parameter that carries the webhook secret.
