@@ -248,7 +248,7 @@ lnurlHelpText                  = """📖 Упс, это не сработало.
 
 # LNURL WITHDRAW
 
-confirmLnurlWithdrawMessage     = """Вы хотите вывести средства?\n\n💸 Сумма: %d сб"""
+confirmLnurlWithdrawMessage     = """Вы хотите вывести средства?\n\n💸 Сумма: %s сб"""
 lnurlPreparingWithdraw        = """🧮 Подготовка к выводу средств..."""
 lnurlWithdrawFailed             = """🚫 Вывод средств не удался."""
 lnurlWithdrawCancelled             = """🚫 Вывод средств отменен."""
@@ -273,7 +273,7 @@ inlineResultFaucetDescription = """👉 Нажмите здесь, чтобы с
 
 inlineFaucetMessage                     = """Нажмите ✅, чтобы забрать %s из этой криптораздачи от %s.
 
-🚰 Осталось: %d/%s (отдано %d/%d пользователям)
+🚰 Осталось: %s/%s (отдано %d/%d пользователям)
 %s"""
 inlineFaucetEndedMessage                = """🚰 Криптораздача завершена 🍺\n\n🏅 %s отдано %d пользователям."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""
@@ -294,7 +294,7 @@ inlineFaucetHelpText                    = """📖 Упс, это не срабо
 inlineQuerySendTitle            = """💸  Отправьте платеж в чат."""
 inlineQuerySendDescription      = """Использование: @%s send <количество> [<пользователь>] [<memo>]"""
 inlineResultSendTitle           = """💸 Отправить %s."""
-inlineResultSendDescription     = """👉 Нажмите, чтобы отправить %d сат в этот чат."""
+inlineResultSendDescription     = """👉 Нажмите, чтобы отправить %s сат в этот чат."""
 
 inlineSendMessage              = """Нажмите ✅ для получения платежа от %s.\n\n💸 Сумма: %s"""
 inlineSendAppendMemo           = """\n✉️ %s"""
@@ -329,7 +329,7 @@ inlineResultTipjarDescription = """👉 Нажмите здесь, чтобы с
 
 inlineTipjarMessage                     = """Нажмите 💸 чтобы *отправить %s* в эту копилку, созданную %s.
 
-🙏 Накоплено: *%d*/%s (от %d пользователей)
+🙏 Накоплено: *%s*/%s (от %d пользователей)
 %s"""
 inlineTipjarEndedMessage                = """🍯 %s's копилка заполнена ⭐️\n\n🏅 %s отправи(л/ли) %d пользовате(ль/ли)."""
 inlineTipjarAppendMemo                  = """\n✉️ %s"""

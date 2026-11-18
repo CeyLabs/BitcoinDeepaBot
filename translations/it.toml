@@ -262,7 +262,7 @@ inlineResultFaucetDescription = """👉 Clicca qui per creare una distribuzione 
 
 inlineFaucetMessage                     = """Premi ✅ per riscuotere %s da questa distribuzione da %s.
 
-🚰 Rimanente: %d/%s (distribuiti a %d/%d utenti)
+🚰 Rimanente: %s/%s (distribuiti a %d/%d utenti)
 %s"""
 inlineFaucetEndedMessage                = """🚰 Distribuzione completata 🍺\n\n🏅 %s distribuiti a %d utenti."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""

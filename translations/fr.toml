@@ -262,7 +262,7 @@ inlineResultFaucetDescription = """👉 Appuyez ici pour créer un faucet dans c
 
 inlineFaucetMessage                     = """Appuyez sur ✅ pour collecter %s de ce faucet de %s.
 
-🚰 Restant: %d/%s (envoyé à %d/%d utilisateurs)
+🚰 Restant: %s/%s (envoyé à %d/%d utilisateurs)
 %s"""
 inlineFaucetEndedMessage                = """🚰 Faucet vide 🍺\n\n🏅 %s envoyé à %d utilisateurs."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""

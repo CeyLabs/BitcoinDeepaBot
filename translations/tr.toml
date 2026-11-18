@@ -261,7 +261,7 @@ inlineResultFaucetDescription = """👉 Fıçı’yı bu sohbete göndermek içi
 
 inlineFaucetMessage = """✅ butonuna basarak %s'in Fıçıdan %s çek.
 
-🚰 Kalan: %d/%s (%d/%d çekildi)
+🚰 Kalan: %s/%s (%d/%d çekildi)
 %s"""
 inlineFaucetEndedMessage = """🚰 Fıçı boşaldı 🍺\n\n🏅 %s %d kullanıcıya dağıtıldı."""
 inlineFaucetAppendMemo = """\n✉️ %s"""

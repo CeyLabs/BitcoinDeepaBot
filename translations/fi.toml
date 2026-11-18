@@ -294,7 +294,7 @@ inlineResultFaucetDescription = """👉 Paina tästä luodaksesi hanan tähän k
 
 inlineFaucetMessage                     = """Painamalla ✅ nostat %s %s:n tekemästä hanasta.
 
-🚰 Jäljellä: %d/%s (nostettu %d/%d käyttäjälle)
+🚰 Jäljellä: %s/%s (nostettu %d/%d käyttäjälle)
 %s"""
 inlineFaucetEndedMessage                = """🚰 Hana on tyhjä 🍺\n\n🏅 %s annettiin %d käyttäjälle."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""
@@ -351,7 +351,7 @@ inlineResultTipjarDescription = """👉 Paina tästä luodaksesi tippikulhon tä
 
 inlineTipjarMessage                     = """Paina 💸 *maksaaksesi %s* %s:n luomaan tippikulhoon.
 
-🙏 Tippikulhossa: *%d*/%s (%d käyttäjältä)
+🙏 Tippikulhossa: *%s*/%s (%d käyttäjältä)
 %s"""
 inlineTipjarEndedMessage                = """🍯 %s:n tippikulho on täynnä⭐️\n\n🏅 %s saatin %d käyttäjältä."""
 inlineTipjarAppendMemo                  = """\n✉️ %s"""

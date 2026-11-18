@@ -277,7 +277,7 @@ inlineResultFaucetDescription = """👉 Haz clic aquí para crear un grifo en es
 
 inlineFaucetMessage                     = """Pulsa ✅ para cobrar %s de este grifo de %s.
 
-🚰 Restante: %d/%s (dado a %d/%d usuarios)
+🚰 Restante: %s/%s (dado a %d/%d usuarios)
 %s"""
 inlineFaucetEndedMessage                = """🚰 Grifo vacío 🍺\n\n🏅 %s dados a %d usuarios."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""
@@ -333,7 +333,7 @@ inlineResultTipjarDescription = """👉 Haz clic aquí para crear una alcancía 
 
 inlineTipjarMessage                     = """Pulsa 💸 para *pagar %s* a esa alcancía de %s.
 
-🙏 Dados: *%d*/%s (por %d usuarios)
+🙏 Dados: *%s*/%s (por %d usuarios)
 %s"""
 inlineTipjarEndedMessage                = """🍯 La alcancía de %s está llena ⭐️\n\n🏅 %s dados por %d usuários."""
 inlineTipjarAppendMemo                  = """\n✉️ %s"""

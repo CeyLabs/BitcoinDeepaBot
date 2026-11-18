@@ -277,7 +277,7 @@ inlineResultFaucetDescription = """👉 Aperte aqui para criar uma torneira nest
 
 inlineFaucetMessage                     = """Aperte ✅ para coletar %s desta torneira de %s.
 
-🚰 Restante: %d/%s (para %d/%d usuários)
+🚰 Restante: %s/%s (para %d/%d usuários)
 %s"""
 inlineFaucetEndedMessage                = """🚰 Torneira vazia 🍺\n\n🏅 %s para %d usuários."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""
@@ -333,7 +333,7 @@ inlineResultTipjarDescription = """👉 Clique aqui para criar um cofrinho neste
 
 inlineTipjarMessage                     = """Pressione 💸 para *pagar %s* a esse cofrinho de %s.
 
-🙏 Doados: *%d*/%s (por %d usuários)
+🙏 Doados: *%s*/%s (por %d usuários)
 %s"""
 inlineTipjarEndedMessage                = """🍯 O cofrinho de %s está cheio ⭐️\n\n🏅 %s doados por %d usuários."""
 inlineTipjarAppendMemo                  = """\n✉️ %s"""
