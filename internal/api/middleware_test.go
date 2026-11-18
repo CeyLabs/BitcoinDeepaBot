@@ -11,7 +11,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal"
 )
 
-const testWalletSecret = "test-secret"
+const testWalletSecret = "test-secret-0123456789abcdef0123456789abcdef"
 
 // withTestWallets swaps in a single whitelisted wallet for the duration of t.
 func withTestWallets(t *testing.T) {

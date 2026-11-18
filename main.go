@@ -130,27 +130,27 @@ func startApiServer(bot *telegram.TipBot) {
 
 	// Bot pay HTTP API module with wallet-based HMAC security (only if enabled)
 	if internal.IsAPISendEnabled() {
-		s.AppendRoute(`/api/v1/send`, api.WalletHMACMiddleware(apiService.Send), http.MethodPost)
+		s.AppendRoute(`/api/v1/send`, api.NetworkAllowlistMiddleware(api.WalletHMACMiddleware(apiService.Send)), http.MethodPost)
 		log.Infof("API Send endpoint registered at /api/v1/send with wallet-based HMAC security")
 
 		// User balance endpoint with wallet-based HMAC security
-		s.AppendRoute(`/api/v1/userbalance`, api.WalletHMACMiddleware(apiService.UserBalance), http.MethodPost)
+		s.AppendRoute(`/api/v1/userbalance`, api.NetworkAllowlistMiddleware(api.WalletHMACMiddleware(apiService.UserBalance)), http.MethodPost)
 		log.Infof("API UserBalance endpoint registered at /api/v1/userbalance with wallet-based HMAC security")
 
 		// User transactions endpoint with wallet-based HMAC security
-		s.AppendRoute(`/api/v1/usertransactions`, api.WalletHMACMiddleware(apiService.UserTransactions), http.MethodPost)
+		s.AppendRoute(`/api/v1/usertransactions`, api.NetworkAllowlistMiddleware(api.WalletHMACMiddleware(apiService.UserTransactions)), http.MethodPost)
 		log.Infof("API UserTransactions endpoint registered at /api/v1/usertransactions with wallet-based HMAC security")
 
 		// Referral lookup endpoint with wallet-based HMAC security
-		s.AppendRoute(`/api/v1/referral/lookup`, api.WalletHMACMiddleware(apiService.ReferralLookup), http.MethodGet)
+		s.AppendRoute(`/api/v1/referral/lookup`, api.NetworkAllowlistMiddleware(api.WalletHMACMiddleware(apiService.ReferralLookup)), http.MethodGet)
 		log.Infof("API ReferralLookup endpoint registered at /api/v1/referral/lookup with wallet-based HMAC security")
 
 		// Send status endpoint — check approval status of a pending transaction
-		s.AppendRoute(`/api/v1/send/status/{transaction_id}`, api.WalletHMACMiddleware(apiService.SendStatus), http.MethodGet)
+		s.AppendRoute(`/api/v1/send/status/{transaction_id}`, api.NetworkAllowlistMiddleware(api.WalletHMACMiddleware(apiService.SendStatus)), http.MethodGet)
 		log.Infof("API SendStatus endpoint registered at /api/v1/send/status/{transaction_id} with wallet-based HMAC security")
 
 		// Payment settlement endpoint — resolve an invoice payment left in flight
-		s.AppendRoute(`/api/v1/send/payment/{payment_hash}`, api.WalletHMACMiddleware(apiService.SendPaymentStatus), http.MethodGet)
+		s.AppendRoute(`/api/v1/send/payment/{payment_hash}`, api.NetworkAllowlistMiddleware(api.WalletHMACMiddleware(apiService.SendPaymentStatus)), http.MethodGet)
 		log.Infof("API SendPaymentStatus endpoint registered at /api/v1/send/payment/{payment_hash} with wallet-based HMAC security")
 	} else {
 		log.Infof("API Send endpoint disabled in configuration")
