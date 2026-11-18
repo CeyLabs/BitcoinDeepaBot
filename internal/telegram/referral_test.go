@@ -3,10 +3,10 @@ package telegram
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 // openReferralTestDB spins up a fresh on-disk sqlite DB and migrates ReferralEntry,
@@ -18,19 +18,83 @@ func openReferralTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&ReferralEntry{}); err != nil {
+	closeOnCleanup(t, db)
+	if err := migrateReferrals(db); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	return db
 }
 
-// upsert replicates the capture path in startHandler.
+// closeOnCleanup closes the database when the test ends, so its file can be
+// removed (Windows refuses to delete an open file).
+func closeOnCleanup(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	if sqlDB, err := db.DB(); err == nil {
+		t.Cleanup(func() { sqlDB.Close() })
+	}
+}
+
+// upsert goes through the same function startHandler uses.
 func upsert(db *gorm.DB, telegramID int64, username, code string) error {
-	entry := ReferralEntry{TelegramID: telegramID, Username: username, ReferralCode: code}
-	return db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "telegram_id"}, {Name: "referral_code"}},
-		DoUpdates: clause.AssignmentColumns([]string{"username", "created_at"}),
-	}).Create(&entry).Error
+	return RecordReferral(db, ReferralEntry{TelegramID: telegramID, Username: username, ReferralCode: code})
+}
+
+// legacyReferralEntry is the schema before the unique index existed.
+type legacyReferralEntry struct {
+	ID           uint  `gorm:"primaryKey;autoIncrement"`
+	TelegramID   int64 `gorm:"index"`
+	Username     string
+	ReferralCode string
+	CreatedAt    time.Time
+}
+
+func (legacyReferralEntry) TableName() string { return "referral_entries" }
+
+// A database written by the old code has duplicate rows. Migrating it must
+// keep the most recent row per (user, code), then enforce uniqueness.
+func TestReferralMigrationCollapsesExistingDuplicates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "referrals_legacy.db")
+	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	closeOnCleanup(t, db)
+	if err := db.AutoMigrate(&legacyReferralEntry{}); err != nil {
+		t.Fatalf("legacy migrate: %v", err)
+	}
+	for _, e := range []legacyReferralEntry{
+		{TelegramID: 1, Username: "", ReferralCode: "PROMO"},
+		{TelegramID: 1, Username: "alice", ReferralCode: "PROMO"}, // latest click for (1, PROMO)
+		{TelegramID: 1, Username: "alice", ReferralCode: "SALE"},
+		{TelegramID: 2, Username: "bob", ReferralCode: "PROMO"},
+		{TelegramID: 2, Username: "bob", ReferralCode: "PROMO"},
+	} {
+		if err := db.Create(&e).Error; err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+
+	if err := migrateReferrals(db); err != nil {
+		t.Fatalf("migrate with existing duplicates: %v", err)
+	}
+	if got := countRows(t, db); got != 3 {
+		t.Fatalf("expected 3 rows after collapsing duplicates, got %d", got)
+	}
+	var e ReferralEntry
+	if err := db.Where("telegram_id = ? AND referral_code = ?", 1, "PROMO").First(&e).Error; err != nil {
+		t.Fatal(err)
+	}
+	if e.Username != "alice" {
+		t.Fatalf("expected the most recent row to survive, got username %q", e.Username)
+	}
+	// The unique index is now in place: a raw duplicate insert must fail.
+	if err := db.Create(&ReferralEntry{TelegramID: 2, Username: "bob", ReferralCode: "PROMO"}).Error; err == nil {
+		t.Fatal("duplicate insert succeeded; unique index missing")
+	}
+	// And the migration is safe to run again.
+	if err := migrateReferrals(db); err != nil {
+		t.Fatalf("second migration: %v", err)
+	}
 }
 
 func countRows(t *testing.T, db *gorm.DB) int64 {
