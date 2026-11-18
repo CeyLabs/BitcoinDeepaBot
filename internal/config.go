@@ -60,11 +60,59 @@ type BotConfiguration struct {
 	LNURLHostUrl   *url.URL            `yaml:"-"`
 	LNURLSendImage bool                `yaml:"lnurl_image"`
 	AdminAPIHost   string              `yaml:"admin_api_host"`
+	// DonateAddress is where /donate (and sends or tips to the bot itself)
+	// pay: a lightning address (name@domain) or an https LNURL-pay URL.
+	// Empty disables /donate.
+	DonateAddress  string `yaml:"donate_address"`
+	DonateEndpoint string `yaml:"-"`
 	// TrustedProxies are the reverse proxies whose X-Forwarded-For and
 	// X-Real-IP headers are believed. Defaults to loopback only. Anything
 	// else that sends those headers is ignored.
 	TrustedProxies   []string     `yaml:"trusted_proxies"`
 	TrustedProxyNets []*net.IPNet `yaml:"-"`
+}
+
+// DonationEndpoint turns a lightning address (name@domain) or an https
+// LNURL-pay URL into the LNURL-pay endpoint to query. Plain http is refused:
+// the endpoint decides which invoice gets paid.
+func DonationEndpoint(address string) (string, error) {
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return "", nil
+	}
+	if strings.Contains(address, "://") {
+		u, err := url.Parse(address)
+		if err != nil || u.Scheme != "https" || u.Host == "" {
+			return "", fmt.Errorf("donate_address %q must be an https URL or a lightning address", address)
+		}
+		return u.String(), nil
+	}
+	name, domain, ok := strings.Cut(address, "@")
+	if !ok || name == "" || domain == "" || strings.ContainsAny(name+domain, "/?#@ ") {
+		return "", fmt.Errorf("donate_address %q must be an https URL or a lightning address (name@domain)", address)
+	}
+	return (&url.URL{Scheme: "https", Host: strings.ToLower(domain), Path: "/.well-known/lnurlp/" + name}).String(), nil
+}
+
+// configPath picks the configuration file: --config <path>, --config=<path>,
+// or $BOT_CONFIG, falling back to ./config.yaml. It reads os.Args directly
+// because the configuration is loaded in a package init, before any flag
+// parsing runs.
+func configPath(args []string, env string) string {
+	for i, a := range args {
+		for _, name := range []string{"--config", "-config"} {
+			if a == name && i+1 < len(args) {
+				return args[i+1]
+			}
+			if v, ok := strings.CutPrefix(a, name+"="); ok && v != "" {
+				return v
+			}
+		}
+	}
+	if env != "" {
+		return env
+	}
+	return "config.yaml"
 }
 
 type TelegramConfiguration struct {
@@ -139,7 +187,11 @@ type WhitelistedWallet struct {
 }
 
 func init() {
-	err := configor.Load(&Configuration, "config.yaml")
+	err := configor.Load(&Configuration, configPath(os.Args[1:], os.Getenv("BOT_CONFIG")))
+	if err != nil {
+		panic(err)
+	}
+	Configuration.Bot.DonateEndpoint, err = DonationEndpoint(Configuration.Bot.DonateAddress)
 	if err != nil {
 		panic(err)
 	}
