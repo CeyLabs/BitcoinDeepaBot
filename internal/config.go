@@ -59,6 +59,49 @@ type BotConfiguration struct {
 	LNURLHostUrl   *url.URL            `yaml:"-"`
 	LNURLSendImage bool                `yaml:"lnurl_image"`
 	AdminAPIHost   string              `yaml:"admin_api_host"`
+	// AdminAPIToken, when set, is required as "Authorization: Bearer <token>"
+	// on every admin API request. It is mandatory if admin_api_host is not a
+	// loopback address.
+	AdminAPIToken string `yaml:"admin_api_token"`
+	// AdminPprof exposes Go's /debug/pprof on the admin API. Off by default:
+	// profiles reveal memory contents, including keys.
+	AdminPprof bool `yaml:"admin_pprof"`
+}
+
+// DefaultAdminAPIHost is used when admin_api_host is empty. An empty address
+// would otherwise make net/http listen on port 80 on every interface.
+const DefaultAdminAPIHost = "127.0.0.1:6060"
+
+// AdminAPIAllowed decides whether the admin API may start with this address
+// and token. The admin API can ban users and dump process memory, so it only
+// runs unauthenticated on loopback.
+func AdminAPIAllowed(host, token string) error {
+	if token != "" && WeakSecret(token) {
+		return fmt.Errorf("bot.admin_api_token is a placeholder or shorter than 32 characters; generate one with: openssl rand -hex 32")
+	}
+	if token == "" && !IsLoopbackAddress(host) {
+		return fmt.Errorf("bot.admin_api_host %q is not a loopback address; set bot.admin_api_token or bind to 127.0.0.1", host)
+	}
+	return nil
+}
+
+// IsLoopbackAddress reports whether a host:port listen address only accepts
+// local connections. An empty host (":6060") listens everywhere.
+func IsLoopbackAddress(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		host = addr
+	}
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	return ip != nil && ip.IsLoopback()
+}
+
+// WeakSecret reports whether a secret is a placeholder or too short to trust.
+func WeakSecret(secret string) bool {
+	return len(secret) < 32 || strings.Contains(strings.ToLower(secret), "change-me")
 }
 
 type TelegramConfiguration struct {
@@ -159,6 +202,9 @@ func init() {
 		panic(err)
 	}
 	Configuration.Bot.LNURLHostUrl = hostname
+	if Configuration.Bot.AdminAPIHost == "" {
+		Configuration.Bot.AdminAPIHost = DefaultAdminAPIHost
+	}
 	checkLnbitsConfiguration()
 	setAPISendDefaults()
 	setAPIAnalyticsDefaults()

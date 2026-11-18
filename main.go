@@ -157,16 +157,27 @@ func startApiServer(bot *telegram.TipBot) {
 	}
 
 	// start internal admin server
+	adminHost, adminToken := internal.Configuration.Bot.AdminAPIHost, internal.Configuration.Bot.AdminAPIToken
+	if err := internal.AdminAPIAllowed(adminHost, adminToken); err != nil {
+		log.Errorf("[admin] Admin API not started: %v", err)
+		return
+	}
 	adminService := admin.New(bot)
-	internalAdminServer := api.NewServer(internal.Configuration.Bot.AdminAPIHost)
+	internalAdminServer := api.NewServer(adminHost)
+	internalAdminServer.Use(api.BearerTokenMiddleware(adminToken))
 	internalAdminServer.AppendRoute("/mutex", mutex.ServeHTTP)
 	internalAdminServer.AppendRoute("/mutex/unlock/{id}", mutex.UnlockHTTP)
 	internalAdminServer.AppendRoute("/admin/ban/{id}", adminService.BanUser)
 	internalAdminServer.AppendRoute("/admin/unban/{id}", adminService.UnbanUser)
 	internalAdminServer.AppendRoute("/admin/dalle/enable", adminService.EnableDalle)
 	internalAdminServer.AppendRoute("/admin/dalle/disable", adminService.DisableDalle)
-	internalAdminServer.PathPrefix("/debug/pprof/", http.DefaultServeMux)
-
+	if internal.Configuration.Bot.AdminPprof {
+		internalAdminServer.PathPrefix("/debug/pprof/", http.DefaultServeMux)
+		log.Warnf("[admin] pprof enabled at %s/debug/pprof/", adminHost)
+	}
+	if adminToken == "" {
+		log.Warnf("[admin] Admin API on %s has no token; set bot.admin_api_token", adminHost)
+	}
 }
 
 func withRecovery(errorLogger *telegram.ErrorLogger) {

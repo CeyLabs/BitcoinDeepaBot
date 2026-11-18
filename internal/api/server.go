@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -60,6 +61,31 @@ func (w *Server) AppendAuthorizedRoute(path string, authType AuthType, accessTyp
 		r.Methods(methods...)
 	}
 }
+
+// Use adds middleware that runs on every route of this server.
+func (w *Server) Use(mw mux.MiddlewareFunc) {
+	w.router.Use(mw)
+}
+
+// BearerTokenMiddleware requires "Authorization: Bearer <token>" on every
+// request, compared in constant time. An empty token disables the check.
+func BearerTokenMiddleware(token string) mux.MiddlewareFunc {
+	return func(next http.Handler) http.Handler {
+		if token == "" {
+			return next
+		}
+		want := []byte("Bearer " + token)
+		return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			if subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), want) != 1 {
+				log.Warnf("[api] Rejected unauthenticated admin request %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+				http.Error(rw, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			next.ServeHTTP(rw, r)
+		})
+	}
+}
+
 func (w *Server) AppendRoute(path string, handler func(http.ResponseWriter, *http.Request), methods ...string) {
 	r := w.router.HandleFunc(path, LoggingMiddleware("API", handler))
 	if len(methods) > 0 {
