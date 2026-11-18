@@ -155,7 +155,7 @@ func (bot TipBot) makeQueryTipjar(ctx intercept.Context) (*InlineTipjar, error) 
 			bot.inlineQueryReplyWithError(ctx, TranslateUser(ctx, "inlineQueryTipjarTitle"), fmt.Sprintf(TranslateUser(ctx, "inlineQueryTipjarDescription"), bot.Telegram.Me.Username))
 			return nil, err
 		case errors.BalanceToLowError:
-			log.Errorf(err.Error())
+			log.Error(err)
 			bot.inlineQueryReplyWithError(ctx, TranslateUser(ctx, "inlineSendBalanceLowMessage"), fmt.Sprintf(TranslateUser(ctx, "inlineQueryTipjarDescription"), bot.Telegram.Me.Username))
 			return nil, err
 		}
@@ -254,7 +254,7 @@ func (bot *TipBot) acceptInlineTipjarHandler(ctx intercept.Context) (intercept.C
 	inlineTipjar := fn.(*InlineTipjar)
 	to := inlineTipjar.To
 	if !inlineTipjar.Active {
-		log.Errorf(fmt.Sprintf("[tipjar] tipjar %s inactive.", inlineTipjar.ID))
+		log.Errorf("[tipjar] tipjar %s inactive.", inlineTipjar.ID)
 		bot.tryEditMessage(c, i18n.Translate(inlineTipjar.LanguageCode, "inlineTipjarCancelledMessage"), &tb.ReplyMarkup{})
 		return ctx, errors.Create(errors.NotActiveError)
 	}

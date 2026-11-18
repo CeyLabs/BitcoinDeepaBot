@@ -123,5 +123,4 @@ func (bot *TipBot) enterUserHandler(ctx intercept.Context) (intercept.Context, e
 		ResetUserState(user, bot)
 		return ctx, errors.Create(errors.InvalidSyntaxError)
 	}
-	return ctx, nil
 }

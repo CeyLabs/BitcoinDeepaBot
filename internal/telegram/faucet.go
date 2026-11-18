@@ -160,7 +160,7 @@ func (bot TipBot) makeQueryFaucet(ctx intercept.Context) (*InlineFaucet, error) 
 			bot.inlineQueryReplyWithError(ctx, TranslateUser(ctx, "inlineQueryFaucetTitle"), fmt.Sprintf(TranslateUser(ctx, "inlineQueryFaucetDescription"), bot.Telegram.Me.Username))
 			return nil, err
 		case errors.BalanceToLowError:
-			log.Errorf(err.Error())
+			log.Error(err)
 			bot.inlineQueryReplyWithError(ctx, TranslateUser(ctx, "inlineSendBalanceLowMessage"), fmt.Sprintf(TranslateUser(ctx, "inlineQueryFaucetDescription"), bot.Telegram.Me.Username))
 			return nil, err
 		}
@@ -259,7 +259,7 @@ func (bot *TipBot) acceptInlineFaucetHandler(ctx intercept.Context) (intercept.C
 	from := inlineFaucet.From
 	// failsafe for queued users
 	if !inlineFaucet.Active {
-		log.Tracef(fmt.Sprintf("[faucet] faucet %s inactive. Remaining: %d sat(s)", inlineFaucet.ID, inlineFaucet.RemainingAmount))
+		log.Tracef("[faucet] faucet %s inactive. Remaining: %d sat(s)", inlineFaucet.ID, inlineFaucet.RemainingAmount)
 		bot.finishFaucet(ctx, c, inlineFaucet)
 		return ctx, errors.Create(errors.NotActiveError)
 	}
@@ -353,7 +353,7 @@ func (bot *TipBot) acceptInlineFaucetHandler(ctx intercept.Context) (intercept.C
 		}
 	}
 	if inlineFaucet.RemainingAmount < inlineFaucet.PerUserAmount {
-		log.Debugf(fmt.Sprintf("[faucet] faucet %s empty. Remaining: %d sat", inlineFaucet.ID, inlineFaucet.RemainingAmount))
+		log.Debugf("[faucet] faucet %s empty. Remaining: %d sat", inlineFaucet.ID, inlineFaucet.RemainingAmount)
 		// faucet is depleted
 		bot.finishFaucet(ctx, c, inlineFaucet)
 	}

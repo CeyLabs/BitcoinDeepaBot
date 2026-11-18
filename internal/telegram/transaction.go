@@ -104,7 +104,7 @@ func (t *Transaction) SendTransaction(bot *TipBot, from *lnbits.User, to *lnbits
 	if balance < amount {
 		errmsg := fmt.Sprintf("available balance too low.")
 		log.Warnf("Available balance of user %s too low", fromUserStr)
-		return false, fmt.Errorf(errmsg)
+		return false, fmt.Errorf("%s", errmsg)
 	}
 
 	t.ToWallet = to.ID
@@ -127,7 +127,7 @@ func (t *Transaction) SendTransaction(bot *TipBot, from *lnbits.User, to *lnbits
 	_, err = from.Wallet.Pay(lnbits.PaymentParams{Out: true, Bolt11: invoice.PaymentRequest}, bot.Client)
 	if err != nil {
 		errmsg := fmt.Sprintf("[Send] Payment failed (%s to %s of %d sat): %s", fromUserStr, toUserStr, amount, err.Error())
-		log.Warnf(errmsg)
+		log.Warn(errmsg)
 		return false, err
 	}
 

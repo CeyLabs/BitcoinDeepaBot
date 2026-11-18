@@ -273,7 +273,7 @@ linkHiddenMessage               = """🔍 Link versteckt. Gebe /link ein um ihn 
 
 # API
 
-walletConnectMessage = """🔗 *Deine API Keys*
+apiConnectMessage = """🔗 *Deine API Keys*
 
 ⚠️ Teile diese Key mit niemandem! Jeder, der darauf Zugriff hat, hat auch Zugriff auf dein Konto. Nutze /link um dein Wallet zu verbinden.
 
