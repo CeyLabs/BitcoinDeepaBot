@@ -53,7 +53,8 @@ func TestClientIP(t *testing.T) {
 		// address it saw. The spoofed first entry must lose.
 		{name: "spoofed first entry loses", remote: "127.0.0.1:40000", xff: "10.0.0.1, 198.51.100.4", trusted: loopback, want: "198.51.100.4"},
 		{name: "skips trusted hops", remote: "127.0.0.1:40000", xff: "198.51.100.4, 127.0.0.1", trusted: loopback, want: "198.51.100.4"},
-		{name: "garbage hop stops at peer", remote: "127.0.0.1:40000", xff: "198.51.100.4, garbage", trusted: loopback, want: "127.0.0.1"},
+		{name: "garbage hop is unknown, not the proxy", remote: "127.0.0.1:40000", xff: "198.51.100.4, garbage", trusted: loopback, want: "unknown"},
+		{name: "garbage only is unknown", remote: "127.0.0.1:40000", xff: "garbage", trusted: loopback, want: "unknown"},
 		{name: "x-real-ip from trusted proxy", remote: "127.0.0.1:40000", xri: "198.51.100.9", trusted: loopback, want: "198.51.100.9"},
 		{name: "ipv6 peer", remote: "[2001:db8::1]:443", want: "2001:db8::1"},
 	}
