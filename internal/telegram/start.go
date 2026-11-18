@@ -36,8 +36,8 @@ func (bot TipBot) startHandler(ctx intercept.Context) (intercept.Context, error)
 			Username:     ctx.Sender().Username,
 			ReferralCode: payload,
 		}
-		if tx := bot.DB.Referrals.Create(&entry); tx.Error != nil {
-			log.Warnf("[startHandler] failed to save referral entry: %s", tx.Error)
+		if err := RecordReferral(bot.DB.Referrals, entry); err != nil {
+			log.Warnf("[startHandler] failed to save referral entry: %s", err)
 		} else {
 			log.Infof("[startHandler] referral recorded: user=%d code=%s", ctx.Sender().ID, payload)
 		}
