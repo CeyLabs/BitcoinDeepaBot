@@ -16,7 +16,19 @@ import (
 )
 
 // lnurlHTTP talks to remote LNURL-pay servers. Tests replace it.
-var lnurlHTTP = &http.Client{Timeout: 20 * time.Second}
+var lnurlHTTP = &http.Client{Timeout: 20 * time.Second, CheckRedirect: httpsOnlyRedirects}
+
+// httpsOnlyRedirects keeps the https-only rule after the first hop: a
+// redirect to a plain-http URL is refused rather than followed.
+func httpsOnlyRedirects(req *http.Request, via []*http.Request) error {
+	if req.URL.Scheme != "https" {
+		return fmt.Errorf("refusing redirect to non-https URL %s", req.URL.Redacted())
+	}
+	if len(via) >= 5 {
+		return fmt.Errorf("stopped after %d redirects", len(via))
+	}
+	return nil
+}
 
 // maxLNURLResponse bounds how much a remote LNURL server can make us read.
 const maxLNURLResponse = 64 << 10
@@ -69,8 +81,10 @@ func FetchLNURLPayInvoice(endpoint string, amountMsat int64, comment string) (st
 	q := callback.Query()
 	q.Set("amount", strconv.FormatInt(amountMsat, 10))
 	if params.CommentAllowed > 0 && comment != "" {
-		if len(comment) > params.CommentAllowed {
-			comment = comment[:params.CommentAllowed]
+		// commentAllowed counts characters; cut on a rune boundary so a
+		// non-ASCII name is never split mid-character.
+		if r := []rune(comment); len(r) > params.CommentAllowed {
+			comment = string(r[:params.CommentAllowed])
 		}
 		q.Set("comment", comment)
 	}

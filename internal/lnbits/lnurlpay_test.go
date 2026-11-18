@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
@@ -75,7 +76,9 @@ func startLNURLServer(t *testing.T, f *fakeLNURLServer) string {
 		json.NewEncoder(w).Encode(f.callback(f.gotAmount))
 	})
 	saved := lnurlHTTP
-	lnurlHTTP = srv.Client()
+	c := srv.Client() // trusts the test certificate
+	c.CheckRedirect = httpsOnlyRedirects
+	lnurlHTTP = c
 	t.Cleanup(func() { lnurlHTTP = saved })
 	f.callbackURL = srv.URL + "/cb"
 	return srv.URL + "/.well-known/lnurlp/donate"
@@ -151,4 +154,39 @@ func TestFetchLNURLPayInvoice(t *testing.T) {
 			t.Fatalf("got %v", err)
 		}
 	})
+
+	t.Run("comment is cut on a character boundary", func(t *testing.T) {
+		f := &fakeLNURLServer{}
+		f.callback = func(string) interface{} {
+			return map[string]string{"pr": signedInvoice(t, amount, testMetadata, now, time.Hour)}
+		}
+		endpoint := startLNURLServer(t, f)
+		// commentAllowed is 10; "ශ්‍රී" style multi-byte names must not be split mid-rune.
+		if _, err := FetchLNURLPayInvoice(endpoint, amount, "from ශ්‍රී ලංකා bot"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !utf8.ValidString(f.gotComment) || utf8.RuneCountInString(f.gotComment) != 10 {
+			t.Fatalf("comment %q: valid=%v runes=%d, want valid UTF-8 of 10 runes", f.gotComment, utf8.ValidString(f.gotComment), utf8.RuneCountInString(f.gotComment))
+		}
+	})
+}
+
+func TestLNURLPayRefusesRedirectToHTTP(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "http://example.invalid/.well-known/lnurlp/donate", http.StatusFound)
+	}))
+	t.Cleanup(srv.Close)
+	saved := lnurlHTTP
+	c := srv.Client()
+	c.CheckRedirect = httpsOnlyRedirects
+	lnurlHTTP = c
+	t.Cleanup(func() { lnurlHTTP = saved })
+
+	_, err := FetchLNURLPayInvoice(srv.URL+"/.well-known/lnurlp/donate", 21000, "")
+	if err == nil || !strings.Contains(err.Error(), "non-https") {
+		t.Fatalf("want redirect refusal, got %v", err)
+	}
+	if lnurlHTTP.CheckRedirect == nil {
+		t.Fatal("production client must refuse non-https redirects")
+	}
 }

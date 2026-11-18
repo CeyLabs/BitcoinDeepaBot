@@ -78,7 +78,8 @@ func (bot TipBot) parseCmdDonHandler(ctx intercept.Context) error {
 	if strings.HasPrefix(strings.ToLower(m.Text), "/tip") && m.ReplyTo != nil {
 		arg = GetUserStr(m.ReplyTo.Sender)
 	}
-	if arg != me {
+	// Telegram usernames are case-insensitive.
+	if !strings.EqualFold(arg, me) {
 		return fmt.Errorf("not addressed to the bot")
 	}
 	amount, err := decodeAmountFromCommand(m.Text)
