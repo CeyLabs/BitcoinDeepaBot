@@ -207,7 +207,7 @@ func (bot TipBot) logMessageInterceptor(ctx intercept.Context) (intercept.Contex
 			if ctx.Message().IsReply() {
 				log_string = fmt.Sprintf("%s -> %s", log_string, GetUserStr(ctx.Message().ReplyTo.Sender))
 			}
-			log.Infof(log_string)
+			log.Info(log_string)
 		} else if ctx.Message().Photo != nil {
 			log.Infof("[%s:%d %s:%d] %s", ctx.Message().Chat.Title, ctx.Message().Chat.ID, GetUserStr(ctx.Message().Sender), ctx.Message().Sender.ID, photoTag)
 		}

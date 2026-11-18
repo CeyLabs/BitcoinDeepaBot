@@ -294,7 +294,7 @@ inlineResultFaucetDescription = """👉 Klikni zde pro vytvoření faucetu v tom
 
 inlineFaucetMessage                     = """Zmáčkni ✅ pro výběr %s z faucetu od %s.
 
-🚰 Zbývá: %d/%s (rozdáno %d/%d uživatelům)
+🚰 Zbývá: %s/%s (rozdáno %d/%d uživatelům)
 %s"""
 inlineFaucetEndedMessage                = """🚰 Faucet je prázdný 🍺\n\n🏅 %s rozdáno %d uživatelům."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""
@@ -351,7 +351,7 @@ inlineResultTipjarDescription = """👉 Klikni zde pro vytvoření tipjar v tomt
 
 inlineTipjarMessage                     = """Zmáčkni 💸 pro *platbu %s* do tohoto tipjar od %s.
 
-🙏 Věnováno: *%d*/%s (od %d uživatelů)
+🙏 Věnováno: *%s*/%s (od %d uživatelů)
 %s"""
 inlineTipjarEndedMessage                = """🍯 Tipjar od %s je plný ⭐️\n\n🏅 Věnováno %s od %d uživatelů."""
 inlineTipjarAppendMemo                  = """\n✉️ %s"""
@@ -400,7 +400,7 @@ Pro připojení ke skupině si promluv s %s a v soukromé zprávě napiš `/join
 *Pro uživatele (v soukromém chatu):* `/join <název_skupiny>`\nPříklad: `/join NejvícHustáSkupina`"""
 
 # DALLE GENERATE
-generateDalleHelpMessage        = """Vytvořit obrázky pomocí OpenAI DALLE 2.\nPoužití: `/generate <prompt>`\nCena: 1000 sat"""
+generateDalleHelpMessage        = """Vytvořit obrázky pomocí OpenAI DALLE 2.\nPoužití: `/generate <prompt>`\nCena: %s"""
 generateDallePayInvoiceMessage  = """Zaplať tuto invoice pro vytvoření 4 obrázků 👇"""
 generateDalleGeneratingMessage  = """Tvé obrázky se generují. Chvilku strpení..."""
 # CONVERT LKR TO SAT

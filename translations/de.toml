@@ -273,7 +273,7 @@ linkHiddenMessage               = """🔍 Link versteckt. Gebe /link ein um ihn 
 
 # API
 
-walletConnectMessage = """🔗 *Deine API Keys*
+apiConnectMessage = """🔗 *Deine API Keys*
 
 ⚠️ Teile diese Key mit niemandem! Jeder, der darauf Zugriff hat, hat auch Zugriff auf dein Konto. Nutze /link um dein Wallet zu verbinden.
 
@@ -290,7 +290,7 @@ inlineResultFaucetDescription = """👉 Klicke hier um den Zapfhahn in diesen Ch
 
 inlineFaucetMessage = """Drücke ✅ um %s aus %s's Zapfhahn zu zapfen.
 
-🚰 Verbleibend: %d/%s (%d/%d gezapft)
+🚰 Verbleibend: %s/%s (%d/%d gezapft)
 %s"""
 inlineFaucetEndedMessage = """🚰 Zapfhahn leer 🍺\n\n🏅 %s an %d User ausgeschüttet."""
 inlineFaucetAppendMemo = """\n✉️ %s"""
@@ -346,7 +346,7 @@ inlineResultTipjarDescription = """👉 Klicke hier um eine Spendendose zu erzeu
 
 inlineTipjarMessage                     = """Drücke 💸 up *%s* in die Spendendose von %s zu *zahlen*.
 
-🙏 Gespendet: *%d*/%s (von %d Benutzern)
+🙏 Gespendet: *%s*/%s (von %d Benutzern)
 %s"""
 inlineTipjarEndedMessage                = """🍯 %s's Spendendose is voll ⭐️\n\n🏅 %s gespendet von %d Nutzern."""
 inlineTipjarAppendMemo                  = """\n✉️ %s"""

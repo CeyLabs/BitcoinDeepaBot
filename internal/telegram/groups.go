@@ -304,7 +304,7 @@ func (bot *TipBot) groupConfirmPayButtonHandler(ctx intercept.Context) (intercep
 	_, err = user.Wallet.Pay(lnbits.PaymentParams{Out: true, Bolt11: ticketEvent.Invoice.PaymentRequest}, bot.Client)
 	if err != nil {
 		errmsg := fmt.Sprintf("[/pay] Could not pay invoice of %s: %s", GetUserStr(user.Telegram), err)
-		err = fmt.Errorf(i18n.Translate(ticketEvent.LanguageCode, "invoiceUndefinedErrorMessage"))
+		err = fmt.Errorf("%s", i18n.Translate(ticketEvent.LanguageCode, "invoiceUndefinedErrorMessage"))
 		if ticketEvent.Callback != InvoiceCallbackPayJoinTicket {
 			bot.tryEditMessage(c, fmt.Sprintf(i18n.Translate(ticketEvent.LanguageCode, "invoicePaymentFailedMessage"), err.Error()), &tb.ReplyMarkup{})
 		}
@@ -328,7 +328,7 @@ func (bot *TipBot) groupGetInviteLinkHandler(event Event) {
 	// take a cut
 	// amount_bot := int64(ticketEvent.Group.Ticket.Price * int64(ticketEvent.Group.Ticket.Cut) / 100)
 
-	log.Infof(invoiceEvent.CallbackData)
+	log.Info(invoiceEvent.CallbackData)
 	ticketEvent := &TicketEvent{Base: storage.New(storage.ID(invoiceEvent.CallbackData))}
 	err := bot.Bunt.Get(ticketEvent)
 	if err != nil {

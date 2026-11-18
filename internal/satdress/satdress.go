@@ -105,7 +105,7 @@ func MakeInvoice(params Params) (CheckInvoiceParams, error) {
 	var err error
 	Client, err := SetupHttpClient(!params.Backend.isLocal(), params.Backend.getCert())
 	if err != nil {
-		log.Errorf(err.Error())
+		log.Error(err)
 		return CheckInvoiceParams{}, err
 	}
 
@@ -241,7 +241,7 @@ func CheckInvoice(params CheckInvoiceParams) (CheckInvoiceParams, error) {
 	var err error
 	Client, err := SetupHttpClient(!params.Backend.isLocal(), params.Backend.getCert())
 	if err != nil {
-		log.Errorf(err.Error())
+		log.Error(err)
 		return CheckInvoiceParams{}, err
 	}
 

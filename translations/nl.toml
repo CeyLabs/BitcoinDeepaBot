@@ -270,7 +270,7 @@ inlineResultFaucetDescription = """👉 Klik hier om een kraan in deze chat te m
 
 inlineFaucetMessage                     = """Druk op ✅ om %s te verzamelen van deze kraan van %s.
 
-🚰 Remaining: %d/%s (given to %d/%d users)
+🚰 Remaining: %s/%s (given to %d/%d users)
 %s"""
 inlineFaucetEndedMessage                = """🚰 kraan leeg 🍺🏅 %s gegeven aan %d gebruikers."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""
@@ -295,7 +295,7 @@ inlineResultSendDescription     = """👉 Klik om %s naar deze chat te sturen.""
 
 inlineSendMessage              = """Druk op ✅ om de betaling van %s te ontvangen.\n💸 Bedrag: %s"""
 inlineSendAppendMemo           = """\n✉️ %s"""
-inlineSendUpdateMessageAccept  = """💸 %d verzonden van %s naar %s."""
+inlineSendUpdateMessageAccept  = """💸 %s verzonden van %s naar %s."""
 inlineSendCreateWalletMessage  = """Chat met %s 👈 om uw wallet te beheren."""
 sendYourselfMessage            = """📖 Je kunt niet aan jezelf betalen."""
 inlineSendFailedMessage        = """🚫 verzenden mislukt."""

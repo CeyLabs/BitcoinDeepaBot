@@ -353,7 +353,7 @@ func (w Lnurl) serveLNURLpSecond(username string, amount_msat int64, comment str
 	// get user settings
 	user2, err := db.FindUserSettings(user, w.bot.DB.Users.Preload("Settings"))
 	if err != nil {
-		fmt.Errorf("[serveLNURLpSecond] Couldn't fetch user settings from database: %v", err)
+		log.Errorf("[serveLNURLpSecond] Couldn't fetch user settings from database: %v", err)
 	} else {
 		user = user2
 	}

@@ -85,7 +85,7 @@ func (bot *TipBot) publishNostrEvent(ev nostr.Event, relays []string) {
 			// remove trailing /
 			relay, e := nostr.RelayConnect(context.Background(), url)
 			if e != nil {
-				log.Errorf(e.Error())
+				log.Error(e)
 				return
 			}
 			time.Sleep(3 * time.Second)
