@@ -89,6 +89,8 @@ const (
 	// processedTTL is how long a handled payment hash is remembered, so a
 	// replayed webhook cannot trigger its callback a second time.
 	processedTTL = 90 * 24 * time.Hour
+	// verifyBudget bounds how long payment verification may keep retrying.
+	verifyBudget = 8 * time.Second
 )
 
 // receive handles a payment webhook from lnbits.
@@ -127,7 +129,9 @@ func (w *Server) receive(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	// Confirm with lnbits, using the receiving wallet's own key.
-	amountMsat, err := w.c.VerifyIncomingPayment(*user.Wallet, webhookEvent.PaymentHash)
+	// Retried briefly on transport errors: lnbits never resends a failed
+	// webhook. The budget stays under the server's 15 s write timeout.
+	amountMsat, err := w.c.VerifyIncomingPaymentWithRetry(*user.Wallet, webhookEvent.PaymentHash, verifyBudget)
 	if err != nil {
 		if errors.Is(err, lnbits.ErrPaymentNotVerified) {
 			log.Warnf("[Webhook] Rejected unverified payment %s for user %d from %s: %v", webhookEvent.PaymentHash, user.Telegram.ID, request.RemoteAddr, err)
