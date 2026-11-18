@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/buntdb"
@@ -77,6 +78,27 @@ func (db *DB) Set(object Storable) error {
 		return err
 	})
 	return err
+}
+
+// ClaimOnce records key and reports whether this call was the first to do so
+// within ttl. The check and the write happen in one transaction, so concurrent
+// callers racing on the same key get exactly one true. Use it to make sure an
+// event that can be delivered more than once (a webhook, a client retry) is
+// acted on once.
+func (db *DB) ClaimOnce(key string, ttl time.Duration) (claimed bool, err error) {
+	err = db.Update(func(tx *buntdb.Tx) error {
+		if _, err := tx.Get(key); err == nil {
+			return nil
+		} else if err != buntdb.ErrNotFound {
+			return err
+		}
+		if _, _, err := tx.Set(key, time.Now().UTC().Format(time.RFC3339), &buntdb.SetOptions{Expires: true, TTL: ttl}); err != nil {
+			return err
+		}
+		claimed = true
+		return nil
+	})
+	return claimed, err
 }
 
 // Delete a storable item.
