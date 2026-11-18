@@ -7,13 +7,37 @@ import (
 )
 
 func TestWeakHMACSecret(t *testing.T) {
-	for _, weak := range []string{"", "short", strings.Repeat("a", 31), "change-me-" + strings.Repeat("a", 40), "CHANGE-ME-" + strings.Repeat("a", 40)} {
+	for _, weak := range []string{
+		"", "short", strings.Repeat("a", 31),
+		"change-me-" + strings.Repeat("a", 40), "CHANGE-ME-" + strings.Repeat("a", 40),
+		// placeholders that shipped in config.yaml.example; anyone could read them
+		"your-unique-bitcoindeepa-secret-here", "your-unique-ceycube-secret-here", "your-analytics-hmac-secret-here",
+		"another-secure-secret-here-xxxxxxxxxxxxx", "placeholder-" + strings.Repeat("b", 30),
+	} {
 		if !WeakHMACSecret(weak) {
 			t.Errorf("WeakHMACSecret(%q) = false, want true", weak)
 		}
 	}
 	if WeakHMACSecret(strings.Repeat("a", 32)) {
 		t.Error("32-character secret reported weak")
+	}
+}
+
+func TestParseTrustedProxies(t *testing.T) {
+	def, err := parseTrustedProxies(nil)
+	if err != nil || len(def) != 2 || !def[0].Contains(net.ParseIP("127.0.0.1")) {
+		t.Fatalf("empty list should default to loopback, got %v, %v", def, err)
+	}
+	for _, none := range [][]string{{"none"}, {"NONE"}, {" none "}} {
+		if n, err := parseTrustedProxies(none); err != nil || n != nil {
+			t.Fatalf("%q should trust no proxy, got %v, %v", none, n, err)
+		}
+	}
+	if n, err := parseTrustedProxies([]string{"10.0.0.0/8"}); err != nil || len(n) != 1 {
+		t.Fatalf("explicit list not parsed: %v, %v", n, err)
+	}
+	if _, err := parseTrustedProxies([]string{"none", "127.0.0.1"}); err == nil {
+		t.Fatal(`"none" mixed with addresses must be rejected`)
 	}
 }
 

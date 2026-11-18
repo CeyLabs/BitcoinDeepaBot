@@ -22,7 +22,8 @@ bot:
   # turn /donate off; sends to the bot then go to the bot's own wallet.
   donate_address: ""
   # Reverse proxies whose X-Forwarded-For / X-Real-IP headers are believed.
-  # Defaults to loopback only; headers from anyone else are ignored.
+  # Empty means loopback only; ["none"] trusts no proxy. Headers from anyone
+  # else are ignored.
   trusted_proxies: ["127.0.0.1", "::1"]
 telegram:
   message_dispose_duration: 10
@@ -76,11 +77,11 @@ api:
     api_keys:
       data-team:
         name: "Data Team"
-        hmac_secret: "your-analytics-hmac-secret-here"
+        hmac_secret: "change-me"  # generate with: openssl rand -hex 32
       # Add more keys for different consumers:
       # dashboard:
       #   name: "Internal Dashboard"
-      #   hmac_secret: "another-secure-secret-here"
+      #   hmac_secret: "change-me"  # generate with: openssl rand -hex 32
 
   # Send API - wallet-based HMAC authenticated endpoints
   send:
@@ -102,12 +103,12 @@ api:
     whitelisted_wallets:
       BiccoindeepaDSA:
         username: "BiccoindeepaDSA"
-        hmac_secret: "your-unique-bitcoindeepa-secret-here"
+        hmac_secret: "change-me"  # generate with: openssl rand -hex 32
         # admin_approval_threshold: 50000  # override global (0 or omit = use global)
         # max_amount: 500000               # override global (0 or omit = use global)
       CeycubeBank:
         username: "CeycubeBank"
-        hmac_secret: "your-unique-ceycube-secret-here"
+        hmac_secret: "change-me"  # generate with: openssl rand -hex 32
         admin_approval_threshold: 200000   # wallet-specific: override global 100000
         max_amount: 2000000                # wallet-specific: override global 1000000
     timestamp_tolerance: 300

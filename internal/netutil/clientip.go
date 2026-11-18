@@ -72,8 +72,10 @@ func ClientIP(r *http.Request, trusted []*net.IPNet) net.IP {
 		for i := len(hops) - 1; i >= 0; i-- {
 			ip := net.ParseIP(strings.TrimSpace(hops[i]))
 			if ip == nil {
-				// An unparseable hop means the chain cannot be trusted past here.
-				return peer
+				// An unparseable hop means the real client cannot be known.
+				// Returning nil ("unknown") rather than the proxy's own address
+				// keeps a client from posing as the proxy with a garbage header.
+				return nil
 			}
 			if !Contains(trusted, ip) {
 				return ip

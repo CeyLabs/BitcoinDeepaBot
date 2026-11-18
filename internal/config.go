@@ -73,8 +73,8 @@ type BotConfiguration struct {
 	DonateAddress  string `yaml:"donate_address"`
 	DonateEndpoint string `yaml:"-"`
 	// TrustedProxies are the reverse proxies whose X-Forwarded-For and
-	// X-Real-IP headers are believed. Defaults to loopback only. Anything
-	// else that sends those headers is ignored.
+	// X-Real-IP headers are believed. Empty means loopback only; ["none"]
+	// trusts no proxy. Headers from anyone else are ignored.
 	TrustedProxies   []string     `yaml:"trusted_proxies"`
 	TrustedProxyNets []*net.IPNet `yaml:"-"`
 }
@@ -269,10 +269,7 @@ func init() {
 	if Configuration.Bot.AdminAPIHost == "" {
 		Configuration.Bot.AdminAPIHost = DefaultAdminAPIHost
 	}
-	if len(Configuration.Bot.TrustedProxies) == 0 {
-		Configuration.Bot.TrustedProxies = []string{"127.0.0.1", "::1"}
-	}
-	Configuration.Bot.TrustedProxyNets, err = netutil.ParseNetworks(Configuration.Bot.TrustedProxies)
+	Configuration.Bot.TrustedProxyNets, err = parseTrustedProxies(Configuration.Bot.TrustedProxies)
 	if err != nil {
 		panic(fmt.Errorf("bot.trusted_proxies: %w", err))
 	}
@@ -407,7 +404,33 @@ func validateAPISend(cfg *APISendConfiguration) error {
 // WeakHMACSecret reports whether an HMAC secret is a placeholder or too short
 // to be trusted.
 func WeakHMACSecret(secret string) bool {
-	return len(secret) < 32 || strings.Contains(strings.ToLower(secret), "change-me")
+	if len(secret) < 32 {
+		return true
+	}
+	s := strings.ToLower(secret)
+	for _, marker := range placeholderMarkers {
+		if strings.Contains(s, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// placeholderMarkers appear in example and template secrets. A secret that
+// contains one was copied from documentation, not generated, and is public.
+var placeholderMarkers = []string{"change-me", "changeme", "your-", "-here", "placeholder"}
+
+// parseTrustedProxies returns the proxies whose forwarding headers are
+// believed. An empty list means loopback (the usual local reverse proxy);
+// the single entry "none" means trust no proxy and always use the TCP peer.
+func parseTrustedProxies(entries []string) ([]*net.IPNet, error) {
+	if len(entries) == 0 {
+		entries = []string{"127.0.0.1", "::1"}
+	}
+	if len(entries) == 1 && strings.EqualFold(strings.TrimSpace(entries[0]), "none") {
+		return nil, nil
+	}
+	return netutil.ParseNetworks(entries)
 }
 
 // IsAPISendEnabled returns whether the API Send module is enabled
