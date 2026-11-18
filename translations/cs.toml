@@ -400,7 +400,7 @@ Pro připojení ke skupině si promluv s %s a v soukromé zprávě napiš `/join
 *Pro uživatele (v soukromém chatu):* `/join <název_skupiny>`\nPříklad: `/join NejvícHustáSkupina`"""
 
 # DALLE GENERATE
-generateDalleHelpMessage        = """Vytvořit obrázky pomocí OpenAI DALLE 2.\nPoužití: `/generate <prompt>`\nCena: 1000 sat"""
+generateDalleHelpMessage        = """Vytvořit obrázky pomocí OpenAI DALLE 2.\nPoužití: `/generate <prompt>`\nCena: %s"""
 generateDallePayInvoiceMessage  = """Zaplať tuto invoice pro vytvoření 4 obrázků 👇"""
 generateDalleGeneratingMessage  = """Tvé obrázky se generují. Chvilku strpení..."""
 # CONVERT LKR TO SAT

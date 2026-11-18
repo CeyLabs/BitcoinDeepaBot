@@ -401,7 +401,7 @@ Aby dołączyć do grupy, napisz do %s i napisz w prywatnej wiadomości `/join <
 *Dla użytkowników (w czacie prywatnym):* `/join <nazwa_grupy>`\nPrzykład: `/join NajlepszaGrupaBitcoinowa`"""
 
 # DALLE GENERATE
-generateDalleHelpMessage        = """Generuj obrazy przy użyciu OpenAI DALLE 2.\nUżycie: `/generate <podpowiedź>`\nCena: 1000 sat"""
+generateDalleHelpMessage        = """Generuj obrazy przy użyciu OpenAI DALLE 2.\nUżycie: `/generate <podpowiedź>`\nCena: %s"""
 generateDallePayInvoiceMessage  = """Opłać tę fakturę by wygenerować 4 obrazy 👇"""
 generateDalleGeneratingMessage  = """Twoje obrazy są generowane. Proszę czekaj..."""
 # CONVERT LKR TO SAT

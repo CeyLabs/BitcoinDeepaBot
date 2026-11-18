@@ -110,8 +110,8 @@ advancedMessage = """%s
 
 👉 *Inline komutlar*
 *send* 💸 Bir sohbete sat gönder: `%s send <miktar> [<kullanıcı>] [<bildirim>]`
-*receive* 🏅 Ödeme iste: `%s receive <miktar> [<kullanıcı>] [<bildirim>]`
-*faucet* 🚰 Bir fıçı oluştur: `%s faucet <toplam> <kullanıcı_başına> [<bildirim>]`
+*receive* 🏅 Ödeme iste: `... receive <miktar> [<kullanıcı>] [<bildirim>]`
+*faucet* 🚰 Bir fıçı oluştur: `... faucet <toplam> <kullanıcı_başına> [<bildirim>]`
 *tipjar* 🍯 Bir tipjar oluştur: `... tipjar <toplam> <kullanıcı_başına> [<bildirim>]`
 
 📖 İnline komutları her sohbette ve hatta özel mesajlarda kullanabilirsin. Komutu yazdıktan sonra bir saniye bekle ve Enter yazmak yerine sonuca *tıkla*.

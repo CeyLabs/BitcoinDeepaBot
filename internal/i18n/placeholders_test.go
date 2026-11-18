@@ -13,16 +13,10 @@ import (
 
 var fmtVerb = regexp.MustCompile(`%(?:\[\d+\])?[-+#0]*\d*(?:\.\d+)?[a-zA-Z]`)
 
-// knownPlaceholderMismatches have a different number of placeholders than the
-// English text, so fixing them means rewording the sentence. Remove an entry
-// once a translator has fixed it.
-var knownPlaceholderMismatches = map[string]bool{
-	"cs.toml/generateDalleHelpMessage":    true,
-	"fi.toml/generateDalleHelpMessage":    true,
-	"pl.toml/generateDalleHelpMessage":    true,
-	"it.toml/inlineSendBalanceLowMessage": true,
-	"tr.toml/advancedMessage":             true,
-}
+// knownPlaceholderMismatches lists translations whose placeholders are
+// knowingly out of step with English. Keep it empty: a mismatch shows users
+// garbled text such as %!s(MISSING).
+var knownPlaceholderMismatches = map[string]bool{}
 
 // The code formats translated messages with fmt.Sprintf using the English
 // argument list, so every translation must use the same verbs in the same
