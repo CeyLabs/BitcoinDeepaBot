@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/LightningTipBot/LightningTipBot/internal/netutil"
 	"github.com/jinzhu/configor"
 	log "github.com/sirupsen/logrus"
 )
@@ -59,6 +60,11 @@ type BotConfiguration struct {
 	LNURLHostUrl   *url.URL            `yaml:"-"`
 	LNURLSendImage bool                `yaml:"lnurl_image"`
 	AdminAPIHost   string              `yaml:"admin_api_host"`
+	// TrustedProxies are the reverse proxies whose X-Forwarded-For and
+	// X-Real-IP headers are believed. Defaults to loopback only. Anything
+	// else that sends those headers is ignored.
+	TrustedProxies   []string     `yaml:"trusted_proxies"`
+	TrustedProxyNets []*net.IPNet `yaml:"-"`
 }
 
 type TelegramConfiguration struct {
@@ -108,8 +114,13 @@ type AnalyticsAPIKey struct {
 }
 
 type APISendConfiguration struct {
-	Enabled                bool                         `yaml:"enabled"`
-	InternalNetwork        string                       `yaml:"internal_network"`
+	Enabled bool `yaml:"enabled"`
+	// InternalNetwork is deprecated and was never enforced. Use AllowedNetworks.
+	InternalNetwork string `yaml:"internal_network"`
+	// AllowedNetworks, when set, limits the send API to these CIDRs or IPs.
+	// Empty means no network restriction (HMAC still applies).
+	AllowedNetworks        []string                     `yaml:"allowed_networks"`
+	AllowedNets            []*net.IPNet                 `yaml:"-"`
 	MaxAmount              int64                        `yaml:"max_amount"`
 	MinAmount              int64                        `yaml:"min_amount"`
 	AdminApprovalThreshold int64                        `yaml:"admin_approval_threshold"`
@@ -159,6 +170,13 @@ func init() {
 		panic(err)
 	}
 	Configuration.Bot.LNURLHostUrl = hostname
+	if len(Configuration.Bot.TrustedProxies) == 0 {
+		Configuration.Bot.TrustedProxies = []string{"127.0.0.1", "::1"}
+	}
+	Configuration.Bot.TrustedProxyNets, err = netutil.ParseNetworks(Configuration.Bot.TrustedProxies)
+	if err != nil {
+		panic(fmt.Errorf("bot.trusted_proxies: %w", err))
+	}
 	checkLnbitsConfiguration()
 	setAPISendDefaults()
 	setAPIAnalyticsDefaults()
@@ -221,17 +239,8 @@ func checkLnbitsConfiguration() {
 
 // setAPISendDefaults sets default values for API Send configuration
 func setAPISendDefaults() {
-	// Set defaults only if not configured
-	if Configuration.API.Send.InternalNetwork == "" {
-		Configuration.API.Send.InternalNetwork = "10.0.0.0/24"
-	}
-
-	// Validate CIDR format
-	_, _, err := net.ParseCIDR(Configuration.API.Send.InternalNetwork)
-	if err != nil {
-		log.Errorf("Invalid internal_network CIDR format '%s': %v. Using default 10.0.0.0/24",
-			Configuration.API.Send.InternalNetwork, err)
-		Configuration.API.Send.InternalNetwork = "10.0.0.0/24"
+	if Configuration.API.Send.InternalNetwork != "" {
+		log.Warnf("api.send.internal_network is deprecated and ignored; use api.send.allowed_networks to restrict the send API by network")
 	}
 
 	if Configuration.API.Send.MaxAmount == 0 {
@@ -253,24 +262,53 @@ func setAPISendDefaults() {
 		Configuration.API.Send.SettlementTimeout = 60 // seconds
 	}
 
-	// Set default whitelisted wallets if none configured
-	if len(Configuration.API.Send.WhitelistedWallets) == 0 {
-		Configuration.API.Send.WhitelistedWallets = map[string]WhitelistedWallet{
-			"CeycubeBank": {
-				Username:   "CeycubeBank",
-				HMACSecret: "change-me-ceycube-secret",
-			},
+	if err := validateAPISend(&Configuration.API.Send); err != nil {
+		if Configuration.API.Send.Enabled {
+			log.Errorf("Disabling API Send: %v", err)
 		}
-		log.Warn("Using default whitelisted wallets. Please configure unique HMAC secrets for each wallet in production!")
+		Configuration.API.Send.Enabled = false
 	}
 
 	// Log API Send configuration status
 	if Configuration.API.Send.Enabled {
-		log.Infof("API Send module enabled with %d whitelisted wallets, network: %s",
-			len(Configuration.API.Send.WhitelistedWallets), Configuration.API.Send.InternalNetwork)
+		network := "any (HMAC only)"
+		if len(Configuration.API.Send.AllowedNetworks) > 0 {
+			network = strings.Join(Configuration.API.Send.AllowedNetworks, ", ")
+		}
+		log.Infof("API Send module enabled with %d whitelisted wallets, networks: %s",
+			len(Configuration.API.Send.WhitelistedWallets), network)
 	} else {
 		log.Infof("API Send module disabled in configuration")
 	}
+}
+
+// validateAPISend checks the send API configuration and parses its networks.
+// There is deliberately no built-in wallet: a default secret shipped in the
+// source would let anyone who reads the code sign requests.
+func validateAPISend(cfg *APISendConfiguration) error {
+	if len(cfg.WhitelistedWallets) == 0 {
+		return fmt.Errorf("no whitelisted_wallets configured")
+	}
+	for id, w := range cfg.WhitelistedWallets {
+		if WeakHMACSecret(w.HMACSecret) {
+			return fmt.Errorf("whitelisted wallet %q has an insecure hmac_secret (placeholder or shorter than 32 characters); generate one with: openssl rand -hex 32", id)
+		}
+		if strings.TrimSpace(w.Username) == "" {
+			return fmt.Errorf("whitelisted wallet %q has no username", id)
+		}
+	}
+	nets, err := netutil.ParseNetworks(cfg.AllowedNetworks)
+	if err != nil {
+		return fmt.Errorf("allowed_networks: %w", err)
+	}
+	cfg.AllowedNets = nets
+	return nil
+}
+
+// WeakHMACSecret reports whether an HMAC secret is a placeholder or too short
+// to be trusted.
+func WeakHMACSecret(secret string) bool {
+	return len(secret) < 32 || strings.Contains(strings.ToLower(secret), "change-me")
 }
 
 // IsAPISendEnabled returns whether the API Send module is enabled
@@ -303,7 +341,7 @@ func setAPIAnalyticsDefaults() {
 
 	// Reject placeholder/insecure secrets
 	for keyID, apiKey := range Configuration.API.Analytics.APIKeys {
-		if strings.Contains(apiKey.HMACSecret, "change-me") || len(apiKey.HMACSecret) < 32 {
+		if WeakHMACSecret(apiKey.HMACSecret) {
 			log.Errorf("Analytics API key '%s' has an insecure HMAC secret (placeholder or too short). "+
 				"Generate a secure secret with: openssl rand -hex 32. Disabling analytics API.", keyID)
 			Configuration.API.Analytics.Enabled = false

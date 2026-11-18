@@ -10,6 +10,9 @@ bot:
   lnurl_server: "http://127.0.0.1:5454" # or http://0.0.0.0:5454 depending on your configuration
   lnurl_image: true
   admin_api_host: localhost:6060
+  # Reverse proxies whose X-Forwarded-For / X-Real-IP headers are believed.
+  # Defaults to loopback only; headers from anyone else are ignored.
+  trusted_proxies: ["127.0.0.1", "::1"]
 telegram:
   message_dispose_duration: 10
   api_key: "1234"
@@ -71,7 +74,10 @@ api:
   # Send API - wallet-based HMAC authenticated endpoints
   send:
     enabled: true
-    internal_network: "10.0.0.0/24"
+    # Optional. When set, only these IPs/CIDRs may call the send API. Leave
+    # empty if callers have changing IPs (HMAC still applies). The old
+    # internal_network setting was never enforced and is now ignored.
+    allowed_networks: []
     max_amount: 1000000
     min_amount: 1
     admin_approval_threshold: 100000
