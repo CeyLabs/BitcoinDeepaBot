@@ -140,6 +140,7 @@ api:
         ed25519_public_key: "base64-public-key"  # from the caller; see docs/send-api-ed25519.md
         # admin_approval_threshold: 50000  # override global (0 or omit = use global)
         # max_amount: 500000               # override global (0 or omit = use global)
+        # can_collect: true                # may ask users to pay it; see docs/collect-api.md
       CeycubeBank:
         username: "CeycubeBank"
         ed25519_public_key: "base64-public-key"

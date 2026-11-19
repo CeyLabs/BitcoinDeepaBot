@@ -257,6 +257,18 @@ Use it as a pre-flight check before large sends.
 
 Remember the query string is signed: sign `code=PROMO2024` exactly as sent.
 
+### 4.7 Collect: ask a user to pay you
+
+Needs `can_collect: true` on the wallet. Nothing moves until the user approves, in the bot chat or in the Mini App / web app (§5.3). Full reference: [`docs/collect-api.md`](collect-api.md).
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/v1/collect` `{ to, amount, memo, external_id }` | Create a request (expires in 15 min). The bot sends the user **Pay / Decline** buttons. |
+| `GET /api/v1/collect/{id}` | Poll it: `pending`, `approved` (see `paid` and `transfer`), `declined`, `cancelled`, `expired` |
+| `POST /api/v1/collect/{id}/cancel` | Withdraw a pending request |
+
+Use your order ID as `external_id`; retries with it return the same request.
+
 ---
 
 ## 5. P2P relay: Mini App and web app
@@ -322,6 +334,9 @@ export async function bdbP2P(method: "GET" | "POST", path: string, cred: { initD
 | `POST /api/v1/p2p/invoice/decode` `{ invoice }` | Show an invoice before paying (`needs_confirmation`, `over_limit`) |
 | `POST /api/v1/p2p/invoice/pay` `{ invoice, memo, idempotency_key }` | Pay a bolt11 invoice |
 | `GET /api/v1/p2p/transfers/{id}` | Poll a transfer. Every 2–3 s while `processing` / `awaiting_confirmation`, every 15–30 s while `in_flight` |
+| `GET /api/v1/p2p/collect/{id}` | Show a collect request (§4.7) to the user it is for |
+| `POST /api/v1/p2p/collect/{id}/approve` | The user pays the collect request (fresh login needed). Returns a transfer. |
+| `POST /api/v1/p2p/collect/{id}/decline` | The user declines it |
 
 ### 5.4 Rules DCA BE's UI must handle
 
