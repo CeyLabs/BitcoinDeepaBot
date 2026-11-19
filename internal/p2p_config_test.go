@@ -1,12 +1,13 @@
 package internal
 
 import (
+	"crypto/ed25519"
 	"encoding/base64"
 	"testing"
 )
 
 func TestSetAPIP2PDefaults(t *testing.T) {
-	key := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	key := p2pTestServiceKey()
 
 	c := APIP2PConfiguration{Enabled: true, ServicePublicKey: key}
 	setAPIP2PDefaults(&c)
@@ -24,7 +25,8 @@ func TestSetAPIP2PDefaults(t *testing.T) {
 		t.Fatalf("spend age not clamped: %d", c.SpendInitDataMaxAge)
 	}
 
-	for name, k := range map[string]string{"missing": "", "not base64": "!!", "wrong length": "AAAA"} {
+	for name, k := range map[string]string{"missing": "", "not base64": "!!", "wrong length": "AAAA",
+		"weak (all zero)": base64.StdEncoding.EncodeToString(make([]byte, 32))} {
 		c := APIP2PConfiguration{Enabled: true, ServicePublicKey: k}
 		setAPIP2PDefaults(&c)
 		if c.Enabled {
@@ -47,7 +49,7 @@ func TestSetAPIP2PDefaults(t *testing.T) {
 }
 
 func TestSetAPIP2PDefaultsOIDC(t *testing.T) {
-	key := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	key := p2pTestServiceKey()
 	saved := Configuration.Telegram.ApiKey
 	t.Cleanup(func() { Configuration.Telegram.ApiKey = saved })
 	Configuration.Telegram.ApiKey = "7654321:secret"
@@ -63,4 +65,11 @@ func TestSetAPIP2PDefaultsOIDC(t *testing.T) {
 	if c.OIDCEnabled || !c.Enabled {
 		t.Fatalf("bad client id: oidc=%v p2p=%v, want login off and P2P still on", c.OIDCEnabled, c.Enabled)
 	}
+}
+
+// p2pTestServiceKey is a real Ed25519 public key in base64.
+func p2pTestServiceKey() string {
+	seed := make([]byte, ed25519.SeedSize)
+	seed[0] = 9
+	return base64.StdEncoding.EncodeToString(ed25519.NewKeyFromSeed(seed).Public().(ed25519.PublicKey))
 }

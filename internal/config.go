@@ -690,6 +690,11 @@ func setAPIP2PDefaults(c *APIP2PConfiguration) {
 			c.Enabled = false
 			return
 		}
+		if err := ValidateEd25519PublicKey(key); err != nil {
+			log.Errorf("Disabling P2P API: api.p2p.service_public_key: %v", err)
+			c.Enabled = false
+			return
+		}
 		c.ServiceKey = ed25519.PublicKey(key)
 		nets, err := netutil.ParseNetworks(c.AllowedNetworks)
 		if err != nil {
