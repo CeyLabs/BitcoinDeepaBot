@@ -265,20 +265,33 @@ Needs `can_collect: true` on the wallet. **The sats move at once, with no approv
 
 **`POST /api/v1/collect`**
 
+Signed with the **send key**, but with its own signed text. The user to charge goes in **`X-BDB-User: <telegram_id>`**, and is signed as the seventh line:
+
+```
+BDB-COLLECT-ED25519-V1
+POST
+/api/v1/collect
+                                  (empty query line)
+<TIMESTAMP>
+<NONCE>
+<telegram_id>                     exactly as in X-BDB-User
+<hex sha256 of the exact body bytes>
+```
+
 ```json
-{ "to": "123456789", "amount": 50000, "memo": "Sell order #812", "external_id": "order-812" }
+{ "amount": 50000, "memo": "Sell order #812", "external_id": "order-812" }
 ```
 
 | Field | Notes |
 |---|---|
-| `to` | The user to charge: numeric Telegram ID (preferred) or `@username`. They must have logged in through `/api/v1/init` (§6.1), otherwise `403 payer_not_linked` |
+| `X-BDB-User` (header) | The user to charge: numeric Telegram ID. They must have logged in through `/api/v1/init` (§6.1), otherwise `403 payer_not_linked` |
 | `amount` | Sats, at most the wallet's `max_amount` |
 | `memo` | Optional. Shown in the user's history |
 | `external_id` | 8–128 chars, unique per charge: **use your order ID**. A retry with it returns the same request (`200` instead of `201`) and never charges twice. The same ID with a different user, amount or memo → `409 idempotency_conflict` |
 
 Returns `201` with the request, already charged. At most 10 charges per wallet per user per hour.
 
-**`GET /api/v1/collect/{id}`**, to poll it:
+**`GET /api/v1/collect/{id}`**, to poll it (signed like §3, no `X-BDB-User`):
 
 ```json
 {
@@ -555,7 +568,7 @@ See §6.8.
 
 ```
 1. User reviews the sell order in the app and taps Sell
-2. POST /collect { to: "<telegram_id>", amount, memo, external_id: "<orderId>" }
+2. POST /collect + X-BDB-User: <telegram_id>  { amount, memo, external_id: "<orderId>" }
      201 → charged
      timeout / 5xx → resend with the SAME external_id (never charges twice)
 3. Poll GET /collect/{id} every 3–5 s:

@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
@@ -64,9 +65,9 @@ func collectWallet(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return id, true
 }
 
-// Collect: POST /api/v1/collect {"to", "amount", "memo", "external_id"}.
-// Charges the user in "to" and pays the calling wallet at once, with no
-// approval. Only users who logged in through /api/v1/init can be charged. A
+// Collect: POST /api/v1/collect {"amount", "memo", "external_id"}, with the
+// payer in X-BDB-User (signed). Charges the payer and pays the calling
+// wallet at once, with no approval. Only users who logged in through /api/v1/init can be charged. A
 // repeat of the same external_id returns the same request and never pays
 // twice.
 func (p *P2PService) Collect(w http.ResponseWriter, r *http.Request) {
@@ -75,7 +76,6 @@ func (p *P2PService) Collect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		To         string `json:"to"`
 		Amount     int64  `json:"amount"`
 		Memo       string `json:"memo"`
 		ExternalID string `json:"external_id"`
@@ -89,7 +89,8 @@ func (p *P2PService) Collect(w http.ResponseWriter, r *http.Request) {
 		p2pFail(w, http.StatusForbidden, "collector_not_allowed", "The collecting wallet has no bot user.")
 		return
 	}
-	payer, err := p.Bot.P2PResolve(req.To)
+	payerID, _ := r.Context().Value(collectPayerKey{}).(int64)
+	payer, err := p.Bot.P2PResolve(strconv.FormatInt(payerID, 10))
 	if err != nil {
 		p2pWriteErr(w, err)
 		return
