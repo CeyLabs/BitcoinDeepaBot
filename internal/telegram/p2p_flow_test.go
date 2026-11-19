@@ -33,7 +33,8 @@ func newTestTransfer(kind string, amount int64) *P2PTransfer {
 func TestP2PEndRunsOnce(t *testing.T) {
 	withP2PConfig(t)
 	bot := buntBot(t)
-	day, unconf := p2pDailyKey(111, time.Now()), p2pUnconfirmedKey(111, time.Now())
+	// unconf is a legacy no-confirmation allowance, still refunded for old records.
+	day, unconf := p2pDailyKey(111, time.Now()), "p2p-unconfirmed:111:legacy"
 	bot.Bunt.AddWithinLimit(day, 300000, 500000, time.Hour)
 	bot.Bunt.AddWithinLimit(unconf, 40000, 50000, time.Hour)
 
@@ -148,36 +149,11 @@ func TestP2PSaveAfterEndIsRefused(t *testing.T) {
 	}
 }
 
-// Small transfers share one daily allowance without confirmation, so a
-// payment split into parts still needs confirmation.
-func TestP2PNeedsConfirmationAcrossSplits(t *testing.T) {
-	withP2PConfig(t) // confirm_threshold 50000
-	bot := buntBot(t)
-	steps := []struct {
-		amount int64
-		want   bool
-	}{
-		{20000, false}, {20000, false}, {20000, true}, {10000, false}, {1, true}, {60000, true},
-	}
-	for i, s := range steps {
-		tr := newTestTransfer(P2PKindInternal, s.amount)
-		if got := bot.p2pNeedsConfirmation(tr); got != s.want {
-			t.Fatalf("step %d (%d sat): needs confirmation = %v, want %v", i, s.amount, got, s.want)
-		}
-		if !s.want && tr.UnconfirmedKey == "" {
-			t.Fatalf("step %d: not counted", i)
-		}
-	}
-	if left := bot.P2PUnconfirmedRemaining(111); left != 0 {
-		t.Errorf("remaining = %d, want 0", left)
-	}
-}
-
 // A lock held by a transfer that can no longer pay doesn't block the invoice.
 func TestP2PLockInvoiceFreesStaleHolders(t *testing.T) {
 	withP2PConfig(t)
 	cases := map[string]func(bot *TipBot, holder *P2PTransfer){
-		"unconfirmed past its deadline": func(bot *TipBot, h *P2PTransfer) {
+		"legacy unconfirmed past its deadline": func(bot *TipBot, h *P2PTransfer) {
 			h.Status, h.ConfirmBy = P2PAwaitingConfirmation, time.Now().Add(-time.Minute)
 			bot.p2pSave(h)
 		},
@@ -204,7 +180,7 @@ func TestP2PLockInvoiceFreesStaleHolders(t *testing.T) {
 		})
 	}
 
-	t.Run("live holder blocks", func(t *testing.T) {
+	t.Run("live legacy holder blocks", func(t *testing.T) {
 		bot := buntBot(t)
 		holder := newTestTransfer(P2PKindInvoice, 1000)
 		holder.Status, holder.ConfirmBy = P2PAwaitingConfirmation, time.Now().Add(time.Minute)
@@ -216,13 +192,3 @@ func TestP2PLockInvoiceFreesStaleHolders(t *testing.T) {
 	})
 }
 
-func TestP2PExpiresIn(t *testing.T) {
-	for d, want := range map[time.Duration]string{
-		10 * time.Minute: "10 minutes", 9*time.Minute + time.Second: "10 minutes",
-		61 * time.Second: "2 minutes", 30 * time.Second: "1 minute", -time.Second: "1 minute",
-	} {
-		if got := p2pExpiresIn(d); got != want {
-			t.Errorf("p2pExpiresIn(%v) = %q, want %q", d, got, want)
-		}
-	}
-}

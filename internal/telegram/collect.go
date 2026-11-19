@@ -10,19 +10,14 @@ import (
 
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/storage"
-	"github.com/LightningTipBot/LightningTipBot/internal/str"
-	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
-	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 	"github.com/LightningTipBot/LightningTipBot/internal/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/buntdb"
-	tb "gopkg.in/lightningtipbot/telebot.v3"
 )
 
 // A collect request asks a user (the payer) to pay sats to a whitelisted API
 // wallet (the collector). The API only creates the request; nothing moves
-// until the payer approves it, either with the Pay button in the bot chat or
-// from the Mini App / web app. Approving creates a P2P transfer from the payer
+// until the payer approves it from the Mini App or web app. Approving creates a P2P transfer from the payer
 // to the collector, so payment, settlement checks and refunds all reuse the
 // P2P code.
 //
@@ -61,7 +56,6 @@ type CollectRequest struct {
 	Memo            string    `json:"memo,omitempty"`
 	ExternalID      string    `json:"external_id"`
 	ExpiresAt       time.Time `json:"expires_at"`
-	Notified        bool      `json:"notified"` // the bot chat prompt was delivered
 }
 
 // TransferID is the ID of the transfer an approval creates. It is fixed, so
@@ -79,11 +73,10 @@ func newCollectID() string {
 func collectDecideKey(id string) string { return "collect-decide:" + id }
 
 // CollectCreate creates a request from walletID's user to collect amount
-// sats from payer. With chatPrompt, the payer also gets Pay / Decline buttons in
-// the bot chat; without it they approve only in the Mini App or web app. A
-// repeat of the same externalID returns the original request; the same
-// externalID with different parameters is refused.
-func (bot *TipBot) CollectCreate(walletID string, collector, payer *lnbits.User, amount, maxAmount int64, memo, externalID string, maxMemo int, chatPrompt bool) (*CollectRequest, bool, error) {
+// sats from payer, who approves it in the Mini App or web app. A repeat of
+// the same externalID returns the original request; the same externalID with
+// different parameters is refused.
+func (bot *TipBot) CollectCreate(walletID string, collector, payer *lnbits.User, amount, maxAmount int64, memo, externalID string, maxMemo int) (*CollectRequest, bool, error) {
 	switch {
 	case amount < 1:
 		return nil, false, p2pErr("invalid_amount", "Amount must be at least 1 sat.")
@@ -129,14 +122,6 @@ func (bot *TipBot) CollectCreate(walletID string, collector, payer *lnbits.User,
 	if err := bot.collectSave(c); err != nil {
 		bot.Bunt.DeleteIfValue(extKey, c.ID)
 		return nil, false, err
-	}
-	if chatPrompt {
-		if err := bot.sendCollectPrompt(payer, c); err != nil {
-			log.Warnf("[collect] Could not prompt %d for %s: %v", payer.Telegram.ID, c.ID, err)
-		} else {
-			c.Notified = true
-			bot.collectSave(c)
-		}
 	}
 	log.Infof("[collect] %s asks %d for %d sat (%s)", walletID, payer.Telegram.ID, amount, c.ID)
 	return c, true, nil
@@ -230,9 +215,8 @@ func (bot *TipBot) collectApprove(c *CollectRequest, payer *lnbits.User) (t *P2P
 	return t, true, nil
 }
 
-// CollectApprove approves a request from the Mini App or web app. Like any
-// Mini App send, an amount above the payer's no-confirmation allowance is
-// confirmed in the bot chat as well. A repeat returns the same transfer.
+// CollectApprove approves and pays a request from the Mini App or web app.
+// A repeat returns the same transfer.
 func (bot *TipBot) CollectApprove(id string, payer *lnbits.User) (*P2PTransfer, error) {
 	c, err := bot.CollectGet(id)
 	if err != nil || c.PayerTelegramID != payer.Telegram.ID {
@@ -268,91 +252,4 @@ func (bot *TipBot) CollectCancel(id, walletID string) (*CollectRequest, error) {
 		return c, p2pErr("request_closed", "This request is %s.", c.Status)
 	}
 	return c, nil
-}
-
-// --- bot chat ---
-
-var (
-	collectMenu      = &tb.ReplyMarkup{ResizeKeyboard: true}
-	btnCollectPay    = collectMenu.Data("✅ Pay", "collect_pay")
-	btnCollectReject = collectMenu.Data("🚫 Decline", "collect_decline")
-)
-
-func collectMarkup(id string) *tb.ReplyMarkup {
-	menu := &tb.ReplyMarkup{ResizeKeyboard: true}
-	menu.Inline(menu.Row(menu.Data("✅ Pay", "collect_pay", id), menu.Data("🚫 Decline", "collect_decline", id)))
-	return menu
-}
-
-func (bot *TipBot) sendCollectPrompt(payer *lnbits.User, c *CollectRequest) error {
-	who := str.MarkdownEscape(c.ToName)
-	if c.ToUsername != "" {
-		who += " (@" + str.MarkdownEscape(c.ToUsername) + ")"
-	}
-	text := fmt.Sprintf("💰 *Payment request*\n\n%s asks you to pay %s", who, thirdparty.FormatSatsWithLKR(c.Amount))
-	if c.Memo != "" {
-		text += "\n✉️ " + str.MarkdownEscape(c.Memo)
-	}
-	text += fmt.Sprintf("\n\n⏳ Expires in %s. Pay only if you expect this.", p2pExpiresIn(time.Until(c.ExpiresAt)))
-	_, err := bot.Telegram.Send(payer.Telegram, text, collectMarkup(c.ID), tb.ModeMarkdown)
-	return err
-}
-
-func (bot *TipBot) collectPayHandler(ctx intercept.Context) (intercept.Context, error) {
-	msg := ctx.Callback().Message
-	c, err := bot.CollectGet(ctx.Data())
-	if err != nil || c.PayerTelegramID != ctx.Callback().Sender.ID {
-		bot.tryEditMessage(msg, "❌ This request no longer exists.", &tb.ReplyMarkup{})
-		return ctx, nil
-	}
-	payer, err := bot.P2PSender(c.PayerTelegramID)
-	if err != nil {
-		bot.tryEditMessage(msg, "❌ "+err.Error(), &tb.ReplyMarkup{})
-		return ctx, nil
-	}
-	t, created, err := bot.collectApprove(c, payer)
-	if err != nil {
-		bot.tryEditMessage(msg, "ℹ️ "+err.Error(), &tb.ReplyMarkup{})
-		return ctx, nil
-	}
-	if !created {
-		bot.tryEditMessage(msg, "ℹ️ This request was already approved.", &tb.ReplyMarkup{})
-		return ctx, nil
-	}
-	if p2pFinal(t.Status) {
-		bot.tryEditMessage(msg, "❌ "+t.Error, &tb.ReplyMarkup{})
-		return ctx, nil
-	}
-	// Pressing Pay is the confirmation, so the transfer runs right away.
-	if !bot.p2pClaim(t) {
-		bot.tryEditMessage(msg, "ℹ️ This request was already handled.", &tb.ReplyMarkup{})
-		return ctx, nil
-	}
-	bot.tryEditMessage(msg, "⏳ Paying…", &tb.ReplyMarkup{})
-	bot.p2pInBackground(t, func() {
-		bot.p2pRun(t)
-		switch t.Status {
-		case P2PCompleted:
-			bot.tryEditMessage(msg, fmt.Sprintf("✅ Paid %s to %s", thirdparty.FormatSatsWithLKR(t.Amount), str.MarkdownEscape(t.ToName)), &tb.ReplyMarkup{})
-		case P2PInFlight:
-			bot.tryEditMessage(msg, "⏳ The payment is in flight.", &tb.ReplyMarkup{})
-		default:
-			bot.tryEditMessage(msg, "❌ "+t.Error, &tb.ReplyMarkup{})
-		}
-	})
-	return ctx, nil
-}
-
-func (bot *TipBot) collectDeclineHandler(ctx intercept.Context) (intercept.Context, error) {
-	msg := ctx.Callback().Message
-	c, err := bot.CollectDecline(ctx.Data(), ctx.Callback().Sender.ID)
-	switch {
-	case c == nil:
-		bot.tryEditMessage(msg, "❌ This request no longer exists.", &tb.ReplyMarkup{})
-	case err != nil:
-		bot.tryEditMessage(msg, "ℹ️ "+err.Error(), &tb.ReplyMarkup{})
-	default:
-		bot.tryEditMessage(msg, "🚫 Declined. Nothing was sent.", &tb.ReplyMarkup{})
-	}
-	return ctx, nil
 }
