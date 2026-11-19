@@ -243,6 +243,9 @@ type WhitelistedWallet struct {
 	Username               string `yaml:"username"`                 // Telegram username without @
 	AdminApprovalThreshold int64  `yaml:"admin_approval_threshold"` // 0 = use global
 	MaxAmount              int64  `yaml:"max_amount"`               // 0 = use global
+	// CanCollect lets this wallet ask users to pay it (/api/v1/collect).
+	// Users still approve every request themselves.
+	CanCollect bool `yaml:"can_collect"`
 	// Ed25519PublicKey is the base64 32-byte public key the wallet signs with.
 	// The bot never sees the private key, so a config leak cannot forge sends.
 	Ed25519PublicKey string            `yaml:"ed25519_public_key"`

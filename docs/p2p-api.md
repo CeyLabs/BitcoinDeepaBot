@@ -224,6 +224,11 @@ every **15–30 seconds** while it is `in_flight`: a payment can stay in flight
 for a long time, and the bot checks it with lnbits at most once every 20
 seconds anyway. Polls are limited to 30 per minute per sender.
 
+### Collect requests
+`GET /collect/{id}`, `POST /collect/{id}/approve` and `POST /collect/{id}/decline`
+let the user answer a request from a wallet to pay it. `approve` needs a fresh
+login, like `/send`. See [collect-api.md](collect-api.md).
+
 ## Transfer
 
 ```json

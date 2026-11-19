@@ -1,6 +1,6 @@
 # DCA Backend ↔ BitcoinDeepa Bot — API Integration Guide
 
-How the DCA backend (DCA BE) talks to the BitcoinDeepa bot after the security changes in #84 (IP allowlist), #86 (Ed25519 request signing) and #85 (P2P). DCA BE also serves the **Telegram Mini App and the web app**, so it relays their P2P sends too. This guide covers setup, signing, every endpoint DCA BE calls, the callback the bot makes to DCA BE, and a migration checklist from HMAC.
+How the DCA backend (DCA BE) talks to the BitcoinDeepa bot after the security changes in #84 (IP allowlist), #86 (Ed25519 request signing) and #85 (P2P), plus the collect API (#89). DCA BE also serves the **Telegram Mini App and the web app**, so it relays their P2P sends too. This guide covers setup, signing, every endpoint DCA BE calls, the callback the bot makes to DCA BE, and a migration checklist from HMAC.
 
 > **Breaking change:** HMAC signing (`X-HMAC-Signature`) is removed. Every call from DCA BE must be signed with Ed25519, or it gets `401`.
 
@@ -10,7 +10,7 @@ How the DCA backend (DCA BE) talks to the BitcoinDeepa bot after the security ch
 
 ```
              (1) wallet API, signed with the SEND key
- DCA BE ─────────────────────────────────────────────►  Bot  /api/v1/send, /userbalance, ...
+ DCA BE ─────────────────────────────────────────────►  Bot  /api/v1/send, /collect, /userbalance, ...
    │
    │         (2) P2P relay, signed with the P2P key + the user's Telegram credential
    ├─────────────────────────────────────────────────►  Bot  /api/v1/p2p/*
@@ -21,7 +21,7 @@ How the DCA backend (DCA BE) talks to the BitcoinDeepa bot after the security ch
    └──────────────────────────────────────────────────  Bot  (when the DCA wallet receives sats)
 ```
 
-1. **DCA's own payouts.** DCA BE sends sats from its whitelisted wallet, checks balances, and polls payment status. Signed with the **send key** (§3–§4).
+1. **DCA's own payouts and collections.** DCA BE sends sats from its whitelisted wallet, asks users to pay it (collect, for sellers), checks balances, and polls payment status. Signed with the **send key** (§3–§4).
 2. **P2P relay.** Mini App and web app users send sats and pay invoices from **their own** wallets. DCA BE forwards their requests, signed with the **P2P key**, plus the user's own Telegram credential. DCA BE cannot send on a user's behalf without that credential (§5).
 3. **Callback.** When the DCA wallet receives a deposit, the bot calls `POST {dca.api_url}/transaction/reset-retry-counts` so DCA BE can retry failed buys (§6).
 
@@ -29,7 +29,7 @@ How the DCA backend (DCA BE) talks to the BitcoinDeepa bot after the security ch
 
 | Key | Signs | Bot config | If it leaks |
 |---|---|---|---|
-| **Send key** | (1) DCA payouts | `api.send.whitelisted_wallets.<id>.ed25519_public_key` | Someone can send sats **from the DCA wallet**, up to its limits |
+| **Send key** | (1) DCA payouts and collect requests | `api.send.whitelisted_wallets.<id>.ed25519_public_key` | Someone can send sats **from the DCA wallet**, up to its limits, and send users payment prompts (they still have to approve each one) |
 | **P2P key** | (2) P2P relay | `api.p2p.service_public_key` | Little on its own: every P2P call also needs that user's Telegram credential |
 
 Keep them **separate**, so either one can be rotated or revoked without touching the other. A signature made with one can't be used on the other API anyway: each signs a different first line (`BDB-SEND-…` vs `BDB-P2P-…`).
@@ -72,6 +72,7 @@ api:
         username: "<telegram username that owns the sending wallet>"
         ed25519_public_key: "<DCA BE public key>"
         # no hmac_secret: a leftover hmac_secret turns the send API off
+        can_collect: true                  # allow /api/v1/collect (§4.7)
   p2p:
     enabled: true
     service_public_key: "<DCA BE P2P public key>"
@@ -257,6 +258,31 @@ Use it as a pre-flight check before large sends.
 
 Remember the query string is signed: sign `code=PROMO2024` exactly as sent.
 
+### 4.7 Collect: ask a user to pay you
+
+Needs `can_collect: true` on the wallet. Nothing moves until the user approves, in the bot chat or in the Mini App / web app (§5.3). Full reference: [`docs/collect-api.md`](collect-api.md).
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/v1/collect` `{ to, amount, memo, external_id, chat_prompt? }` | Create a request (expires in 15 min). The bot sends the user **Pay / Decline** buttons, unless `chat_prompt: false` (Mini App-only flow). |
+| `GET /api/v1/collect/{id}` | Poll it: `pending`, `approved` (see `paid` and `transfer`), `declined`, `cancelled`, `expired` |
+| `POST /api/v1/collect/{id}/cancel` | Withdraw a pending request |
+
+Use your order ID as `external_id`; retries with it return the same request.
+
+The user approves in one of two places:
+
+- **Bot chat:** they press **✅ Pay**. Nothing for DCA BE to do but poll.
+- **Mini App / web app:** DCA BE shows the request and relays approve or decline with the user's credential (§5.3). DCA BE knows the request ID because it created it, so pass the ID to the Mini App (for example in the page URL).
+
+Rules:
+
+- Per-request cap is the wallet's `max_amount`. The P2P daily limit does not apply.
+- At most 10 requests per wallet per user per hour (`429 rate_limited`).
+- `notified: false` means no chat message was sent: `chat_prompt: false`, or the bot could not message the user (for example, they blocked the bot). Point them to the Mini App.
+- A `failed` transfer (for example, the seller's balance is too low) is final. Create a new request with a new `external_id`.
+- Errors use the P2P shape `{ "code", "message" }`: `403 collect_not_allowed` (no `can_collect`), `404 recipient_not_found`, `409 idempotency_conflict` / `request_closed`.
+
 ---
 
 ## 5. P2P relay: Mini App and web app
@@ -322,6 +348,9 @@ export async function bdbP2P(method: "GET" | "POST", path: string, cred: { initD
 | `POST /api/v1/p2p/invoice/decode` `{ invoice }` | Show an invoice before paying (`needs_confirmation`, `over_limit`) |
 | `POST /api/v1/p2p/invoice/pay` `{ invoice, memo, idempotency_key }` | Pay a bolt11 invoice |
 | `GET /api/v1/p2p/transfers/{id}` | Poll a transfer. Every 2–3 s while `processing` / `awaiting_confirmation`, every 15–30 s while `in_flight` |
+| `GET /api/v1/p2p/collect/{id}` | Show a collect request (§4.7) to the user it is for |
+| `POST /api/v1/p2p/collect/{id}/approve` | The user pays the collect request (fresh login needed). Returns a transfer. |
+| `POST /api/v1/p2p/collect/{id}/decline` | The user declines it |
 
 ### 5.4 Rules DCA BE's UI must handle
 
@@ -376,11 +405,29 @@ Content-Type: application/json
 
 The memo is your idempotency key: one memo per order, reused on every retry of that order.
 
+### 8.1 Collect flow (user sells bitcoin to DCA)
+
+```
+1. POST /collect { to: "<telegram_id>", amount, memo, external_id: "<orderId>" }
+     201 → pending; the user gets Pay / Decline in the bot chat
+     4xx → nothing created (reason in message)
+     timeout / 5xx → resend with the SAME external_id; you get the same request back
+2. Poll GET /collect/{id} every 3–5 s:
+     pending                         → keep polling (expires after 15 min)
+     approved, paid: true            → sats received: settle the order (pay the user LKR)
+     approved, transfer processing / awaiting_confirmation / in_flight → keep polling
+     approved, transfer failed       → order failed, nothing received
+     declined | cancelled | expired  → order closed, nothing received
+3. (optional) POST /collect/{id}/cancel to withdraw a request the user hasn't answered
+```
+
+Only pay the user out (LKR) after `paid: true`.
+
 ---
 
 ## 9. Code changes and migration checklist
 
-**Bot:** no code changes. Only config: the two public keys, `hmac_secret` removed, and `api.p2p` enabled (§2.2).
+**Bot:** no further code changes. Only config: the two public keys, `hmac_secret` removed, `can_collect: true` on the DCA wallet, and `api.p2p` enabled (§2.2).
 
 **DCA BE:**
 
@@ -388,6 +435,8 @@ The memo is your idempotency key: one memo per order, reused on every retry of t
 |---|---|
 | Payout client | Replace HMAC signing with the Ed25519 send-key client (§3.3) |
 | Payout handling | Handle `202 awaiting_approval` and `202 pending` (§4.1), and poll §4.2 / §4.3 |
+| Collect (new) | Create requests for sell orders, poll until `paid` or closed, settle only on `paid: true` (§4.7, §8.1) |
+| Collect in the Mini App (new) | Screen that shows a request and relays approve / decline (§5.3) |
 | P2P relay (new) | Routes for the Mini App and web app that forward the user's credential and sign with the P2P key (§5.2), for each P2P endpoint (§5.3) |
 | Web app login | Log In with Telegram (OIDC, scopes `openid profile`, client = the bot); keep the `id_token` in the server session (§5.1) |
 | P2P UI | Re-login prompt when the credential is over 10 min old for spends, `idempotency_key` per payment, the confirmation state, polling (§5.4) |
@@ -405,6 +454,7 @@ The memo is your idempotency key: one memo per order, reused on every retry of t
 - [ ] HTTP timeout ≥ 95 s for `/send`.
 - [ ] `202` handling for both approval and pending invoice payments (§4).
 - [ ] `reset-retry-counts` handler is safe to call repeatedly (§6).
+- [ ] Collect: `can_collect: true` set on the DCA wallet; sell orders use the order ID as `external_id` and settle only on `paid: true` (§8.1).
 - [ ] If IP allowlists are used, DCA BE has a static egress IP and it's listed.
 - [ ] Tested end-to-end on the dev bot before the production switch. Deploy the bot change and the DCA BE change **together**: after the bot deploys, HMAC requests get `401`.
 

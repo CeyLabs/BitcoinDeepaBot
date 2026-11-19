@@ -106,6 +106,9 @@ type P2PTransfer struct {
 	// internal send. It is saved before paying, so the outcome can be looked
 	// up if the send is cut off.
 	InternalPaymentHash string `json:"internal_payment_hash,omitempty"`
+	// CollectID is set when the transfer pays a collect request. The payer
+	// approved that exact payment, so the P2P daily limit does not apply.
+	CollectID string `json:"collect_id,omitempty"`
 }
 
 // settlementHash is the payment to look up for this transfer, or "".
@@ -503,6 +506,10 @@ func (bot *TipBot) p2pRun(t *P2PTransfer) {
 		bot.p2pEnd(t, P2PFailed, err.Error(), nil)
 		return
 	}
+	if t.CollectID != "" {
+		bot.p2pSendInternal(from, t)
+		return
+	}
 	cfg := p2pConfig()
 	day := p2pDailyKey(t.FromTelegramID, time.Now())
 	ok, _, err := bot.Bunt.AddWithinLimit(day, t.Amount, cfg.DailyLimit, 48*time.Hour)
@@ -556,10 +563,15 @@ func (bot *TipBot) p2pSendInternal(from *lnbits.User, t *P2PTransfer) {
 	defer reservation.Release()
 
 	memo := fmt.Sprintf("💸 P2P Send from %s to %s.", GetUserStr(from.Telegram), GetUserStr(to.Telegram))
+	txType := "p2p_send"
+	if t.CollectID != "" {
+		memo = fmt.Sprintf("💰 Collect by %s from %s.", GetUserStr(to.Telegram), GetUserStr(from.Telegram))
+		txType = "collect"
+	}
 	if t.Memo != "" {
 		memo += " Memo: " + t.Memo
 	}
-	tx := NewTransaction(bot, from, to, t.Amount, TransactionType("p2p_send"))
+	tx := NewTransaction(bot, from, to, t.Amount, TransactionType(txType))
 	tx.Memo = memo
 	tx.OnInvoice = func(inv lnbits.Invoice) {
 		t.InternalPaymentHash = inv.PaymentHash
@@ -574,7 +586,7 @@ func (bot *TipBot) p2pSendInternal(from *lnbits.User, t *P2PTransfer) {
 	}
 	log.Errorf("[p2p] Transfer %s failed: %v", t.ID, err)
 	if bot.ErrorLogger != nil {
-		bot.ErrorLogger.LogTransactionError(err, "p2p_send", t.Amount, from.Telegram, to.Telegram)
+		bot.ErrorLogger.LogTransactionError(err, txType, t.Amount, from.Telegram, to.Telegram)
 	}
 	if tx.Invoice.PaymentHash == "" {
 		// Failed before paying: the recipient's invoice was never created.
