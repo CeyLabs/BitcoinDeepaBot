@@ -87,7 +87,11 @@ api:
     confirm_threshold: 50000  # above this, the sender confirms in the bot chat
     rate_limit_per_minute: 10
     init_data_max_age: 3600   # seconds
+    spend_init_data_max_age: 600  # seconds; shorter window for /send and /invoice/pay
     max_memo_length: 280
+    # Required when enabled: base64 Ed25519 public key of the Mini App server,
+    # which signs every call. See docs/p2p-api.md.
+    service_public_key: ""
   # Analytics API - HMAC authenticated endpoints for data export
   # Generate secrets with: openssl rand -hex 32
   analytics:
