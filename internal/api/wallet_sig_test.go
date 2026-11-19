@@ -157,3 +157,78 @@ func TestWalletAuthMiddlewareRejectsLargeBody(t *testing.T) {
 		t.Fatalf("got %d, want 413", rec.Code)
 	}
 }
+
+func withAnalyticsKey(t *testing.T) {
+	t.Helper()
+	saved := internal.Configuration.API.Analytics
+	t.Cleanup(func() { internal.Configuration.API.Analytics = saved })
+	internal.Configuration.API.Analytics.TimestampTolerance = 300
+	internal.Configuration.API.Analytics.APIKeys = map[string]internal.AnalyticsAPIKey{
+		"data-team": {Name: "Data Team", PublicKey: testWalletKey.Public().(ed25519.PublicKey)},
+	}
+}
+
+func analyticsRequest(path, keyID, nonce string, ts int64, version string) *http.Request {
+	r := httptest.NewRequest(http.MethodGet, path, nil)
+	tsStr := strconv.FormatInt(ts, 10)
+	msg := signingString(version, http.MethodGet, r.URL.Path, r.URL.RawQuery, tsStr, nonce, nil)
+	r.Header.Set("X-Key-ID", keyID)
+	r.Header.Set("X-Timestamp", tsStr)
+	r.Header.Set("X-Nonce", nonce)
+	r.Header.Set("X-Signature", base64.StdEncoding.EncodeToString(ed25519.Sign(testWalletKey, []byte(msg))))
+	return r
+}
+
+func serveAnalytics(r *http.Request) (int, string) {
+	var key string
+	rec := httptest.NewRecorder()
+	AnalyticsAuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		key, _ = r.Context().Value("analytics_api_key").(string)
+	})(rec, r)
+	return rec.Code, key
+}
+
+func TestAnalyticsAuthMiddleware(t *testing.T) {
+	withAnalyticsKey(t)
+	now := time.Now().Unix()
+	path := "/api/v1/analytics/transactions?start_date=2026-11-01&limit=10"
+
+	r := analyticsRequest(path, "data-team", newNonce(), now, analyticsSigVersion)
+	if code, key := serveAnalytics(r); code != http.StatusOK || key != "data-team" {
+		t.Fatalf("valid: got %d key %q", code, key)
+	}
+	if code, _ := serveAnalytics(analyticsRequest(path, "data-team", r.Header.Get("X-Nonce"), now, analyticsSigVersion)); code != http.StatusUnauthorized {
+		t.Errorf("replay: got %d, want 401", code)
+	}
+
+	bad := map[string]*http.Request{
+		"unknown key":          analyticsRequest(path, "nope", newNonce(), now, analyticsSigVersion),
+		"expired":              analyticsRequest(path, "data-team", newNonce(), now-301, analyticsSigVersion),
+		"future":               analyticsRequest(path, "data-team", newNonce(), now+301, analyticsSigVersion),
+		"send API signature":   analyticsRequest(path, "data-team", newNonce(), now, ed25519SigVersion),
+		"old hmac header only": httptest.NewRequest(http.MethodGet, path, nil),
+	}
+	changed := analyticsRequest(path, "data-team", newNonce(), now, analyticsSigVersion)
+	changed.URL.RawQuery = "start_date=2020-01-01&limit=10"
+	bad["query changed"] = changed
+	bad["old hmac header only"].Header.Set("X-HMAC-Signature", "deadbeef")
+	bad["old hmac header only"].Header.Set("X-Timestamp", strconv.FormatInt(now, 10))
+	for name, r := range bad {
+		if code, key := serveAnalytics(r); code != http.StatusUnauthorized || key != "" {
+			t.Errorf("%s: got %d key %q, want 401", name, code, key)
+		}
+	}
+}
+
+// A wallet signature can't be used on the analytics API, even with the same
+// key pair and id.
+func TestWalletSignatureRejectedByAnalytics(t *testing.T) {
+	withTestWallets(t)
+	withAnalyticsKey(t)
+	internal.Configuration.API.Analytics.APIKeys["testwallet"] = internal.AnalyticsAPIKey{PublicKey: testWalletKey.Public().(ed25519.PublicKey)}
+	r := newSigReq(http.MethodGet, "/api/v1/analytics/transactions", "").build()
+	r.Header.Set("X-Key-ID", "testwallet")
+	if code, _ := serveAnalytics(r); code != http.StatusUnauthorized {
+		t.Fatalf("got %d, want 401", code)
+	}
+}

@@ -122,11 +122,11 @@ func startApiServer(bot *telegram.TipBot) {
 	s.AppendAuthorizedRoute(`/api/v1/createinvoice`, api.AuthTypeBasic, api.AccessKeyTypeInvoice, bot.DB.Users, apiService.CreateInvoice, http.MethodPost)
 	s.AppendAuthorizedRoute(`/api/v1/balance`, api.AuthTypeBasic, api.AccessKeyTypeInvoice, bot.DB.Users, apiService.Balance, http.MethodGet)
 
-	// Analytics API endpoints (HMAC authenticated)
+	// Analytics API endpoints (Ed25519 signed)
 	if internal.IsAPIAnalyticsEnabled() {
-		s.AppendRoute(`/api/v1/analytics/transactions`, api.AnalyticsHMACMiddleware(apiService.GetTransactionAnalytics), http.MethodGet)
-		s.AppendRoute(`/api/v1/analytics/user/{user_id}/transactions`, api.AnalyticsHMACMiddleware(apiService.GetUserTransactionHistory), http.MethodGet)
-		log.Infof("Analytics API endpoints registered with HMAC security")
+		s.AppendRoute(`/api/v1/analytics/transactions`, api.AnalyticsAuthMiddleware(apiService.GetTransactionAnalytics), http.MethodGet)
+		s.AppendRoute(`/api/v1/analytics/user/{user_id}/transactions`, api.AnalyticsAuthMiddleware(apiService.GetUserTransactionHistory), http.MethodGet)
+		log.Infof("Analytics API endpoints registered with Ed25519 signatures")
 	} else {
 		log.Infof("Analytics API endpoints disabled in configuration")
 	}

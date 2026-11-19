@@ -103,3 +103,27 @@ func TestValidateAPISend(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateAPIAnalytics(t *testing.T) {
+	pubKey := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	cfg := APIAnalyticsConfiguration{APIKeys: map[string]AnalyticsAPIKey{"data": {Name: "Data", Ed25519PublicKey: pubKey}}}
+	if err := validateAPIAnalytics(&cfg); err != nil {
+		t.Fatalf("valid config rejected: %v", err)
+	}
+	if len(cfg.APIKeys["data"].PublicKey) != 32 {
+		t.Fatal("public key not parsed")
+	}
+	for name, k := range map[string]AnalyticsAPIKey{
+		"no public key":        {Name: "x"},
+		"bad public key":       {Name: "x", Ed25519PublicKey: "AAAA"},
+		"leftover hmac secret": {Name: "x", Ed25519PublicKey: pubKey, HMACSecret: strings.Repeat("s", 64)},
+	} {
+		cfg := APIAnalyticsConfiguration{APIKeys: map[string]AnalyticsAPIKey{"data": k}}
+		if err := validateAPIAnalytics(&cfg); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+	if err := validateAPIAnalytics(&APIAnalyticsConfiguration{}); err == nil {
+		t.Error("no keys: accepted")
+	}
+}
