@@ -95,6 +95,11 @@ api:
     # Only these IPs/CIDRs (the Mini App server) can call /api/v1/p2p/*.
     # Empty means any IP; the service signature still applies.
     allowed_networks: []
+    # Accept "Log In with Telegram" (OIDC) ID tokens from the web app, as
+    # well as Mini App init data. The web app must log in with this bot and
+    # request the "openid profile" scopes.
+    oidc_enabled: false
+    # oidc_client_id: ""  # bot ID the web app logs in with; empty = this bot
   # Analytics API - HMAC authenticated endpoints for data export
   # Generate secrets with: openssl rand -hex 32
   analytics:

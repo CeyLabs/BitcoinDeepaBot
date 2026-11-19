@@ -1,23 +1,26 @@
-# Mini App P2P API
+# Mini App & Web App P2P API
 
-Lets the BitcoinDeepa Telegram Mini App send sats to other bot users and pay
-Lightning invoices.
+Lets the BitcoinDeepa Telegram Mini App, and the web app that uses
+"Log In with Telegram", send sats to other bot users and pay Lightning invoices.
 
 - **Base URL:** `https://bitcoindeepa.com/api/v1/p2p`
 - **Off by default.** Enable with `api.p2p.enabled: true` (see Configuration).
 
 ## Authentication: who is sending
 
-Every request carries the Mini App's signed launch data, **unchanged**:
+Every request carries **exactly one** credential signed by Telegram,
+**unchanged**:
 
-```
-X-Telegram-Init-Data: <window.Telegram.WebApp.initData>
-```
+| From | Header | Value |
+|---|---|---|
+| Mini App | `X-Telegram-Init-Data` | `window.Telegram.WebApp.initData` |
+| Web app | `X-Telegram-ID-Token` | the `id_token` from Log In with Telegram (OIDC) |
 
-The bot checks Telegram's signature with its own token (the Mini App is opened
-from @BitcoinDeepaBot), and the sender is **always** the user in that data.
-Nothing else in a request can name or change the sender. A backend that relays
-the request cannot send on anyone's behalf.
+The bot checks Telegram's signature (the bot token for init data, Telegram's
+published keys for ID tokens), and the sender is **always** the Telegram user
+in that credential. Nothing else in a request can name or change the sender. A
+backend that relays the request cannot send on anyone's behalf. A request with
+both headers is rejected.
 
 - Init data older than `init_data_max_age` (default 1 hour) is rejected: ask
   the user to reopen the Mini App.
@@ -29,19 +32,42 @@ the request cannot send on anyone's behalf.
   `initDataUnsafe` to warn them before they tap Send.
 - Pass `initData` (the raw string), not `initDataUnsafe`.
 
-### Calling it from the Mini App
+### Web app: Log In with Telegram (OIDC)
+
+Turn it on with `api.p2p.oidc_enabled: true`. The bot then accepts ID tokens
+from [Log In with Telegram](https://core.telegram.org/bots/telegram-login):
+
+- Log in with **this bot** (@BitcoinDeepaBot) as the client. The token's `aud`
+  must be the bot ID (`oidc_client_id`, by default the number before `:` in the
+  bot token).
+- Request the **`openid profile`** scopes. The bot reads the user from the
+  `id` claim, which only comes with `profile`. (`sub` is not the Telegram ID.)
+- The bot checks the signature against
+  `https://oauth.telegram.org/.well-known/jwks.json` (RS256, ES256 or EdDSA),
+  `iss` = `https://oauth.telegram.org`, `aud`, and `exp`.
+- The same age limits apply to the token's login time (`iat`): up to
+  `init_data_max_age` for reads, and up to `spend_init_data_max_age`
+  (default **10 minutes**) for `/send` and `/invoice/pay`. ID tokens can't be
+  refreshed, so if the login is older than that, ask the user to tap
+  **Log In with Telegram** again before sending, then retry with the same
+  `idempotency_key`. Check `iat` in the token to prompt them before they tap
+  Send.
+- Keep the ID token on the web app server (e.g. in the session), not in the
+  browser's storage.
+
+### Calling it from the Mini App or web app
 
 Call it **from the TMA server**, not the browser. Set `api.p2p.allowed_networks`
 to the TMA server's IPs so the P2P routes answer only them (`403 forbidden`
 otherwise):
 
 ```
-browser ──(initData)──► TMA server route ──(X-Telegram-Init-Data: same string
-                                            + service signature)──► bot
+Mini App ──(initData)──► TMA server ──(X-Telegram-Init-Data + service signature)──► bot
+web app  ──(session)───► TMA server ──(X-Telegram-ID-Token  + service signature)──► bot
 ```
 
-The server route forwards the header as-is and adds nothing that identifies a
-user.
+The server forwards the credential as-is and adds nothing that identifies a
+user. One server and one service key serve both.
 
 ## Authentication: who is calling (service signature)
 
@@ -73,12 +99,12 @@ BDB-P2P-ED25519-V1
 <QUERY>                                 raw query without "?", or empty
 <TIMESTAMP>
 <NONCE>
-<hex sha256 of the X-Telegram-Init-Data value>
+<hex sha256 of the credential>         the X-Telegram-Init-Data or X-Telegram-ID-Token value
 <hex sha256 of the exact body bytes>    (sha256 of empty string for GET)
 ```
 
-The init data is signed too, so a captured request can't be reused with
-another user's init data. Each nonce works once.
+The credential is signed too, so a captured request can't be reused with
+another user's credential. Each nonce works once.
 
 ```js
 // TMA server (Node.js)
@@ -86,19 +112,21 @@ const crypto = require("crypto");
 const key = crypto.createPrivateKey(process.env.P2P_SERVICE_KEY_PEM);
 const sha = (s) => crypto.createHash("sha256").update(s).digest("hex");
 
-function p2pHeaders(method, path, query, initData, body) {
+// cred: { initData } from the Mini App, or { idToken } from the web app session
+function p2pHeaders(method, path, query, cred, body) {
   const ts = Math.floor(Date.now() / 1000).toString();
   const nonce = crypto.randomBytes(16).toString("hex");
-  const msg = ["BDB-P2P-ED25519-V1", method, path, query, ts, nonce, sha(initData), sha(body)].join("\n");
+  const value = cred.initData ?? cred.idToken;
+  const msg = ["BDB-P2P-ED25519-V1", method, path, query, ts, nonce, sha(value), sha(body)].join("\n");
   return {
     "Content-Type": "application/json",
-    "X-Telegram-Init-Data": initData,
+    [cred.initData ? "X-Telegram-Init-Data" : "X-Telegram-ID-Token"]: value,
     "X-Timestamp": ts,
     "X-Nonce": nonce,
     "X-Signature": crypto.sign(null, Buffer.from(msg), key).toString("base64"),
   };
 }
-// fetch(`${BOT}/api/v1/p2p/send`, { method: "POST", headers: p2pHeaders("POST", "/api/v1/p2p/send", "", initData, body), body })
+// fetch(`${BOT}/api/v1/p2p/send`, { method: "POST", headers: p2pHeaders("POST", "/api/v1/p2p/send", "", { initData }, body), body })
 ```
 
 ## Rules
@@ -227,7 +255,7 @@ seconds anyway. Polls are limited to 30 per minute per sender.
 | HTTP | `code` |
 |---|---|
 | 400 | `invalid_json`, `invalid_amount`, `amount_too_large`, `memo_too_long`, `invalid_idempotency_key`, `invalid_recipient`, `self_send`, `invalid_invoice`, `amountless_invoice`, `invoice_expired` |
-| 401 | `unauthorized`: init data missing, invalid or expired (for spends: older than `spend_init_data_max_age`). Reopen the Mini App. |
+| 401 | `unauthorized`: credential missing, invalid or expired, both credentials sent, or (for spends) the login is older than `spend_init_data_max_age`. Mini App: reopen it. Web app: log in with Telegram again. |
 | 401 | `bad_service_signature`: the TMA server's signature is missing, wrong, expired or replayed. A server bug, not a user error. |
 | 403 | `forbidden` (caller's IP not in `api.p2p.allowed_networks`), `sender_not_found` (user must start the bot first), `sender_not_allowed` |
 | 404 | `recipient_not_found`, `not_found` |
@@ -252,4 +280,6 @@ api:
     spend_init_data_max_age: 600   # /send and /invoice/pay
     max_memo_length: 280
     service_public_key: "<base64 Ed25519 public key of the TMA server>"   # required
+    oidc_enabled: true    # accept Log In with Telegram ID tokens from the web app
+    # oidc_client_id: "1234567890"   # bot ID the web app logs in with; default: this bot
 ```

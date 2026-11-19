@@ -32,13 +32,14 @@ const (
 var p2pNonceRe = regexp.MustCompile(`^[A-Za-z0-9_-]{16,128}$`)
 
 // P2PSigningString is the exact text the Mini App server signs. It covers the
-// init data too, so a captured request cannot be replayed for another user.
-func P2PSigningString(method, path, rawQuery, timestamp, nonce, initData string, body []byte) string {
+// user credential (init data or ID token) too, so a captured request cannot be
+// reused for another user.
+func P2PSigningString(method, path, rawQuery, timestamp, nonce, credential string, body []byte) string {
 	bodySum := sha256.Sum256(body)
-	initSum := sha256.Sum256([]byte(initData))
+	credSum := sha256.Sum256([]byte(credential))
 	return strings.Join([]string{
 		p2pSigVersion, method, path, rawQuery, timestamp, nonce,
-		hex.EncodeToString(initSum[:]), hex.EncodeToString(bodySum[:]),
+		hex.EncodeToString(credSum[:]), hex.EncodeToString(bodySum[:]),
 	}, "\n")
 }
 
@@ -71,7 +72,7 @@ func verifyP2PServiceSig(w http.ResponseWriter, r *http.Request, key ed25519.Pub
 	}
 	r.Body = io.NopCloser(bytes.NewReader(body))
 
-	msg := P2PSigningString(r.Method, r.URL.Path, r.URL.RawQuery, tsStr, nonce, r.Header.Get(InitDataHeader), body)
+	msg := P2PSigningString(r.Method, r.URL.Path, r.URL.RawQuery, tsStr, nonce, p2pCredential(r), body)
 	if !ed25519.Verify(key, []byte(msg), sig) {
 		return fmt.Errorf("signature check failed")
 	}
@@ -79,4 +80,13 @@ func verifyP2PServiceSig(w http.ResponseWriter, r *http.Request, key ed25519.Pub
 		return fmt.Errorf("replayed nonce")
 	}
 	return nil
+}
+
+// p2pCredential is the user credential the request carries: the Mini App init
+// data, or else the web app's ID token.
+func p2pCredential(r *http.Request) string {
+	if v := r.Header.Get(InitDataHeader); v != "" {
+		return v
+	}
+	return r.Header.Get(IDTokenHeader)
 }

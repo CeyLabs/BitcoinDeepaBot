@@ -17,6 +17,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/netutil"
 	"github.com/LightningTipBot/LightningTipBot/internal/storage"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
+	"github.com/LightningTipBot/LightningTipBot/internal/tgoidc"
 	"github.com/LightningTipBot/LightningTipBot/internal/tma"
 )
 
@@ -240,4 +241,107 @@ func contains(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+// withTestOIDC turns on Telegram login with a test signing key served as a
+// JWKS, and returns that key.
+func withTestOIDC(t *testing.T) ed25519.PrivateKey {
+	t.Helper()
+	_, priv, _ := ed25519.GenerateKey(nil)
+	jwks, _ := json.Marshal(map[string]interface{}{"keys": []map[string]string{{
+		"kty": "OKP", "crv": "Ed25519", "kid": "k1",
+		"x": base64.RawURLEncoding.EncodeToString(priv.Public().(ed25519.PublicKey)),
+	}}})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write(jwks) }))
+	saved := tgoidc.Default
+	tgoidc.Default = &tgoidc.KeySet{URL: srv.URL, Client: srv.Client()}
+	t.Cleanup(func() { tgoidc.Default = saved; srv.Close() })
+	internal.Configuration.API.P2P.OIDCEnabled = true
+	internal.Configuration.API.P2P.OIDCClientID = "123"
+	return priv
+}
+
+func testIDToken(priv ed25519.PrivateKey, userID int64, issued time.Time) string {
+	enc := base64.RawURLEncoding.EncodeToString
+	h, _ := json.Marshal(map[string]string{"alg": "EdDSA", "kid": "k1"})
+	c, _ := json.Marshal(map[string]interface{}{
+		"iss": tgoidc.Issuer, "aud": "123", "iat": issued.Unix(), "exp": issued.Add(time.Hour).Unix(),
+		"id": userID, "preferred_username": "alice",
+	})
+	input := enc(h) + "." + enc(c)
+	return input + "." + enc(ed25519.Sign(priv, []byte(input)))
+}
+
+// p2pTokenRequest is a service-signed request carrying an ID token.
+func p2pTokenRequest(path, token string, key ed25519.PrivateKey) *http.Request {
+	r := httptest.NewRequest(http.MethodPost, path, strings.NewReader("{}"))
+	r.Header.Set(IDTokenHeader, token)
+	ts := strconv.FormatInt(time.Now().Unix(), 10)
+	nonce := p2pNonce()
+	msg := P2PSigningString(http.MethodPost, path, "", ts, nonce, token, []byte("{}"))
+	r.Header.Set("X-Timestamp", ts)
+	r.Header.Set("X-Nonce", nonce)
+	r.Header.Set("X-Signature", base64.StdEncoding.EncodeToString(ed25519.Sign(key, []byte(msg))))
+	return r
+}
+
+func TestP2PIdentifyWithIDToken(t *testing.T) {
+	withP2PConfig(t)
+	priv := withTestOIDC(t)
+	cfg := internal.Configuration.API.P2P
+	now := time.Now()
+
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/p2p/me", nil)
+	r.Header.Set(IDTokenHeader, testIDToken(priv, 987654321, now.Add(-time.Minute)))
+	if id, ok := p2pIdentify(httptest.NewRecorder(), r, cfg, 10*time.Minute, now); !ok || id != 987654321 {
+		t.Fatalf("valid token: id %d ok %v", id, ok)
+	}
+
+	cases := map[string]func(r *http.Request){
+		"login too old for spends": func(r *http.Request) {
+			r.Header.Set(IDTokenHeader, testIDToken(priv, 987654321, now.Add(-20*time.Minute)))
+		},
+		"both credentials": func(r *http.Request) {
+			r.Header.Set(IDTokenHeader, testIDToken(priv, 987654321, now))
+			r.Header.Set(InitDataHeader, tma.Sign(tma.User{ID: 42}, "123:REAL", now, nil))
+		},
+		"forged token": func(r *http.Request) {
+			_, other, _ := ed25519.GenerateKey(nil)
+			r.Header.Set(IDTokenHeader, testIDToken(other, 987654321, now))
+		},
+	}
+	for name, set := range cases {
+		r := httptest.NewRequest(http.MethodGet, "/api/v1/p2p/me", nil)
+		set(r)
+		rec := httptest.NewRecorder()
+		if _, ok := p2pIdentify(rec, r, cfg, 10*time.Minute, now); ok || rec.Code != http.StatusUnauthorized {
+			t.Errorf("%s: ok=%v code=%d, want 401", name, ok, rec.Code)
+		}
+	}
+
+	cfg.OIDCEnabled = false
+	r = httptest.NewRequest(http.MethodGet, "/api/v1/p2p/me", nil)
+	r.Header.Set(IDTokenHeader, testIDToken(priv, 987654321, now))
+	if _, ok := p2pIdentify(httptest.NewRecorder(), r, cfg, 10*time.Minute, now); ok {
+		t.Error("ID token accepted with Telegram login turned off")
+	}
+}
+
+func TestP2PAuthSpendWithIDToken(t *testing.T) {
+	withP2PConfig(t)
+	priv := withTestOIDC(t)
+
+	// A login older than spend_init_data_max_age can't send.
+	old := testIDToken(priv, 987654321, time.Now().Add(-20*time.Minute))
+	if code, errCode, reached := serveP2PAuth(p2pTokenRequest("/api/v1/p2p/send", old, testServiceKey), true); code != http.StatusUnauthorized || errCode != "unauthorized" || reached {
+		t.Fatalf("old login: got %d %q reached=%v", code, errCode, reached)
+	}
+
+	// The service signature covers the ID token: swapping in another
+	// user's token breaks it.
+	r := p2pTokenRequest("/api/v1/p2p/send", testIDToken(priv, 1, time.Now()), testServiceKey)
+	r.Header.Set(IDTokenHeader, testIDToken(priv, 2, time.Now()))
+	if code, errCode, _ := serveP2PAuth(r, true); code != http.StatusUnauthorized || errCode != "bad_service_signature" {
+		t.Fatalf("swapped token: got %d %q, want 401 bad_service_signature", code, errCode)
+	}
 }
