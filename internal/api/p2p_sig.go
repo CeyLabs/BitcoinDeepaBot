@@ -26,6 +26,9 @@ import (
 //	X-Signature:  base64 Ed25519 signature of P2PSigningString(...)
 const (
 	p2pSigVersion  = "BDB-P2P-ED25519-V1"
+	// p2pSigVersionV2 signs the user ID from UserHeader instead of a
+	// Telegram credential.
+	p2pSigVersionV2 = "BDB-P2P-ED25519-V2"
 	p2pMaxBodySize = 16 << 10
 	p2pSigMaxSkew  = 300 // seconds
 )
@@ -41,6 +44,19 @@ func P2PSigningString(method, path, rawQuery, timestamp, nonce, credential strin
 	return strings.Join([]string{
 		p2pSigVersion, method, path, rawQuery, timestamp, nonce,
 		hex.EncodeToString(credSum[:]), hex.EncodeToString(bodySum[:]),
+	}, "\n")
+}
+
+// UserHeader names the user on V2 calls: the DCA backend's own session says
+// who the user is, and no Telegram credential is sent.
+const UserHeader = "X-BDB-User"
+
+// P2PSigningStringV2 is the text the DCA backend signs on V2 calls. The user
+// ID is signed as sent in UserHeader.
+func P2PSigningStringV2(method, path, rawQuery, timestamp, nonce, userID string, body []byte) string {
+	bodySum := sha256.Sum256(body)
+	return strings.Join([]string{
+		p2pSigVersionV2, method, path, rawQuery, timestamp, nonce, userID, hex.EncodeToString(bodySum[:]),
 	}, "\n")
 }
 
@@ -88,6 +104,9 @@ func verifyP2PServiceSig(w http.ResponseWriter, r *http.Request, key ed25519.Pub
 	// The path is signed exactly as sent (still percent-encoded), the same
 	// rule as the query string.
 	msg := P2PSigningString(r.Method, r.URL.EscapedPath(), r.URL.RawQuery, tsStr, nonce, p2pCredential(r), body)
+	if len(r.Header.Values(UserHeader)) > 0 {
+		msg = P2PSigningStringV2(r.Method, r.URL.EscapedPath(), r.URL.RawQuery, tsStr, nonce, r.Header.Get(UserHeader), body)
+	}
 	if !ed25519.Verify(key, []byte(msg), sig) {
 		return fmt.Errorf("signature check failed")
 	}

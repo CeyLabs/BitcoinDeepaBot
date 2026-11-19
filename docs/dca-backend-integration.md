@@ -334,6 +334,19 @@ export async function bdbP2P(method: "GET" | "POST", path: string, cred: { initD
 }
 ```
 
+**Without a Telegram credential on each call (V2).** When the bot has `api.p2p.service_user_auth: true`, DCA BE can keep its own session and name the user instead:
+
+1. On login, call `POST /api/v1/init` **with** the user's `initData` / `id_token` (V1). That links the user.
+2. After that, send `X-BDB-User: <telegram_id>` and no Telegram header, signed with version `BDB-P2P-ED25519-V2`. The seventh line is the user ID as sent, not a hash.
+
+```ts
+const msg = ["BDB-P2P-ED25519-V2", method, path, "", ts, nonce, String(telegramId), sha256hex(raw)].join("\n");
+// headers: { "X-BDB-User": String(telegramId), "X-Timestamp": ts, "X-Nonce": nonce, "X-Signature": sig }
+```
+
+- A user who never went through `/api/v1/init` gets `403 login_required`.
+- Keep the P2P key safe. With V2 it can pay from any linked user's wallet (up to `daily_limit`) until passkeys exist.
+
 ### 5.3 Endpoints
 
 | Endpoint | Purpose |

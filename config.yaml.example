@@ -100,6 +100,11 @@ api:
     # request the "openid profile" scopes.
     oidc_enabled: false
     # oidc_client_id: ""  # bot ID the web app logs in with; empty = this bot
+    # Let the DCA backend name the user with X-BDB-User (signature V2) instead of
+    # sending a Telegram credential on every call. Only users linked by a
+    # Telegram-verified POST /api/v1/init. Until passkeys exist, the P2P key can
+    # then pay from linked users' wallets (up to daily_limit). See docs/p2p-api.md.
+    service_user_auth: false
   # Analytics API - data export endpoints, authenticated with Ed25519
   # signatures (see docs/send-api-ed25519.md). Each consumer keeps its
   # private key; only the public key goes here.

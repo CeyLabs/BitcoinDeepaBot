@@ -645,6 +645,12 @@ type APIP2PConfiguration struct {
 	// OIDCClientID is the ID token audience: the bot ID the web app logs in
 	// with. Empty means this bot's ID (the number before ":" in its token).
 	OIDCClientID string `yaml:"oidc_client_id"`
+	// ServiceUserAuth lets the DCA backend name the user with X-BDB-User
+	// (P2P signature V2) instead of sending a Telegram credential on every
+	// call. Only users linked by a Telegram-verified call (POST /api/v1/init)
+	// can be named. Until passkeys exist, this trusts the DCA backend to
+	// move sats for linked users.
+	ServiceUserAuth bool `yaml:"service_user_auth"`
 }
 
 // DecodeKeyBase64 decodes standard or URL-safe base64, padded or not.
@@ -725,5 +731,8 @@ func setAPIP2PDefaults(c *APIP2PConfiguration) {
 	}
 	if c.Enabled {
 		log.Infof("P2P API enabled: max %d sat per transfer, %d sat per day", c.MaxAmount, c.DailyLimit)
+		if c.ServiceUserAuth {
+			log.Warnf("P2P API: service_user_auth is on: the DCA backend can act for linked users (X-BDB-User) without a Telegram credential")
+		}
 	}
 }
