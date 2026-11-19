@@ -191,6 +191,12 @@ type LnbitsConfiguration struct {
 type APIConfiguration struct {
 	Send      APISendConfiguration      `yaml:"send"`
 	Analytics APIAnalyticsConfiguration `yaml:"analytics"`
+	// AllowedNetworks, when set, limits every /api/v1/ endpoint to these IPs
+	// or CIDRs: the send API, analytics and the per-user wallet API. Empty
+	// means no restriction. The client address is resolved through
+	// bot.trusted_proxies.
+	AllowedNetworks []string     `yaml:"allowed_networks"`
+	AllowedNets     []*net.IPNet `yaml:"-"`
 }
 
 type APIAnalyticsConfiguration struct {
@@ -276,6 +282,20 @@ func init() {
 		panic(fmt.Errorf("bot.trusted_proxies: %w", err))
 	}
 	checkLnbitsConfiguration()
+	// An unreadable allowlist must stop the bot rather than leave the API open.
+	// Parsed before setAPISendDefaults, which logs it.
+	Configuration.API.AllowedNets, err = netutil.ParseNetworks(Configuration.API.AllowedNetworks)
+	if err != nil {
+		panic(fmt.Errorf("api.allowed_networks: %w", err))
+	}
+	// Entries that are all blank (e.g. an unset env var) parse to nothing,
+	// which would mean "no restriction". Treat that as a config error.
+	if len(Configuration.API.AllowedNetworks) > 0 && len(Configuration.API.AllowedNets) == 0 {
+		panic(fmt.Errorf("api.allowed_networks: all %d entries are blank", len(Configuration.API.AllowedNetworks)))
+	}
+	if len(Configuration.API.AllowedNets) > 0 {
+		log.Infof("/api/v1/ restricted to: %s", strings.Join(Configuration.API.AllowedNetworks, ", "))
+	}
 	setAPISendDefaults()
 	setAPIAnalyticsDefaults()
 }
@@ -428,9 +448,18 @@ func setAPISendDefaults() {
 
 	// Log API Send configuration status
 	if Configuration.API.Send.Enabled {
-		network := "any (HMAC only)"
+		// Both lists apply: a caller must be in api.allowed_networks and in
+		// api.send.allowed_networks.
+		var limits []string
+		if len(Configuration.API.AllowedNetworks) > 0 {
+			limits = append(limits, "api: "+strings.Join(Configuration.API.AllowedNetworks, ", "))
+		}
 		if len(Configuration.API.Send.AllowedNetworks) > 0 {
-			network = strings.Join(Configuration.API.Send.AllowedNetworks, ", ")
+			limits = append(limits, "send: "+strings.Join(Configuration.API.Send.AllowedNetworks, ", "))
+		}
+		network := "any (HMAC only)"
+		if len(limits) > 0 {
+			network = strings.Join(limits, " AND ")
 		}
 		log.Infof("API Send module enabled with %d whitelisted wallets, networks: %s",
 			len(Configuration.API.Send.WhitelistedWallets), network)
