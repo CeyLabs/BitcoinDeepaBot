@@ -1,11 +1,14 @@
 package internal
 
 import (
+	"crypto/ed25519"
 	"crypto/subtle"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -191,6 +194,13 @@ type LnbitsConfiguration struct {
 type APIConfiguration struct {
 	Send      APISendConfiguration      `yaml:"send"`
 	Analytics APIAnalyticsConfiguration `yaml:"analytics"`
+	P2P       APIP2PConfiguration       `yaml:"p2p"`
+	// AllowedNetworks, when set, limits every /api/v1/ endpoint to these IPs
+	// or CIDRs: the send API, analytics, P2P and the per-user wallet API. Empty
+	// means no restriction. The client address is resolved through
+	// bot.trusted_proxies.
+	AllowedNetworks []string     `yaml:"allowed_networks"`
+	AllowedNets     []*net.IPNet `yaml:"-"`
 }
 
 type APIAnalyticsConfiguration struct {
@@ -200,8 +210,14 @@ type APIAnalyticsConfiguration struct {
 }
 
 type AnalyticsAPIKey struct {
-	Name       string `yaml:"name"`        // Descriptive name (e.g. "data-team")
-	HMACSecret string `yaml:"hmac_secret"` // HMAC secret for this key
+	Name string `yaml:"name"` // Descriptive name (e.g. "data-team")
+	// Ed25519PublicKey is the base64 32-byte public key this consumer signs
+	// with. The bot never sees the private key.
+	Ed25519PublicKey string            `yaml:"ed25519_public_key"`
+	PublicKey        ed25519.PublicKey `yaml:"-"`
+	// HMACSecret is no longer supported. It is read only so that a leftover
+	// value disables the analytics API instead of being silently ignored.
+	HMACSecret string `yaml:"hmac_secret"`
 }
 
 type APISendConfiguration struct {
@@ -209,7 +225,7 @@ type APISendConfiguration struct {
 	// InternalNetwork is deprecated and was never enforced. Use AllowedNetworks.
 	InternalNetwork string `yaml:"internal_network"`
 	// AllowedNetworks, when set, limits the send API to these CIDRs or IPs.
-	// Empty means no network restriction (HMAC still applies).
+	// Empty means no network restriction (signatures still apply).
 	AllowedNetworks        []string                     `yaml:"allowed_networks"`
 	AllowedNets            []*net.IPNet                 `yaml:"-"`
 	MaxAmount              int64                        `yaml:"max_amount"`
@@ -224,9 +240,28 @@ type APISendConfiguration struct {
 
 type WhitelistedWallet struct {
 	Username               string `yaml:"username"`                 // Telegram username without @
-	HMACSecret             string `yaml:"hmac_secret"`              // Unique HMAC secret for this wallet
 	AdminApprovalThreshold int64  `yaml:"admin_approval_threshold"` // 0 = use global
 	MaxAmount              int64  `yaml:"max_amount"`               // 0 = use global
+	// Ed25519PublicKey is the base64 32-byte public key the wallet signs with.
+	// The bot never sees the private key, so a config leak cannot forge sends.
+	Ed25519PublicKey string            `yaml:"ed25519_public_key"`
+	PublicKey        ed25519.PublicKey `yaml:"-"`
+	// HMACSecret is no longer supported. It is read only so that a leftover
+	// value stops the send API instead of being silently ignored.
+	HMACSecret string `yaml:"hmac_secret"`
+}
+
+// DecodeBase64Any decodes standard or URL-safe base64, padded or not.
+func DecodeBase64Any(s string) ([]byte, error) {
+	s = strings.TrimSpace(s)
+	var err error
+	for _, enc := range []*base64.Encoding{base64.StdEncoding, base64.RawStdEncoding, base64.URLEncoding, base64.RawURLEncoding} {
+		var b []byte
+		if b, err = enc.DecodeString(s); err == nil {
+			return b, nil
+		}
+	}
+	return nil, err
 }
 
 func init() {
@@ -276,8 +311,23 @@ func init() {
 		panic(fmt.Errorf("bot.trusted_proxies: %w", err))
 	}
 	checkLnbitsConfiguration()
+	// An unreadable allowlist must stop the bot rather than leave the API open.
+	// Parsed before setAPISendDefaults, which logs it.
+	Configuration.API.AllowedNets, err = netutil.ParseNetworks(Configuration.API.AllowedNetworks)
+	if err != nil {
+		panic(fmt.Errorf("api.allowed_networks: %w", err))
+	}
+	// Entries that are all blank (e.g. an unset env var) parse to nothing,
+	// which would mean "no restriction". Treat that as a config error.
+	if len(Configuration.API.AllowedNetworks) > 0 && len(Configuration.API.AllowedNets) == 0 {
+		panic(fmt.Errorf("api.allowed_networks: all %d entries are blank", len(Configuration.API.AllowedNetworks)))
+	}
+	if len(Configuration.API.AllowedNets) > 0 {
+		log.Infof("/api/v1/ restricted to: %s", strings.Join(Configuration.API.AllowedNetworks, ", "))
+	}
 	setAPISendDefaults()
 	setAPIAnalyticsDefaults()
+	setAPIP2PDefaults(&Configuration.API.P2P)
 }
 
 // WebhookSecretParam is the query parameter that carries the webhook secret.
@@ -428,9 +478,18 @@ func setAPISendDefaults() {
 
 	// Log API Send configuration status
 	if Configuration.API.Send.Enabled {
-		network := "any (HMAC only)"
+		// Both lists apply: a caller must be in api.allowed_networks and in
+		// api.send.allowed_networks.
+		var limits []string
+		if len(Configuration.API.AllowedNetworks) > 0 {
+			limits = append(limits, "api: "+strings.Join(Configuration.API.AllowedNetworks, ", "))
+		}
 		if len(Configuration.API.Send.AllowedNetworks) > 0 {
-			network = strings.Join(Configuration.API.Send.AllowedNetworks, ", ")
+			limits = append(limits, "send: "+strings.Join(Configuration.API.Send.AllowedNetworks, ", "))
+		}
+		network := "any (signature only)"
+		if len(limits) > 0 {
+			network = strings.Join(limits, " AND ")
 		}
 		log.Infof("API Send module enabled with %d whitelisted wallets, networks: %s",
 			len(Configuration.API.Send.WhitelistedWallets), network)
@@ -447,12 +506,18 @@ func validateAPISend(cfg *APISendConfiguration) error {
 		return fmt.Errorf("no whitelisted_wallets configured")
 	}
 	for id, w := range cfg.WhitelistedWallets {
-		if WeakHMACSecret(w.HMACSecret) {
-			return fmt.Errorf("whitelisted wallet %q has an insecure hmac_secret (placeholder or shorter than 32 characters); generate one with: openssl rand -hex 32", id)
+		if w.HMACSecret != "" {
+			return fmt.Errorf("whitelisted wallet %q has hmac_secret, which is no longer supported; remove it and set ed25519_public_key (see docs/send-api-ed25519.md)", id)
 		}
+		key, err := DecodeBase64Any(w.Ed25519PublicKey)
+		if w.Ed25519PublicKey == "" || err != nil || len(key) != ed25519.PublicKeySize {
+			return fmt.Errorf("whitelisted wallet %q needs a valid ed25519_public_key (base64 of 32 bytes; see docs/send-api-ed25519.md)", id)
+		}
+		w.PublicKey = ed25519.PublicKey(key)
 		if strings.TrimSpace(w.Username) == "" {
 			return fmt.Errorf("whitelisted wallet %q has no username", id)
 		}
+		cfg.WhitelistedWallets[id] = w
 	}
 	nets, err := netutil.ParseNetworks(cfg.AllowedNetworks)
 	if err != nil {
@@ -516,26 +581,147 @@ func setAPIAnalyticsDefaults() {
 		Configuration.API.Analytics.TimestampTolerance = 300 // 5 minutes
 	}
 
-	if len(Configuration.API.Analytics.APIKeys) == 0 {
-		log.Errorf("Analytics API enabled but no API keys configured. Disabling analytics API.")
+	if err := validateAPIAnalytics(&Configuration.API.Analytics); err != nil {
+		log.Errorf("Disabling analytics API: %v", err)
 		Configuration.API.Analytics.Enabled = false
 		return
-	}
-
-	// Reject placeholder/insecure secrets
-	for keyID, apiKey := range Configuration.API.Analytics.APIKeys {
-		if WeakHMACSecret(apiKey.HMACSecret) {
-			log.Errorf("Analytics API key '%s' has an insecure HMAC secret (placeholder or too short). "+
-				"Generate a secure secret with: openssl rand -hex 32. Disabling analytics API.", keyID)
-			Configuration.API.Analytics.Enabled = false
-			return
-		}
 	}
 
 	log.Infof("Analytics API enabled with %d API keys", len(Configuration.API.Analytics.APIKeys))
 }
 
+// validateAPIAnalytics checks every analytics key and parses its public key.
+func validateAPIAnalytics(cfg *APIAnalyticsConfiguration) error {
+	if len(cfg.APIKeys) == 0 {
+		return fmt.Errorf("no api_keys configured")
+	}
+	for id, k := range cfg.APIKeys {
+		if k.HMACSecret != "" {
+			return fmt.Errorf("api key %q has hmac_secret, which is no longer supported; remove it and set ed25519_public_key (see docs/send-api-ed25519.md)", id)
+		}
+		key, err := DecodeBase64Any(k.Ed25519PublicKey)
+		if k.Ed25519PublicKey == "" || err != nil || len(key) != ed25519.PublicKeySize {
+			return fmt.Errorf("api key %q needs a valid ed25519_public_key (base64 of 32 bytes)", id)
+		}
+		k.PublicKey = ed25519.PublicKey(key)
+		cfg.APIKeys[id] = k
+	}
+	return nil
+}
+
 // IsAPIAnalyticsEnabled returns whether the Analytics API is enabled
 func IsAPIAnalyticsEnabled() bool {
 	return Configuration.API.Analytics.Enabled
+}
+
+// APIP2PConfiguration configures sending from the Telegram Mini App
+// (/api/v1/p2p/*). The sender is always the Telegram user in the Mini App's
+// signed init data. Amounts are in sats.
+type APIP2PConfiguration struct {
+	Enabled            bool  `yaml:"enabled"`
+	MaxAmount          int64 `yaml:"max_amount"`            // per transfer
+	DailyLimit         int64 `yaml:"daily_limit"`           // per sender, per UTC day
+	ConfirmThreshold   int64 `yaml:"confirm_threshold"`     // above this, the sender confirms in the bot chat
+	RateLimitPerMinute int   `yaml:"rate_limit_per_minute"` // sends and invoice payments per sender
+	InitDataMaxAge     int64 `yaml:"init_data_max_age"`     // seconds
+	// SpendInitDataMaxAge is a shorter init data age for /send and
+	// /invoice/pay, so leaked init data can't move sats for long.
+	SpendInitDataMaxAge int64 `yaml:"spend_init_data_max_age"` // seconds
+	MaxMemoLength       int   `yaml:"max_memo_length"`
+	// ServicePublicKey is the base64 Ed25519 public key of the Mini App
+	// server. Every P2P call must be signed with its private key. Required.
+	ServicePublicKey string            `yaml:"service_public_key"`
+	ServiceKey       ed25519.PublicKey `yaml:"-"`
+	// AllowedNetworks limits /api/v1/p2p/* to these IPs or CIDRs (the Mini
+	// App server). Empty means any IP; the service signature still applies.
+	// The client address is resolved through bot.trusted_proxies.
+	AllowedNetworks []string     `yaml:"allowed_networks"`
+	AllowedNets     []*net.IPNet `yaml:"-"`
+	// OIDCEnabled lets the web app identify the user with a "Log In with
+	// Telegram" ID token (X-Telegram-ID-Token) instead of Mini App init
+	// data. init_data_max_age and spend_init_data_max_age apply to the
+	// login time of the token too.
+	OIDCEnabled bool `yaml:"oidc_enabled"`
+	// OIDCClientID is the ID token audience: the bot ID the web app logs in
+	// with. Empty means this bot's ID (the number before ":" in its token).
+	OIDCClientID string `yaml:"oidc_client_id"`
+}
+
+// DecodeKeyBase64 decodes standard or URL-safe base64, padded or not.
+func DecodeKeyBase64(s string) ([]byte, error) {
+	s = strings.TrimSpace(s)
+	var err error
+	for _, enc := range []*base64.Encoding{base64.StdEncoding, base64.RawStdEncoding, base64.URLEncoding, base64.RawURLEncoding} {
+		var b []byte
+		if b, err = enc.DecodeString(s); err == nil {
+			return b, nil
+		}
+	}
+	return nil, err
+}
+
+func setAPIP2PDefaults(c *APIP2PConfiguration) {
+	if c.MaxAmount <= 0 {
+		c.MaxAmount = 100000
+	}
+	if c.DailyLimit <= 0 {
+		c.DailyLimit = 500000
+	}
+	if c.ConfirmThreshold <= 0 {
+		c.ConfirmThreshold = 50000
+	}
+	if c.RateLimitPerMinute <= 0 {
+		c.RateLimitPerMinute = 10
+	}
+	if c.InitDataMaxAge <= 0 {
+		c.InitDataMaxAge = 3600
+	}
+	if c.MaxMemoLength <= 0 {
+		c.MaxMemoLength = 280
+	}
+	if c.SpendInitDataMaxAge <= 0 {
+		c.SpendInitDataMaxAge = 600
+	}
+	if c.SpendInitDataMaxAge > c.InitDataMaxAge {
+		c.SpendInitDataMaxAge = c.InitDataMaxAge
+	}
+	if c.Enabled {
+		key, err := DecodeKeyBase64(c.ServicePublicKey)
+		if c.ServicePublicKey == "" || err != nil || len(key) != ed25519.PublicKeySize {
+			log.Errorf("Disabling P2P API: api.p2p.service_public_key must be a base64 Ed25519 public key (see docs/p2p-api.md)")
+			c.Enabled = false
+			return
+		}
+		c.ServiceKey = ed25519.PublicKey(key)
+		nets, err := netutil.ParseNetworks(c.AllowedNetworks)
+		if err != nil {
+			log.Errorf("Disabling P2P API: api.p2p.allowed_networks: %v", err)
+			c.Enabled = false
+			return
+		}
+		// Entries that are all blank (e.g. an unset env var) would mean "any IP".
+		if len(c.AllowedNetworks) > 0 && len(nets) == 0 {
+			log.Errorf("Disabling P2P API: api.p2p.allowed_networks has only blank entries")
+			c.Enabled = false
+			return
+		}
+		c.AllowedNets = nets
+		if len(nets) == 0 {
+			log.Warnf("P2P API: api.p2p.allowed_networks is empty, so any IP can call it (the service signature still applies)")
+		}
+		if c.OIDCEnabled {
+			if c.OIDCClientID == "" {
+				c.OIDCClientID, _, _ = strings.Cut(Configuration.Telegram.ApiKey, ":")
+			}
+			if _, err := strconv.ParseInt(c.OIDCClientID, 10, 64); err != nil {
+				log.Errorf("P2P API: Telegram login turned off: api.p2p.oidc_client_id must be the numeric bot ID")
+				c.OIDCEnabled = false
+			} else {
+				log.Infof("P2P API: Telegram login (web app) enabled for bot %s", c.OIDCClientID)
+			}
+		}
+	}
+	if c.Enabled {
+		log.Infof("P2P API enabled: max %d sat per transfer, %d sat per day, confirm above %d sat", c.MaxAmount, c.DailyLimit, c.ConfirmThreshold)
+	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net"
 	"net/http"
 	"runtime/debug"
 	"strings"
@@ -82,6 +83,8 @@ func startApiServer(bot *telegram.TipBot) {
 	webhook.NewServer(bot)
 	// start external api server
 	s := api.NewServer(internal.Configuration.Bot.LNURLServerUrl.Host)
+	// api.allowed_networks applies to every /api/v1/ route on this server.
+	s.Use(api.PathAllowlistMiddleware("/api/v1/", func() []*net.IPNet { return internal.Configuration.API.AllowedNets }))
 
 	s.AppendRoute("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -119,42 +122,56 @@ func startApiServer(bot *telegram.TipBot) {
 	s.AppendAuthorizedRoute(`/api/v1/createinvoice`, api.AuthTypeBasic, api.AccessKeyTypeInvoice, bot.DB.Users, apiService.CreateInvoice, http.MethodPost)
 	s.AppendAuthorizedRoute(`/api/v1/balance`, api.AuthTypeBasic, api.AccessKeyTypeInvoice, bot.DB.Users, apiService.Balance, http.MethodGet)
 
-	// Analytics API endpoints (HMAC authenticated)
+	// Analytics API endpoints (Ed25519 signed)
 	if internal.IsAPIAnalyticsEnabled() {
-		s.AppendRoute(`/api/v1/analytics/transactions`, api.AnalyticsHMACMiddleware(apiService.GetTransactionAnalytics), http.MethodGet)
-		s.AppendRoute(`/api/v1/analytics/user/{user_id}/transactions`, api.AnalyticsHMACMiddleware(apiService.GetUserTransactionHistory), http.MethodGet)
-		log.Infof("Analytics API endpoints registered with HMAC security")
+		s.AppendRoute(`/api/v1/analytics/transactions`, api.AnalyticsAuthMiddleware(apiService.GetTransactionAnalytics), http.MethodGet)
+		s.AppendRoute(`/api/v1/analytics/user/{user_id}/transactions`, api.AnalyticsAuthMiddleware(apiService.GetUserTransactionHistory), http.MethodGet)
+		log.Infof("Analytics API endpoints registered with Ed25519 signatures")
 	} else {
 		log.Infof("Analytics API endpoints disabled in configuration")
 	}
 
-	// Bot pay HTTP API module with wallet-based HMAC security (only if enabled)
+	// Bot pay HTTP API module with wallet Ed25519 signatures (only if enabled)
 	if internal.IsAPISendEnabled() {
-		s.AppendRoute(`/api/v1/send`, api.NetworkAllowlistMiddleware(api.WalletHMACMiddleware(apiService.Send)), http.MethodPost)
-		log.Infof("API Send endpoint registered at /api/v1/send with wallet-based HMAC security")
+		s.AppendRoute(`/api/v1/send`, api.NetworkAllowlistMiddleware(api.WalletAuthMiddleware(apiService.Send)), http.MethodPost)
+		log.Infof("API Send endpoint registered at /api/v1/send with wallet Ed25519 signatures")
 
-		// User balance endpoint with wallet-based HMAC security
-		s.AppendRoute(`/api/v1/userbalance`, api.NetworkAllowlistMiddleware(api.WalletHMACMiddleware(apiService.UserBalance)), http.MethodPost)
-		log.Infof("API UserBalance endpoint registered at /api/v1/userbalance with wallet-based HMAC security")
+		// User balance endpoint with wallet Ed25519 signatures
+		s.AppendRoute(`/api/v1/userbalance`, api.NetworkAllowlistMiddleware(api.WalletAuthMiddleware(apiService.UserBalance)), http.MethodPost)
+		log.Infof("API UserBalance endpoint registered at /api/v1/userbalance with wallet Ed25519 signatures")
 
-		// User transactions endpoint with wallet-based HMAC security
-		s.AppendRoute(`/api/v1/usertransactions`, api.NetworkAllowlistMiddleware(api.WalletHMACMiddleware(apiService.UserTransactions)), http.MethodPost)
-		log.Infof("API UserTransactions endpoint registered at /api/v1/usertransactions with wallet-based HMAC security")
+		// User transactions endpoint with wallet Ed25519 signatures
+		s.AppendRoute(`/api/v1/usertransactions`, api.NetworkAllowlistMiddleware(api.WalletAuthMiddleware(apiService.UserTransactions)), http.MethodPost)
+		log.Infof("API UserTransactions endpoint registered at /api/v1/usertransactions with wallet Ed25519 signatures")
 
-		// Referral lookup endpoint with wallet-based HMAC security
-		s.AppendRoute(`/api/v1/referral/lookup`, api.NetworkAllowlistMiddleware(api.WalletHMACMiddleware(apiService.ReferralLookup)), http.MethodGet)
-		log.Infof("API ReferralLookup endpoint registered at /api/v1/referral/lookup with wallet-based HMAC security")
+		// Referral lookup endpoint with wallet Ed25519 signatures
+		s.AppendRoute(`/api/v1/referral/lookup`, api.NetworkAllowlistMiddleware(api.WalletAuthMiddleware(apiService.ReferralLookup)), http.MethodGet)
+		log.Infof("API ReferralLookup endpoint registered at /api/v1/referral/lookup with wallet Ed25519 signatures")
 
 		// Send status endpoint — check approval status of a pending transaction
-		s.AppendRoute(`/api/v1/send/status/{transaction_id}`, api.NetworkAllowlistMiddleware(api.WalletHMACMiddleware(apiService.SendStatus)), http.MethodGet)
-		log.Infof("API SendStatus endpoint registered at /api/v1/send/status/{transaction_id} with wallet-based HMAC security")
+		s.AppendRoute(`/api/v1/send/status/{transaction_id}`, api.NetworkAllowlistMiddleware(api.WalletAuthMiddleware(apiService.SendStatus)), http.MethodGet)
+		log.Infof("API SendStatus endpoint registered at /api/v1/send/status/{transaction_id} with wallet Ed25519 signatures")
 
 		// Payment settlement endpoint — resolve an invoice payment left in flight
-		s.AppendRoute(`/api/v1/send/payment/{payment_hash}`, api.NetworkAllowlistMiddleware(api.WalletHMACMiddleware(apiService.SendPaymentStatus)), http.MethodGet)
-		log.Infof("API SendPaymentStatus endpoint registered at /api/v1/send/payment/{payment_hash} with wallet-based HMAC security")
+		s.AppendRoute(`/api/v1/send/payment/{payment_hash}`, api.NetworkAllowlistMiddleware(api.WalletAuthMiddleware(apiService.SendPaymentStatus)), http.MethodGet)
+		log.Infof("API SendPaymentStatus endpoint registered at /api/v1/send/payment/{payment_hash} with wallet Ed25519 signatures")
 	} else {
 		log.Infof("API Send endpoint disabled in configuration")
 	}
+
+	// Telegram Mini App sending. The sender is the user in the signed init data.
+	if internal.Configuration.API.P2P.Enabled {
+		p2p := api.NewP2PService(bot)
+		s.AppendRoute(`/api/v1/p2p/me`, p2p.Auth(p2p.Me), http.MethodGet)
+		s.AppendRoute(`/api/v1/p2p/resolve`, p2p.Auth(p2p.Resolve), http.MethodPost)
+		s.AppendRoute(`/api/v1/p2p/send`, p2p.AuthSpend(p2p.Send), http.MethodPost)
+		s.AppendRoute(`/api/v1/p2p/invoice/decode`, p2p.Auth(p2p.DecodeInvoice), http.MethodPost)
+		s.AppendRoute(`/api/v1/p2p/invoice/pay`, p2p.AuthSpend(p2p.PayInvoice), http.MethodPost)
+		s.AppendRoute(`/api/v1/p2p/transfers/{id}`, p2p.Auth(p2p.Transfer), http.MethodGet)
+		log.Infof("P2P API endpoints registered at /api/v1/p2p/*")
+	}
+	// Start serving only after every middleware and route is added.
+	s.ListenAndServe()
 
 	// start internal admin server
 	adminHost, adminToken := internal.Configuration.Bot.AdminAPIHost, internal.Configuration.Bot.AdminAPIToken
@@ -175,6 +192,7 @@ func startApiServer(bot *telegram.TipBot) {
 		internalAdminServer.PathPrefix("/debug/pprof/", http.DefaultServeMux)
 		log.Warnf("[admin] pprof enabled at %s/debug/pprof/", adminHost)
 	}
+	internalAdminServer.ListenAndServe()
 	if adminToken == "" {
 		log.Warnf("[admin] Admin API on %s has no token; set bot.admin_api_token", adminHost)
 	}

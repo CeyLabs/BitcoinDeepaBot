@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -50,7 +51,7 @@ type SendResponse struct {
 }
 
 // NetworkAllowlistMiddleware limits the send API to api.send.allowed_networks.
-// With no networks configured it lets everything through and the HMAC check
+// With no networks configured it lets everything through and the Ed25519 signature check
 // is the only gate. The client address comes from netutil.ClientIP, which only
 // believes forwarding headers from bot.trusted_proxies.
 func NetworkAllowlistMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -67,6 +68,28 @@ func NetworkAllowlistMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		next.ServeHTTP(w, r)
+	}
+}
+
+// PathAllowlistMiddleware limits every request whose path starts with prefix
+// to the given networks. It runs on the whole router, so it also covers routes
+// added later. With no networks it lets everything through.
+func PathAllowlistMiddleware(prefix string, allowed func() []*net.IPNet) mux.MiddlewareFunc {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nets := allowed()
+			if len(nets) == 0 || !strings.HasPrefix(r.URL.Path, prefix) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			ip := netutil.ClientIP(r, internal.Configuration.Bot.TrustedProxyNets)
+			if !netutil.Contains(nets, ip) {
+				log.Warnf("[api] Access to %q denied for IP %v (not in api.allowed_networks)", r.URL.Path, ip)
+				http.Error(w, "Access denied", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
 	}
 }
 
@@ -94,7 +117,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get authenticated wallet from context (set by WalletHMACMiddleware)
+	// Get authenticated wallet from context (set by WalletAuthMiddleware)
 	authenticatedWallet := r.Context().Value("authenticated_wallet")
 	if authenticatedWallet == nil {
 		log.Error("[api/send] No authenticated wallet found in request context")
@@ -639,7 +662,7 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 	//
 	// The budget is measured from when the request entered the handler chain,
 	// not from the Pay call: the server's write deadline is already ticking
-	// through HMAC verification, the user lookup and the balance check.
+	// through signature verification, the user lookup and the balance check.
 	elapsedSince := payStart
 	if start, ok := RequestStart(r.Context()); ok {
 		elapsedSince = start

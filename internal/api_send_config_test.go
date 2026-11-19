@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"encoding/base64"
 	"net"
 	"strings"
 	"testing"
@@ -42,10 +43,10 @@ func TestParseTrustedProxies(t *testing.T) {
 }
 
 func TestValidateAPISend(t *testing.T) {
-	strong := strings.Repeat("s", 64)
+	pubKey := base64.StdEncoding.EncodeToString(make([]byte, 32))
 	good := func() APISendConfiguration {
 		return APISendConfiguration{WhitelistedWallets: map[string]WhitelistedWallet{
-			"dca": {Username: "BitcoinDeepaDCA", HMACSecret: strong},
+			"dca": {Username: "BitcoinDeepaDCA", Ed25519PublicKey: pubKey},
 		}}
 	}
 
@@ -55,6 +56,9 @@ func TestValidateAPISend(t *testing.T) {
 	}
 	if len(cfg.AllowedNets) != 0 {
 		t.Fatalf("no allowed_networks should mean no restriction, got %v", cfg.AllowedNets)
+	}
+	if len(cfg.WhitelistedWallets["dca"].PublicKey) != 32 {
+		t.Fatal("public key not parsed")
 	}
 
 	cfg = good()
@@ -66,16 +70,26 @@ func TestValidateAPISend(t *testing.T) {
 		t.Fatalf("allowed networks not parsed: %v", cfg.AllowedNets)
 	}
 
+	// Unpadded base64 is accepted too.
+	cfg = good()
+	cfg.WhitelistedWallets["dca"] = WhitelistedWallet{Username: "x", Ed25519PublicKey: strings.TrimRight(pubKey, "=")}
+	if err := validateAPISend(&cfg); err != nil {
+		t.Fatalf("unpadded key rejected: %v", err)
+	}
+
 	bad := map[string]func(*APISendConfiguration){
 		"no wallets (the old built-in default is gone)": func(c *APISendConfiguration) { c.WhitelistedWallets = nil },
-		"empty secret": func(c *APISendConfiguration) {
-			c.WhitelistedWallets["dca"] = WhitelistedWallet{Username: "x", HMACSecret: ""}
+		"no public key": func(c *APISendConfiguration) {
+			c.WhitelistedWallets["dca"] = WhitelistedWallet{Username: "x"}
 		},
-		"published placeholder secret": func(c *APISendConfiguration) {
-			c.WhitelistedWallets["dca"] = WhitelistedWallet{Username: "x", HMACSecret: "change-me-ceycube-secret"}
+		"bad public key": func(c *APISendConfiguration) {
+			c.WhitelistedWallets["dca"] = WhitelistedWallet{Username: "x", Ed25519PublicKey: "AAAA"}
+		},
+		"leftover hmac secret": func(c *APISendConfiguration) {
+			c.WhitelistedWallets["dca"] = WhitelistedWallet{Username: "x", Ed25519PublicKey: pubKey, HMACSecret: strings.Repeat("s", 64)}
 		},
 		"missing username": func(c *APISendConfiguration) {
-			c.WhitelistedWallets["dca"] = WhitelistedWallet{HMACSecret: strong}
+			c.WhitelistedWallets["dca"] = WhitelistedWallet{Ed25519PublicKey: pubKey}
 		},
 		"invalid network": func(c *APISendConfiguration) { c.AllowedNetworks = []string{"10.0.0.0/99"} },
 	}
@@ -87,5 +101,29 @@ func TestValidateAPISend(t *testing.T) {
 				t.Fatal("invalid config accepted")
 			}
 		})
+	}
+}
+
+func TestValidateAPIAnalytics(t *testing.T) {
+	pubKey := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	cfg := APIAnalyticsConfiguration{APIKeys: map[string]AnalyticsAPIKey{"data": {Name: "Data", Ed25519PublicKey: pubKey}}}
+	if err := validateAPIAnalytics(&cfg); err != nil {
+		t.Fatalf("valid config rejected: %v", err)
+	}
+	if len(cfg.APIKeys["data"].PublicKey) != 32 {
+		t.Fatal("public key not parsed")
+	}
+	for name, k := range map[string]AnalyticsAPIKey{
+		"no public key":        {Name: "x"},
+		"bad public key":       {Name: "x", Ed25519PublicKey: "AAAA"},
+		"leftover hmac secret": {Name: "x", Ed25519PublicKey: pubKey, HMACSecret: strings.Repeat("s", 64)},
+	} {
+		cfg := APIAnalyticsConfiguration{APIKeys: map[string]AnalyticsAPIKey{"data": k}}
+		if err := validateAPIAnalytics(&cfg); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+	if err := validateAPIAnalytics(&APIAnalyticsConfiguration{}); err == nil {
+		t.Error("no keys: accepted")
 	}
 }
