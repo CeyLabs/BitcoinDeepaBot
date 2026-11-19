@@ -79,10 +79,11 @@ func newCollectID() string {
 func collectDecideKey(id string) string { return "collect-decide:" + id }
 
 // CollectCreate creates a request from walletID's user to collect amount
-// sats from payer, and prompts the payer in the bot chat. A repeat of the
-// same externalID returns the original request; the same externalID with
-// different parameters is refused.
-func (bot *TipBot) CollectCreate(walletID string, collector, payer *lnbits.User, amount, maxAmount int64, memo, externalID string, maxMemo int) (*CollectRequest, bool, error) {
+// sats from payer. With chatPrompt, the payer also gets Pay / Decline buttons in
+// the bot chat; without it they approve only in the Mini App or web app. A
+// repeat of the same externalID returns the original request; the same
+// externalID with different parameters is refused.
+func (bot *TipBot) CollectCreate(walletID string, collector, payer *lnbits.User, amount, maxAmount int64, memo, externalID string, maxMemo int, chatPrompt bool) (*CollectRequest, bool, error) {
 	switch {
 	case amount < 1:
 		return nil, false, p2pErr("invalid_amount", "Amount must be at least 1 sat.")
@@ -129,11 +130,13 @@ func (bot *TipBot) CollectCreate(walletID string, collector, payer *lnbits.User,
 		bot.Bunt.DeleteIfValue(extKey, c.ID)
 		return nil, false, err
 	}
-	if err := bot.sendCollectPrompt(payer, c); err != nil {
-		log.Warnf("[collect] Could not prompt %d for %s: %v", payer.Telegram.ID, c.ID, err)
-	} else {
-		c.Notified = true
-		bot.collectSave(c)
+	if chatPrompt {
+		if err := bot.sendCollectPrompt(payer, c); err != nil {
+			log.Warnf("[collect] Could not prompt %d for %s: %v", payer.Telegram.ID, c.ID, err)
+		} else {
+			c.Notified = true
+			bot.collectSave(c)
+		}
 	}
 	log.Infof("[collect] %s asks %d for %d sat (%s)", walletID, payer.Telegram.ID, amount, c.ID)
 	return c, true, nil
