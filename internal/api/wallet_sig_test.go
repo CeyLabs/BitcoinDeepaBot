@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -49,7 +50,7 @@ func newSigReq(method, path, body string) sigReq {
 func (s sigReq) build() *http.Request {
 	ts := strconv.FormatInt(s.ts, 10)
 	r := httptest.NewRequest(s.method, s.path, strings.NewReader(s.body))
-	msg := Ed25519SigningString(s.method, r.URL.Path, r.URL.RawQuery, ts, s.nonce, []byte(s.body))
+	msg := Ed25519SigningString(s.method, r.URL.EscapedPath(), r.URL.RawQuery, ts, s.nonce, []byte(s.body))
 	r.Header.Set("X-Wallet-ID", s.wallet)
 	r.Header.Set("X-Timestamp", ts)
 	r.Header.Set("X-Nonce", s.nonce)
@@ -105,7 +106,9 @@ func TestWalletAuthMiddleware(t *testing.T) {
 			r.Header.Del("X-Signature")
 			r.Header.Set("X-HMAC-Signature", "deadbeef")
 		}), http.StatusUnauthorized, "Invalid signature"},
-		{"body changed", tamper(func(r *http.Request) { r.Body = httptest.NewRequest("POST", "/", strings.NewReader(`{"amount":5000}`)).Body }), http.StatusUnauthorized, "Invalid signature"},
+		{"body changed", tamper(func(r *http.Request) {
+			r.Body = httptest.NewRequest("POST", "/", strings.NewReader(`{"amount":5000}`)).Body
+		}), http.StatusUnauthorized, "Invalid signature"},
 		{"query changed", tamper(func(r *http.Request) { r.URL.RawQuery = "x=2" }), http.StatusUnauthorized, "Invalid signature"},
 		{"path changed", tamper(func(r *http.Request) { r.URL.Path = "/api/v1/userbalance" }), http.StatusUnauthorized, "Invalid signature"},
 		{"method changed", tamper(func(r *http.Request) { r.Method = http.MethodPut }), http.StatusUnauthorized, "Invalid signature"},
@@ -230,5 +233,70 @@ func TestWalletSignatureRejectedByAnalytics(t *testing.T) {
 	r.Header.Set("X-Key-ID", "testwallet")
 	if code, _ := serveAnalytics(r); code != http.StatusUnauthorized {
 		t.Fatalf("got %d, want 401", code)
+	}
+}
+
+// A path with escaped characters is signed exactly as sent.
+func TestWalletAuthSignsEscapedPath(t *testing.T) {
+	withTestWallets(t)
+	if rec, _ := serveAuth(newSigReq(http.MethodGet, "/api/v1/send/status/a%20b", "").build()); rec.Code != http.StatusOK {
+		t.Fatalf("escaped path: got %d %q", rec.Code, rec.Body.String())
+	}
+}
+
+// Unknown and configured IDs get the same answers, so IDs can't be probed.
+func TestWalletAuthDoesNotRevealIDs(t *testing.T) {
+	withTestWallets(t)
+	answer := func(wallet string, set func(r *http.Request)) string {
+		r := httptest.NewRequest(http.MethodPost, "/api/v1/send", strings.NewReader("{}"))
+		r.Header.Set("X-Wallet-ID", wallet)
+		set(r)
+		rec, _ := serveAuth(r)
+		return strconv.Itoa(rec.Code) + " " + rec.Body.String()
+	}
+	ts := strconv.FormatInt(time.Now().Unix(), 10)
+	for name, set := range map[string]func(*http.Request){
+		"nothing":      func(*http.Request) {},
+		"timestamp":    func(r *http.Request) { r.Header.Set("X-Timestamp", ts) },
+		"no signature": func(r *http.Request) { r.Header.Set("X-Timestamp", ts); r.Header.Set("X-Nonce", newNonce()) },
+		"bad signature": func(r *http.Request) {
+			r.Header.Set("X-Timestamp", ts)
+			r.Header.Set("X-Nonce", newNonce())
+			r.Header.Set("X-Signature", base64.StdEncoding.EncodeToString(make([]byte, ed25519.SignatureSize)))
+		},
+	} {
+		if known, unknown := answer("testwallet", set), answer("nope", set); known != unknown {
+			t.Errorf("%s: known id %q, unknown id %q", name, known, unknown)
+		}
+	}
+}
+
+// The nonce is kept until the signed timestamp can no longer pass.
+func TestWalletAuthNonceOutlivesTimestamp(t *testing.T) {
+	withTestWallets(t)
+	s := newSigReq(http.MethodPost, "/api/v1/send", "{}")
+	s.ts = time.Now().Unix() + 300 // the latest accepted timestamp
+	if rec, _ := serveAuth(s.build()); rec.Code != http.StatusOK {
+		t.Fatalf("got %d", rec.Code)
+	}
+	usedSignatures.mu.Lock()
+	expiry := usedSignatures.seen[ed25519SigVersion+":testwallet:"+s.nonce]
+	usedSignatures.mu.Unlock()
+	if last := time.Unix(s.ts+300+1, 0); expiry.Before(last) {
+		t.Fatalf("nonce forgotten at %v, before the timestamp expires at %v", expiry, last)
+	}
+}
+
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
+
+// A body that can't be read is a 400, not "too large".
+func TestWalletAuthBodyReadError(t *testing.T) {
+	withTestWallets(t)
+	s := newSigReq(http.MethodPost, "/api/v1/send", "{}")
+	s.tamper = func(r *http.Request) { r.Body = io.NopCloser(failingReader{}) }
+	if rec, _ := serveAuth(s.build()); rec.Code != http.StatusBadRequest {
+		t.Fatalf("got %d, want 400", rec.Code)
 	}
 }

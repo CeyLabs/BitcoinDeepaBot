@@ -491,11 +491,11 @@ func validateAPISend(cfg *APISendConfiguration) error {
 		if w.HMACSecret != "" {
 			return fmt.Errorf("whitelisted wallet %q has hmac_secret, which is no longer supported; remove it and set ed25519_public_key (see docs/send-api-ed25519.md)", id)
 		}
-		key, err := DecodeBase64Any(w.Ed25519PublicKey)
-		if w.Ed25519PublicKey == "" || err != nil || len(key) != ed25519.PublicKeySize {
-			return fmt.Errorf("whitelisted wallet %q needs a valid ed25519_public_key (base64 of 32 bytes; see docs/send-api-ed25519.md)", id)
+		key, err := ParseEd25519PublicKey(w.Ed25519PublicKey)
+		if err != nil {
+			return fmt.Errorf("whitelisted wallet %q needs a valid ed25519_public_key (%v; see docs/send-api-ed25519.md)", id, err)
 		}
-		w.PublicKey = ed25519.PublicKey(key)
+		w.PublicKey = key
 		if strings.TrimSpace(w.Username) == "" {
 			return fmt.Errorf("whitelisted wallet %q has no username", id)
 		}
@@ -581,11 +581,11 @@ func validateAPIAnalytics(cfg *APIAnalyticsConfiguration) error {
 		if k.HMACSecret != "" {
 			return fmt.Errorf("api key %q has hmac_secret, which is no longer supported; remove it and set ed25519_public_key (see docs/send-api-ed25519.md)", id)
 		}
-		key, err := DecodeBase64Any(k.Ed25519PublicKey)
-		if k.Ed25519PublicKey == "" || err != nil || len(key) != ed25519.PublicKeySize {
-			return fmt.Errorf("api key %q needs a valid ed25519_public_key (base64 of 32 bytes)", id)
+		key, err := ParseEd25519PublicKey(k.Ed25519PublicKey)
+		if err != nil {
+			return fmt.Errorf("api key %q needs a valid ed25519_public_key (%v; see docs/send-api-ed25519.md)", id, err)
 		}
-		k.PublicKey = ed25519.PublicKey(key)
+		k.PublicKey = key
 		cfg.APIKeys[id] = k
 	}
 	return nil

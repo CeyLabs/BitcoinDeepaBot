@@ -40,6 +40,7 @@ require (
 )
 
 require (
+	filippo.io/edwards25519 v1.1.0
 	github.com/SaveTheRbtz/generic-sync-map-go v0.0.0-20220414055132-a37292614db8 // indirect
 	github.com/XiaoMi/pegasus-go-client v0.0.0-20210427083443-f3b6b08bc4c2 // indirect
 	github.com/aead/siphash v1.0.1 // indirect
