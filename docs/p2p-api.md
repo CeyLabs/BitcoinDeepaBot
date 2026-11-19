@@ -59,7 +59,8 @@ from [Log In with Telegram](https://core.telegram.org/bots/telegram-login):
 
 Call it **from the TMA server**, not the browser. Set `api.p2p.allowed_networks`
 to the TMA server's IPs so the P2P routes answer only them (`403 forbidden`
-otherwise):
+otherwise). If the global `api.allowed_networks` is set too, it also covers
+`/api/v1/p2p/*`, so the TMA server must be in **both** lists:
 
 ```
 Mini App ──(initData)──► TMA server ──(X-Telegram-Init-Data + service signature)──► bot

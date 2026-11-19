@@ -194,13 +194,13 @@ type LnbitsConfiguration struct {
 type APIConfiguration struct {
 	Send      APISendConfiguration      `yaml:"send"`
 	Analytics APIAnalyticsConfiguration `yaml:"analytics"`
+	P2P       APIP2PConfiguration       `yaml:"p2p"`
 	// AllowedNetworks, when set, limits every /api/v1/ endpoint to these IPs
-	// or CIDRs: the send API, analytics and the per-user wallet API. Empty
+	// or CIDRs: the send API, analytics, P2P and the per-user wallet API. Empty
 	// means no restriction. The client address is resolved through
 	// bot.trusted_proxies.
 	AllowedNetworks []string     `yaml:"allowed_networks"`
 	AllowedNets     []*net.IPNet `yaml:"-"`
-	P2P       APIP2PConfiguration       `yaml:"p2p"`
 }
 
 type APIAnalyticsConfiguration struct {
