@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -19,14 +20,24 @@ type Server struct {
 const (
 	StatusError = "ERROR"
 	StatusOk    = "OK"
+
+	// ServerWriteTimeout bounds how long a handler has to produce a response.
+	// A handler that overruns it has its write fail, leaving the caller with a
+	// dropped connection instead of an answer — so any handler that waits on
+	// something slow must budget against this (see sendToInvoice).
+	ServerWriteTimeout = 90 * time.Second
+
+	// responseWriteMargin is held back from ServerWriteTimeout so there is
+	// always room to serialise and flush the response.
+	responseWriteMargin = 10 * time.Second
 )
 
 func NewServer(address string) *Server {
 	srv := &http.Server{
 		Addr: address,
 		// Good practice: enforce timeouts for servers you create!
-		WriteTimeout: 90 * time.Second,
-		ReadTimeout:  90 * time.Second,
+		WriteTimeout: ServerWriteTimeout,
+		ReadTimeout:  ServerWriteTimeout,
 	}
 	apiServer := &Server{
 		httpServer: srv,
@@ -50,6 +61,31 @@ func (w *Server) AppendAuthorizedRoute(path string, authType AuthType, accessTyp
 		r.Methods(methods...)
 	}
 }
+
+// Use adds middleware that runs on every route of this server.
+func (w *Server) Use(mw mux.MiddlewareFunc) {
+	w.router.Use(mw)
+}
+
+// BearerTokenMiddleware requires "Authorization: Bearer <token>" on every
+// request, compared in constant time. An empty token disables the check.
+func BearerTokenMiddleware(token string) mux.MiddlewareFunc {
+	return func(next http.Handler) http.Handler {
+		if token == "" {
+			return next
+		}
+		want := []byte("Bearer " + token)
+		return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			if subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), want) != 1 {
+				log.Warnf("[api] Rejected unauthenticated admin request %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+				http.Error(rw, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			next.ServeHTTP(rw, r)
+		})
+	}
+}
+
 func (w *Server) AppendRoute(path string, handler func(http.ResponseWriter, *http.Request), methods ...string) {
 	r := w.router.HandleFunc(path, LoggingMiddleware("API", handler))
 	if len(methods) > 0 {

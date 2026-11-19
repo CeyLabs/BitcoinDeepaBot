@@ -262,7 +262,7 @@ inlineResultFaucetDescription = """👉 Clicca qui per creare una distribuzione 
 
 inlineFaucetMessage                     = """Premi ✅ per riscuotere %s da questa distribuzione da %s.
 
-🚰 Rimanente: %d/%s (distribuiti a %d/%d utenti)
+🚰 Rimanente: %s/%s (distribuiti a %d/%d utenti)
 %s"""
 inlineFaucetEndedMessage                = """🚰 Distribuzione completata 🍺\n\n🏅 %s distribuiti a %d utenti."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""
@@ -292,7 +292,7 @@ inlineSendCreateWalletMessage  = """Chatta con %s 👈 per gestire il tuo wallet
 sendYourselfMessage            = """📖 Non puoi inviare un pagamento a te stesso."""
 inlineSendFailedMessage        = """🚫 Invio non riuscito."""
 inlineSendInvalidAmountMessage = """🚫 L'ammontare deve essere maggiore di 0."""
-inlineSendBalanceLowMessage    = """🚫 Il tuo saldo è insufficiente (%s)."""
+inlineSendBalanceLowMessage    = """🚫 Il tuo saldo è insufficiente."""
 
 # INLINE RECEIVE
 

@@ -229,7 +229,7 @@ func (bot *TipBot) listPotsHandler(ctx intercept.Context) (intercept.Context, er
 
 	LKRPerSat, USDPerSat, err := thirdparty.GetSatPrice()
 	if err != nil {
-		log.Infof("[/pots] error fetching price from coingecko\n")
+		log.Errorf("[/pots] error fetching price from coingecko: %v\n", err)
 	}
 
 	message := "🏺 Your Savings Pots:\n\n"

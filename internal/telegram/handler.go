@@ -39,7 +39,11 @@ func getDefaultAfterInterceptor(bot TipBot) []intercept.Func {
 
 // registerHandlerWithInterceptor will register a ctx with all the predefined interceptors, based on the interceptor type
 func (bot TipBot) registerHandlerWithInterceptor(h InterceptionWrapper) {
-	h.Interceptor.Before = append(getDefaultBeforeInterceptor(bot), h.Interceptor.Before...)
+	before := getDefaultBeforeInterceptor(bot)
+	if !worksWithoutLNbits(h.Endpoints) {
+		before = append(before, bot.lnbitsAvailableInterceptor)
+	}
+	h.Interceptor.Before = append(before, h.Interceptor.Before...)
 	//h.Interceptor.After = append(h.Interceptor.After, getDefaultAfterInterceptor(bot)...)
 	//h.Interceptor.OnDefer = append(h.Interceptor.OnDefer, getDefaultDeferInterceptor(bot)...)
 	for _, endpoint := range h.Endpoints {
@@ -398,6 +402,22 @@ func (bot TipBot) getHandler() []InterceptionWrapper {
 					bot.logMessageInterceptor,
 					bot.requireUserInterceptor,
 					bot.loadReplyToInterceptor,
+					bot.lockInterceptor,
+				},
+				OnDefer: []intercept.Func{
+					bot.unlockInterceptor,
+				},
+			},
+		},
+		{
+			Endpoints: []interface{}{"/sendbatch"},
+			Handler:   bot.sendbatchHandler,
+			Interceptor: &Interceptor{
+				Before: []intercept.Func{
+					bot.requirePrivateChatInterceptor,
+					bot.localizerInterceptor,
+					bot.logMessageInterceptor,
+					bot.requireUserInterceptor,
 					bot.lockInterceptor,
 				},
 				OnDefer: []intercept.Func{
@@ -827,6 +847,36 @@ func (bot TipBot) getHandler() []InterceptionWrapper {
 			Handler:   bot.cancelSendHandler,
 			Interceptor: &Interceptor{
 
+				Before: []intercept.Func{
+					bot.localizerInterceptor,
+					bot.requireUserInterceptor,
+					bot.answerCallbackInterceptor,
+					bot.lockInterceptor,
+				},
+				OnDefer: []intercept.Func{
+					bot.unlockInterceptor,
+				},
+			},
+		},
+		{
+			Endpoints: []interface{}{&btnConfirmSendBatch},
+			Handler:   bot.confirmSendBatchHandler,
+			Interceptor: &Interceptor{
+				Before: []intercept.Func{
+					bot.localizerInterceptor,
+					bot.requireUserInterceptor,
+					bot.answerCallbackInterceptor,
+					bot.lockInterceptor,
+				},
+				OnDefer: []intercept.Func{
+					bot.unlockInterceptor,
+				},
+			},
+		},
+		{
+			Endpoints: []interface{}{&btnCancelSendBatch},
+			Handler:   bot.cancelSendBatchHandler,
+			Interceptor: &Interceptor{
 				Before: []intercept.Func{
 					bot.localizerInterceptor,
 					bot.requireUserInterceptor,

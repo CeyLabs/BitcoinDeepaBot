@@ -19,9 +19,16 @@ type ExchangeRateResponse struct {
 
 // GetUSDToLKRRate fetches USD to LKR exchange rate from Ceylon Cash
 func GetUSDToLKRRate() (float64, error) {
-	url := "https://fx.ceyloncash.com/currency/USD"
+	const apiURL = "https://fx.ceyloncash.com/currency/USD"
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(url)
+
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to build request: %v", err)
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; BitcoinDeepaBot/1.0)")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch exchange rate: %v", err)
 	}

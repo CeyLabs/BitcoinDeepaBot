@@ -220,7 +220,7 @@ func (bot *TipBot) confirmPayHandler(ctx intercept.Context) (intercept.Context, 
 			bot.ErrorLogger.LogPaymentError(err, payData.Amount, payData.Memo, payData.Invoice, user.Telegram)
 		}
 
-		err = fmt.Errorf(i18n.Translate(payData.LanguageCode, "invoiceUndefinedErrorMessage"))
+		err = fmt.Errorf("%s", i18n.Translate(payData.LanguageCode, "invoiceUndefinedErrorMessage"))
 		bot.tryEditMessage(ctx.Message(), fmt.Sprintf(i18n.Translate(payData.LanguageCode, "invoicePaymentFailedMessage"), err.Error()), &tb.ReplyMarkup{})
 		// verbose error message, turned off for now
 		// if len(err.Error()) == 0 {

@@ -295,7 +295,7 @@ inlineResultFaucetDescription = """👉 Kliknij tu aby utworzyć kranik w tym ch
 
 inlineFaucetMessage                     = """Naciśnij ✅ aby zebrać %s z kranika %s.
 
-🚰 Pozostało: %d/%s (rozdanych %d użytkownikom z %d)
+🚰 Pozostało: %s/%s (rozdanych %d użytkownikom z %d)
 %s"""
 inlineFaucetEndedMessage                = """🚰 Kranik pusty 🍺\n\n🏅 %s rozdano do %d użytkowników."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""
@@ -352,7 +352,7 @@ inlineResultTipjarDescription = """👉 Kliknij tu aby utworzyć w tym chacie s�
 
 inlineTipjarMessage                     = """Naciśnij 💸 aby *wpłacić %s* do tego słoika na napiwki (_tipjar_) przez %s.
 
-🙏 Przekazano: *%d*/%s (przez %d użytkowników)
+🙏 Przekazano: *%s*/%s (przez %d użytkowników)
 %s"""
 inlineTipjarEndedMessage                = """🍯 Słoik na napiwki %s jest pełen ⭐️\n\n🏅 %s przekazanych przez %d użytkowników."""
 inlineTipjarAppendMemo                  = """\n✉️ %s"""
@@ -401,7 +401,7 @@ Aby dołączyć do grupy, napisz do %s i napisz w prywatnej wiadomości `/join <
 *Dla użytkowników (w czacie prywatnym):* `/join <nazwa_grupy>`\nPrzykład: `/join NajlepszaGrupaBitcoinowa`"""
 
 # DALLE GENERATE
-generateDalleHelpMessage        = """Generuj obrazy przy użyciu OpenAI DALLE 2.\nUżycie: `/generate <podpowiedź>`\nCena: 1000 sat"""
+generateDalleHelpMessage        = """Generuj obrazy przy użyciu OpenAI DALLE 2.\nUżycie: `/generate <podpowiedź>`\nCena: %s"""
 generateDallePayInvoiceMessage  = """Opłać tę fakturę by wygenerować 4 obrazy 👇"""
 generateDalleGeneratingMessage  = """Twoje obrazy są generowane. Proszę czekaj..."""
 # CONVERT LKR TO SAT

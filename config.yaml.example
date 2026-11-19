@@ -9,7 +9,22 @@ bot:
   lnurl_public_host_name: "https://mylnurl.com"
   lnurl_server: "http://127.0.0.1:5454" # or http://0.0.0.0:5454 depending on your configuration
   lnurl_image: true
-  admin_api_host: localhost:6060
+  # Admin API (ban/unban, DALL-E switch, mutexes). Keep it on loopback; it will
+  # refuse to start on any other address unless admin_api_token is set.
+  admin_api_host: 127.0.0.1:6060
+  # Optional on loopback, required elsewhere. Sent as "Authorization: Bearer <token>".
+  # Generate with: openssl rand -hex 32
+  admin_api_token: ""
+  # Expose Go's /debug/pprof on the admin API. Profiles can contain keys; leave off.
+  admin_pprof: false
+  # Where /donate pays, and where /send or /tip to the bot itself is routed:
+  # a lightning address (name@domain) or an https LNURL-pay URL. Leave empty to
+  # turn /donate off; sends to the bot then go to the bot's own wallet.
+  donate_address: ""
+  # Reverse proxies whose X-Forwarded-For / X-Real-IP headers are believed.
+  # Empty means loopback only; ["none"] trusts no proxy. Headers from anyone
+  # else are ignored.
+  trusted_proxies: ["127.0.0.1", "::1"]
 telegram:
   message_dispose_duration: 10
   api_key: "1234"
@@ -18,9 +33,18 @@ telegram:
 lnbits:
   url: "http://127.0.0.1:5000"
   admin_key: "1234"
-  admin_id: "1234"
+  admin_id: "1234"  # unused on lnbits 1.x, kept for older deployments
+  # ACL token scoped to /users/api/v1, required on lnbits 1.x to create users.
+  # Mint one under your lnbits account's access-control settings; a wallet api
+  # key does not grant account management there.
+  admin_token: "1234"
   webhook_server: "http://0.0.0.0:5588"  # Local webhook server address
   webhook_public_url: "https://yourdomain.com/webhook"  # Public URL for webhooks (for reverse proxy)
+  # Optional but recommended. Added to every webhook URL handed to lnbits and
+  # required on incoming webhooks. Generate with: openssl rand -hex 32
+  # Invoices created before you set it will not trigger callbacks, so set it
+  # right after a restart. Every webhook is also verified with lnbits either way.
+  webhook_secret: ""
   lnbits_public_url: "link.mylnurl.com"
 database:
   db_path: "data/bot.db"
@@ -28,6 +52,7 @@ database:
   transactions_path: "data/transactions.db"
   shop_buntdb_path: "data/shop.db"
   groupsdb_path: "data/groups.db"
+  referrals_path: "data/referrals.db"
 generate:
   open_ai_bearer_token: "token_here"
   dalle_key: "asd"
@@ -35,6 +60,17 @@ generate:
   worker: 2
 nostr:
   private_key: "hex private key here"
+
+# Third-party price API configuration
+# Bitcoin price is fetched in parallel from CoinGecko, CoinMarketCap, and Binance.
+# First successful response wins. CoinGecko and Binance require no key.
+third_party:
+  coinmarketcap_api_key: "your-cmc-api-key-here"  # optional — get free key at coinmarketcap.com/api
+
+# DCA bot integration
+dca:
+  wallet_username: ""  # when sats are received by this Telegram username, reset DCA retry counts
+  api_url: "https://bitcoindeepa-dca-be-production.up.railway.app"
 
 # API Configuration
 api:
@@ -46,26 +82,38 @@ api:
     api_keys:
       data-team:
         name: "Data Team"
-        hmac_secret: "your-analytics-hmac-secret-here"
+        hmac_secret: "change-me"  # generate with: openssl rand -hex 32
       # Add more keys for different consumers:
       # dashboard:
       #   name: "Internal Dashboard"
-      #   hmac_secret: "another-secure-secret-here"
+      #   hmac_secret: "change-me"  # generate with: openssl rand -hex 32
 
   # Send API - wallet-based HMAC authenticated endpoints
   send:
     enabled: true
-    internal_network: "10.0.0.0/24"
+    # Optional. When set, only these IPs/CIDRs may call the send API. Leave
+    # empty if callers have changing IPs (HMAC still applies). The old
+    # internal_network setting was never enforced and is now ignored.
+    allowed_networks: []
     max_amount: 1000000
     min_amount: 1
     admin_approval_threshold: 100000
     max_memo_length: 280
     rate_limit: 60
+    # How long to wait for an outgoing bolt11 payment to actually settle before
+    # answering the caller. lnbits returns as soon as it has handed the payment
+    # to its backend, so without this wait a payment that is still routing (or
+    # never leaves the node) would be reported as a success.
+    settlement_timeout: 60  # seconds
     whitelisted_wallets:
       BiccoindeepaDSA:
         username: "BiccoindeepaDSA"
-        hmac_secret: "your-unique-bitcoindeepa-secret-here"
+        hmac_secret: "change-me"  # generate with: openssl rand -hex 32
+        # admin_approval_threshold: 50000  # override global (0 or omit = use global)
+        # max_amount: 500000               # override global (0 or omit = use global)
       CeycubeBank:
         username: "CeycubeBank"
-        hmac_secret: "your-unique-ceycube-secret-here"
+        hmac_secret: "change-me"  # generate with: openssl rand -hex 32
+        admin_approval_threshold: 200000   # wallet-specific: override global 100000
+        max_amount: 2000000                # wallet-specific: override global 1000000
     timestamp_tolerance: 300

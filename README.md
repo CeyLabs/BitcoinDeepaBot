@@ -56,7 +56,8 @@ The bot now includes a new HTTP API endpoint `/api/send` for programmatic Bitcoi
 
 - **Secure**: Only whitelisted sender accounts can use the API
 - **Network Restricted**: Limited to internal network access (10.0.0.0/24)
-- **Flexible Recipients**: Send to any Telegram username or wallet ID
+- **Flexible Recipients**: Send to any Telegram username, wallet ID, Lightning address, or bolt11 invoice
+- **Bolt11 Invoices**: Pass a `lnbc...` invoice as `to` to pay it externally (amount is taken from the invoice; response includes `payment_hash` and `fee`)
 - **Transaction Logging**: All API payments are logged for audit purposes
 
 ### Quick Start

@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/LightningTipBot/LightningTipBot/internal/errors"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram/intercept"
@@ -15,8 +16,12 @@ import (
 
 func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, error) {
 	m := ctx.Message()
-	// check and print all commands
-	if len(m.Text) > 0 {
+	if strings.HasPrefix(m.Text, MainMenuCommandBalance) {
+		// Balance button: just remove the button press. anyTextHandler would
+		// route it back here and the balance would be sent twice.
+		bot.tryDeleteMessage(m)
+	} else if len(m.Text) > 0 {
+		// check and print all commands
 		bot.anyTextHandler(ctx)
 	}
 
@@ -36,18 +41,30 @@ func (bot *TipBot) balanceHandler(ctx intercept.Context) (intercept.Context, err
 	}
 
 	usrStr := GetUserStr(ctx.Sender())
+	// While LNbits is down, show a maintenance notice with the last known
+	// balance instead of waiting for a call that will fail.
+	if !bot.Client.Available() {
+		bot.trySendMessage(ctx.Sender(), maintenanceBalanceMessage(ctx, user.Wallet.Balance))
+		return ctx, nil
+	}
 	// Get available balance (wallet balance - pot balance)
 	availableBalance, err := bot.GetUserAvailableBalance(user)
 	if err != nil {
+		// Never show a made-up 0 balance: users would think their funds are gone.
 		log.Errorf("[/balance] Error fetching %s's available balance: %s", usrStr, err)
-		availableBalance = 0
+		if !bot.Client.Available() {
+			bot.trySendMessage(ctx.Sender(), maintenanceBalanceMessage(ctx, user.Wallet.Balance))
+		} else {
+			bot.trySendMessage(ctx.Sender(), Translate(ctx, "errorTryLaterMessage"))
+		}
+		return ctx, err
 	}
 
 	log.Infof("[/balance] %s's available balance: %s\n", usrStr, utils.FormatSats(availableBalance))
 
 	LKRPerSat, USDPerSat, err := thirdparty.GetSatPrice()
 	if err != nil {
-		log.Infof("[/balance] error fetching price from coingecko\n")
+		log.Errorf("[/balance] error fetching price from coingecko: %v\n", err)
 	}
 
 	potBalance, err := bot.GetUserTotalPotBalance(user)

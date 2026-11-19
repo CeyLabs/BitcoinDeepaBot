@@ -207,7 +207,7 @@ func (bot *TipBot) HandleLNURL(rawlnurl string) (string, lnurl.LNURLParams, erro
 		lnurl_str, ok := lnurl.FindLNURLInText(rawlnurl)
 		if !ok {
 			return "", nil,
-				fmt.Errorf("invalid bech32-encoded lnurl: " + rawlnurl)
+				fmt.Errorf("invalid bech32-encoded lnurl: %s", rawlnurl)
 		}
 		rawurl, err = lnurl.LNURLDecodeStrict(lnurl_str)
 		if err != nil {
@@ -247,7 +247,7 @@ func (bot *TipBot) HandleLNURL(rawlnurl string) (string, lnurl.LNURLParams, erro
 		return rawurl, nil, err
 	}
 	if resp.StatusCode >= 300 {
-		return rawurl, nil, fmt.Errorf("HTTP error: " + resp.Status)
+		return rawurl, nil, fmt.Errorf("HTTP error: %s", resp.Status)
 	}
 
 	b, err := ioutil.ReadAll(resp.Body)

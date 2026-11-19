@@ -1,27 +1,42 @@
 package internal
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"strings"
+	"time"
 
+	"github.com/LightningTipBot/LightningTipBot/internal/netutil"
 	"github.com/jinzhu/configor"
 	log "github.com/sirupsen/logrus"
 )
 
 var Configuration = struct {
-	Bot      BotConfiguration      `yaml:"bot"`
-	Telegram TelegramConfiguration `yaml:"telegram"`
-	Database DatabaseConfiguration `yaml:"database"`
-	Lnbits   LnbitsConfiguration   `yaml:"lnbits"`
-	Generate GenerateConfiguration `yaml:"generate"`
-	Nostr    NostrConfiguration    `yaml:"nostr"`
-	API      APIConfiguration      `yaml:"api"`
+	Bot        BotConfiguration        `yaml:"bot"`
+	Telegram   TelegramConfiguration   `yaml:"telegram"`
+	Database   DatabaseConfiguration   `yaml:"database"`
+	Lnbits     LnbitsConfiguration     `yaml:"lnbits"`
+	Generate   GenerateConfiguration   `yaml:"generate"`
+	Nostr      NostrConfiguration      `yaml:"nostr"`
+	API        APIConfiguration        `yaml:"api"`
+	ThirdParty ThirdPartyConfiguration `yaml:"third_party"`
+	DCA        DCAConfiguration        `yaml:"dca"`
 }{}
+
+type DCAConfiguration struct {
+	WalletUsername string `yaml:"wallet_username"`
+	ApiUrl         string `yaml:"api_url"`
+}
 
 type NostrConfiguration struct {
 	PrivateKey string `yaml:"private_key"`
+}
+
+type ThirdPartyConfiguration struct {
+	CoinMarketCapAPIKey string `yaml:"coinmarketcap_api_key"`
 }
 
 type GenerateConfiguration struct {
@@ -46,6 +61,97 @@ type BotConfiguration struct {
 	LNURLHostUrl   *url.URL            `yaml:"-"`
 	LNURLSendImage bool                `yaml:"lnurl_image"`
 	AdminAPIHost   string              `yaml:"admin_api_host"`
+	// AdminAPIToken, when set, is required as "Authorization: Bearer <token>"
+	// on every admin API request. It is mandatory if admin_api_host is not a
+	// loopback address.
+	AdminAPIToken string `yaml:"admin_api_token"`
+	// AdminPprof exposes Go's /debug/pprof on the admin API. Off by default:
+	// profiles reveal memory contents, including keys.
+	AdminPprof bool `yaml:"admin_pprof"`
+	// DonateAddress is where /donate (and sends or tips to the bot itself)
+	// pay: a lightning address (name@domain) or an https LNURL-pay URL.
+	// Empty disables /donate.
+	DonateAddress  string `yaml:"donate_address"`
+	DonateEndpoint string `yaml:"-"`
+	// TrustedProxies are the reverse proxies whose X-Forwarded-For and
+	// X-Real-IP headers are believed. Empty means loopback only; ["none"]
+	// trusts no proxy. Headers from anyone else are ignored.
+	TrustedProxies   []string     `yaml:"trusted_proxies"`
+	TrustedProxyNets []*net.IPNet `yaml:"-"`
+}
+
+// DefaultAdminAPIHost is used when admin_api_host is empty. An empty address
+// would otherwise make net/http listen on port 80 on every interface.
+const DefaultAdminAPIHost = "127.0.0.1:6060"
+
+// AdminAPIAllowed decides whether the admin API may start with this address
+// and token. The admin API can ban users and dump process memory, so it only
+// runs unauthenticated on loopback.
+func AdminAPIAllowed(host, token string) error {
+	if token != "" && WeakHMACSecret(token) {
+		return fmt.Errorf("bot.admin_api_token is a placeholder or shorter than 32 characters; generate one with: openssl rand -hex 32")
+	}
+	if token == "" && !IsLoopbackAddress(host) {
+		return fmt.Errorf("bot.admin_api_host %q is not a loopback address; set bot.admin_api_token or bind to 127.0.0.1", host)
+	}
+	return nil
+}
+
+// IsLoopbackAddress reports whether a host:port listen address only accepts
+// local connections. An empty host (":6060") listens everywhere.
+func IsLoopbackAddress(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		host = addr
+	}
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	return ip != nil && ip.IsLoopback()
+}
+
+// DonationEndpoint turns a lightning address (name@domain) or an https
+// LNURL-pay URL into the LNURL-pay endpoint to query. Plain http is refused:
+// the endpoint decides which invoice gets paid.
+func DonationEndpoint(address string) (string, error) {
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return "", nil
+	}
+	if strings.Contains(address, "://") {
+		u, err := url.Parse(address)
+		if err != nil || u.Scheme != "https" || u.Host == "" {
+			return "", fmt.Errorf("donate_address %q must be an https URL or a lightning address", address)
+		}
+		return u.String(), nil
+	}
+	name, domain, ok := strings.Cut(address, "@")
+	if !ok || name == "" || domain == "" || strings.ContainsAny(name+domain, "/?#@ ") {
+		return "", fmt.Errorf("donate_address %q must be an https URL or a lightning address (name@domain)", address)
+	}
+	return (&url.URL{Scheme: "https", Host: strings.ToLower(domain), Path: "/.well-known/lnurlp/" + name}).String(), nil
+}
+
+// configPath picks the configuration file: --config <path>, --config=<path>,
+// or $BOT_CONFIG, falling back to ./config.yaml. It reads os.Args directly
+// because the configuration is loaded in a package init, before any flag
+// parsing runs.
+func configPath(args []string, env string) string {
+	for i, a := range args {
+		for _, name := range []string{"--config", "-config"} {
+			if a == name && i+1 < len(args) {
+				return args[i+1]
+			}
+			if v, ok := strings.CutPrefix(a, name+"="); ok && v != "" {
+				return v
+			}
+		}
+	}
+	if env != "" {
+		return env
+	}
+	return "config.yaml"
 }
 
 type TelegramConfiguration struct {
@@ -60,17 +166,26 @@ type DatabaseConfiguration struct {
 	BuntDbPath       string `yaml:"buntdb_path"`
 	TransactionsPath string `yaml:"transactions_path"`
 	GroupsDbPath     string `yaml:"groupsdb_path"`
+	ReferralsDbPath  string `yaml:"referrals_path"`
 }
 
 type LnbitsConfiguration struct {
 	AdminId                string   `yaml:"admin_id"`
 	AdminKey               string   `yaml:"admin_key"`
+	// AdminToken is an lnbits ACL token, scoped to /users/api/v1. Account
+	// management moved behind account-level auth in lnbits 1.x, where a wallet
+	// api key no longer grants it, so creating users needs a bearer token.
+	AdminToken             string   `yaml:"admin_token"`
 	Url                    string   `yaml:"url"`
 	LnbitsPublicUrl        string   `yaml:"lnbits_public_url"`
 	WebhookServer          string   `yaml:"webhook_server"`
 	WebhookServerUrl       *url.URL `yaml:"-"`
 	WebhookPublicUrl       string   `yaml:"webhook_public_url"`
 	WebhookPublicUrlParsed *url.URL `yaml:"-"`
+	// WebhookSecret, when set, is added to every webhook URL the bot hands to
+	// lnbits and is required on every incoming webhook. Requests without it are
+	// dropped before they are parsed. Generate one with: openssl rand -hex 32
+	WebhookSecret string `yaml:"webhook_secret"`
 }
 
 type APIConfiguration struct {
@@ -90,8 +205,13 @@ type AnalyticsAPIKey struct {
 }
 
 type APISendConfiguration struct {
-	Enabled                bool                         `yaml:"enabled"`
-	InternalNetwork        string                       `yaml:"internal_network"`
+	Enabled bool `yaml:"enabled"`
+	// InternalNetwork is deprecated and was never enforced. Use AllowedNetworks.
+	InternalNetwork string `yaml:"internal_network"`
+	// AllowedNetworks, when set, limits the send API to these CIDRs or IPs.
+	// Empty means no network restriction (HMAC still applies).
+	AllowedNetworks        []string                     `yaml:"allowed_networks"`
+	AllowedNets            []*net.IPNet                 `yaml:"-"`
 	MaxAmount              int64                        `yaml:"max_amount"`
 	MinAmount              int64                        `yaml:"min_amount"`
 	AdminApprovalThreshold int64                        `yaml:"admin_approval_threshold"`
@@ -99,20 +219,30 @@ type APISendConfiguration struct {
 	RateLimit              int                          `yaml:"rate_limit"`
 	WhitelistedWallets     map[string]WhitelistedWallet `yaml:"whitelisted_wallets"`
 	TimestampTolerance     int64                        `yaml:"timestamp_tolerance"` // seconds
+	SettlementTimeout      int64                        `yaml:"settlement_timeout"`  // seconds to wait for an outgoing payment to settle
 }
 
 type WhitelistedWallet struct {
-	Username   string `yaml:"username"`    // Telegram username without @
-	HMACSecret string `yaml:"hmac_secret"` // Unique HMAC secret for this wallet
+	Username               string `yaml:"username"`                 // Telegram username without @
+	HMACSecret             string `yaml:"hmac_secret"`              // Unique HMAC secret for this wallet
+	AdminApprovalThreshold int64  `yaml:"admin_approval_threshold"` // 0 = use global
+	MaxAmount              int64  `yaml:"max_amount"`               // 0 = use global
 }
 
 func init() {
-	err := configor.Load(&Configuration, "config.yaml")
+	err := configor.Load(&Configuration, configPath(os.Args[1:], os.Getenv("BOT_CONFIG")))
+	if err != nil {
+		panic(err)
+	}
+	Configuration.Bot.DonateEndpoint, err = DonationEndpoint(Configuration.Bot.DonateAddress)
 	if err != nil {
 		panic(err)
 	}
 	webhookUrl, err := url.Parse(Configuration.Lnbits.WebhookServer)
 	if err != nil {
+		panic(err)
+	}
+	if err := checkWebhookSecret(Configuration.Lnbits.WebhookSecret); err != nil {
 		panic(err)
 	}
 	Configuration.Lnbits.WebhookServerUrl = webhookUrl
@@ -138,19 +268,85 @@ func init() {
 		panic(err)
 	}
 	Configuration.Bot.LNURLHostUrl = hostname
+	if Configuration.Bot.AdminAPIHost == "" {
+		Configuration.Bot.AdminAPIHost = DefaultAdminAPIHost
+	}
+	Configuration.Bot.TrustedProxyNets, err = parseTrustedProxies(Configuration.Bot.TrustedProxies)
+	if err != nil {
+		panic(fmt.Errorf("bot.trusted_proxies: %w", err))
+	}
 	checkLnbitsConfiguration()
 	setAPISendDefaults()
 	setAPIAnalyticsDefaults()
 }
 
-// GetWebhookURL returns the appropriate webhook URL
+// WebhookSecretParam is the query parameter that carries the webhook secret.
+// A query parameter rather than a path segment keeps working behind reverse
+// proxies that rewrite or strip paths.
+const WebhookSecretParam = "s"
+
+// GetWebhookURL returns the URL lnbits should call for payment webhooks.
 // If webhook_public_url is configured, it returns that (for reverse proxy scenarios)
 // Otherwise, it returns the webhook_server URL (for direct access)
+// When webhook_secret is set, it is appended as a query parameter.
 func GetWebhookURL() string {
+	return withWebhookSecret(webhookBaseURL(), Configuration.Lnbits.WebhookSecret)
+}
+
+// GetWebhookURLRedacted is GetWebhookURL with the secret masked, for logs.
+func GetWebhookURLRedacted() string {
+	if Configuration.Lnbits.WebhookSecret == "" {
+		return webhookBaseURL()
+	}
+	return withWebhookSecret(webhookBaseURL(), "REDACTED")
+}
+
+func webhookBaseURL() string {
 	if Configuration.Lnbits.WebhookPublicUrl != "" {
 		return Configuration.Lnbits.WebhookPublicUrl
 	}
 	return Configuration.Lnbits.WebhookServer
+}
+
+func withWebhookSecret(base, secret string) string {
+	if secret == "" {
+		return base
+	}
+	u, err := url.Parse(base)
+	if err != nil {
+		return base
+	}
+	q := u.Query()
+	q.Set(WebhookSecretParam, secret)
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+// WebhookSecretMatches reports whether a webhook request carries the configured
+// secret, comparing in constant time. With no secret configured every request
+// passes this check and still has to pass payment verification.
+func WebhookSecretMatches(got string) bool {
+	return secretMatches(got, Configuration.Lnbits.WebhookSecret)
+}
+
+func secretMatches(got, want string) bool {
+	if want == "" {
+		return true
+	}
+	return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
+}
+
+// checkWebhookSecret refuses to start with a placeholder or short secret. An
+// empty secret is allowed (webhooks are still verified against lnbits), but a
+// weak one would only give false confidence.
+func checkWebhookSecret(secret string) error {
+	if secret == "" {
+		return nil
+	}
+	if strings.Contains(secret, "change-me") || len(secret) < 32 {
+		return fmt.Errorf("lnbits.webhook_secret is a placeholder or shorter than 32 characters; generate one with: openssl rand -hex 32")
+	}
+	return nil
 }
 
 // GetWebhookURLParsed returns the parsed webhook URL
@@ -158,9 +354,35 @@ func GetWebhookURLParsed() *url.URL {
 	return Configuration.Lnbits.WebhookPublicUrlParsed
 }
 
+// underTest reports whether this binary is a `go test` binary.
+//
+// Package init runs before the testing package registers its flags, so
+// flag.Lookup("test.v") is not yet usable here and os.Args is the only
+// reliable signal. This exists because most packages reach this one through
+// the import graph (lnbits -> satdress -> network -> internal), so without it
+// a unit test that never talks to lnbits still cannot run unless a full
+// operator config.yaml sits in its package directory.
+func underTest() bool {
+	if strings.HasSuffix(os.Args[0], ".test") || strings.HasSuffix(os.Args[0], ".test.exe") {
+		return true
+	}
+	for _, arg := range os.Args[1:] {
+		if strings.HasPrefix(arg, "-test.") {
+			return true
+		}
+	}
+	return false
+}
+
 // checkLnbitsConfiguration validates the lnbits configuration
 func checkLnbitsConfiguration() {
 	if Configuration.Lnbits.Url == "" {
+		// A missing lnbits url stays fatal in production: the bot cannot move
+		// sats without it. Under `go test` there is no wallet to talk to, so
+		// refusing to link would only make the package untestable.
+		if underTest() {
+			return
+		}
 		panic(fmt.Errorf("please configure a lnbits url"))
 	}
 	if Configuration.Lnbits.LnbitsPublicUrl == "" {
@@ -174,17 +396,8 @@ func checkLnbitsConfiguration() {
 
 // setAPISendDefaults sets default values for API Send configuration
 func setAPISendDefaults() {
-	// Set defaults only if not configured
-	if Configuration.API.Send.InternalNetwork == "" {
-		Configuration.API.Send.InternalNetwork = "10.0.0.0/24"
-	}
-
-	// Validate CIDR format
-	_, _, err := net.ParseCIDR(Configuration.API.Send.InternalNetwork)
-	if err != nil {
-		log.Errorf("Invalid internal_network CIDR format '%s': %v. Using default 10.0.0.0/24",
-			Configuration.API.Send.InternalNetwork, err)
-		Configuration.API.Send.InternalNetwork = "10.0.0.0/24"
+	if Configuration.API.Send.InternalNetwork != "" {
+		log.Warnf("api.send.internal_network is deprecated and ignored; use api.send.allowed_networks to restrict the send API by network")
 	}
 
 	if Configuration.API.Send.MaxAmount == 0 {
@@ -202,30 +415,94 @@ func setAPISendDefaults() {
 	if Configuration.API.Send.RateLimit == 0 {
 		Configuration.API.Send.RateLimit = 60
 	}
+	if Configuration.API.Send.SettlementTimeout == 0 {
+		Configuration.API.Send.SettlementTimeout = 60 // seconds
+	}
 
-	// Set default whitelisted wallets if none configured
-	if len(Configuration.API.Send.WhitelistedWallets) == 0 {
-		Configuration.API.Send.WhitelistedWallets = map[string]WhitelistedWallet{
-			"CeycubeBank": {
-				Username:   "CeycubeBank",
-				HMACSecret: "change-me-ceycube-secret",
-			},
+	if err := validateAPISend(&Configuration.API.Send); err != nil {
+		if Configuration.API.Send.Enabled {
+			log.Errorf("Disabling API Send: %v", err)
 		}
-		log.Warn("Using default whitelisted wallets. Please configure unique HMAC secrets for each wallet in production!")
+		Configuration.API.Send.Enabled = false
 	}
 
 	// Log API Send configuration status
 	if Configuration.API.Send.Enabled {
-		log.Infof("API Send module enabled with %d whitelisted wallets, network: %s",
-			len(Configuration.API.Send.WhitelistedWallets), Configuration.API.Send.InternalNetwork)
+		network := "any (HMAC only)"
+		if len(Configuration.API.Send.AllowedNetworks) > 0 {
+			network = strings.Join(Configuration.API.Send.AllowedNetworks, ", ")
+		}
+		log.Infof("API Send module enabled with %d whitelisted wallets, networks: %s",
+			len(Configuration.API.Send.WhitelistedWallets), network)
 	} else {
 		log.Infof("API Send module disabled in configuration")
 	}
 }
 
+// validateAPISend checks the send API configuration and parses its networks.
+// There is deliberately no built-in wallet: a default secret shipped in the
+// source would let anyone who reads the code sign requests.
+func validateAPISend(cfg *APISendConfiguration) error {
+	if len(cfg.WhitelistedWallets) == 0 {
+		return fmt.Errorf("no whitelisted_wallets configured")
+	}
+	for id, w := range cfg.WhitelistedWallets {
+		if WeakHMACSecret(w.HMACSecret) {
+			return fmt.Errorf("whitelisted wallet %q has an insecure hmac_secret (placeholder or shorter than 32 characters); generate one with: openssl rand -hex 32", id)
+		}
+		if strings.TrimSpace(w.Username) == "" {
+			return fmt.Errorf("whitelisted wallet %q has no username", id)
+		}
+	}
+	nets, err := netutil.ParseNetworks(cfg.AllowedNetworks)
+	if err != nil {
+		return fmt.Errorf("allowed_networks: %w", err)
+	}
+	cfg.AllowedNets = nets
+	return nil
+}
+
+// WeakHMACSecret reports whether an HMAC secret is a placeholder or too short
+// to be trusted.
+func WeakHMACSecret(secret string) bool {
+	if len(secret) < 32 {
+		return true
+	}
+	s := strings.ToLower(secret)
+	for _, marker := range placeholderMarkers {
+		if strings.Contains(s, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// placeholderMarkers appear in example and template secrets. A secret that
+// contains one was copied from documentation, not generated, and is public.
+var placeholderMarkers = []string{"change-me", "changeme", "your-", "-here", "placeholder"}
+
+// parseTrustedProxies returns the proxies whose forwarding headers are
+// believed. An empty list means loopback (the usual local reverse proxy);
+// the single entry "none" means trust no proxy and always use the TCP peer.
+func parseTrustedProxies(entries []string) ([]*net.IPNet, error) {
+	if len(entries) == 0 {
+		entries = []string{"127.0.0.1", "::1"}
+	}
+	if len(entries) == 1 && strings.EqualFold(strings.TrimSpace(entries[0]), "none") {
+		return nil, nil
+	}
+	return netutil.ParseNetworks(entries)
+}
+
 // IsAPISendEnabled returns whether the API Send module is enabled
 func IsAPISendEnabled() bool {
 	return Configuration.API.Send.Enabled
+}
+
+// APISendSettlementTimeout returns how long to wait for an outgoing Lightning
+// payment to settle before reporting it back as still pending.
+func APISendSettlementTimeout() time.Duration {
+	return time.Duration(Configuration.API.Send.SettlementTimeout) * time.Second
 }
 
 // setAPIAnalyticsDefaults sets default values for API Analytics configuration
@@ -247,7 +524,7 @@ func setAPIAnalyticsDefaults() {
 
 	// Reject placeholder/insecure secrets
 	for keyID, apiKey := range Configuration.API.Analytics.APIKeys {
-		if strings.Contains(apiKey.HMACSecret, "change-me") || len(apiKey.HMACSecret) < 32 {
+		if WeakHMACSecret(apiKey.HMACSecret) {
 			log.Errorf("Analytics API key '%s' has an insecure HMAC secret (placeholder or too short). "+
 				"Generate a secure secret with: openssl rand -hex 32. Disabling analytics API.", keyID)
 			Configuration.API.Analytics.Enabled = false

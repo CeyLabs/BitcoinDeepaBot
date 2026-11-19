@@ -270,7 +270,7 @@ inlineResultFaucetDescription = """👉 Pencet disini untuk membuat sebuah keran
 
 inlineFaucetMessage                     = """Tekan ✅ untuk mengambil %s dari keran ini %s.
 
-🚰 Tersisa: %d/%s (diberikan kepada %d/%d pengguna)
+🚰 Tersisa: %s/%s (diberikan kepada %d/%d pengguna)
 %s"""
 inlineFaucetEndedMessage                = """🚰 Keran kosong 🍺\n\n🏅 %s diberikan kepada %d pengguna."""
 inlineFaucetAppendMemo                  = """\n✉️ %s"""

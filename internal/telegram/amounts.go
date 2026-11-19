@@ -40,7 +40,7 @@ func decodeAmountFromCommand(input string) (amount int64, err error) {
 	if len(strings.Split(input, " ")) < 2 {
 		errmsg := "message doesn't contain any amount"
 		// log.Errorln(errmsg)
-		return 0, fmt.Errorf(errmsg)
+		return 0, fmt.Errorf("%s", errmsg)
 	}
 	amount, err = GetAmount(strings.Split(input, " ")[1])
 	return amount, err

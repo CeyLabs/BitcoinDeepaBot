@@ -52,7 +52,11 @@ func NewBot() TipBot {
 
 	bot := TipBot{
 		DB:       dbs,
-		Client:   lnbits.NewClient(internal.Configuration.Lnbits.AdminKey, internal.Configuration.Lnbits.Url),
+		Client: lnbits.NewClient(
+			internal.Configuration.Lnbits.AdminKey,
+			internal.Configuration.Lnbits.AdminToken,
+			internal.Configuration.Lnbits.Url,
+		),
 		Bunt:     createBunt(internal.Configuration.Database.BuntDbPath),
 		ShopBunt: createBunt(internal.Configuration.Database.ShopBuntDbPath),
 		Telegram: newTelegramBot(),
@@ -123,6 +127,10 @@ func (bot *TipBot) Start() {
 	if err != nil {
 		log.Errorf("Could not initialize bot wallet: %s", err.Error())
 	}
+
+	// watch LNbits so the bot can switch to maintenance mode while it is down
+	bot.startLNbitsAlerts()
+	bot.Client.StartHealthCheck(context.Background())
 
 	// register telegram handlers
 	bot.registerTelegramHandlers()

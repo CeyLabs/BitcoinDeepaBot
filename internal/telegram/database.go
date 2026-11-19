@@ -27,12 +27,49 @@ import (
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Databases struct {
 	Users        *gorm.DB
 	Transactions *gorm.DB
 	Groups       *gorm.DB
+	Referrals    *gorm.DB
+}
+
+type ReferralEntry struct {
+	ID           uint   `gorm:"primaryKey;autoIncrement"`
+	TelegramID   int64  `gorm:"index;uniqueIndex:idx_referral_user_code"`
+	Username     string
+	ReferralCode string `gorm:"uniqueIndex:idx_referral_user_code"`
+	CreatedAt    time.Time
+}
+
+// migrateReferrals brings the referrals table up to the current schema.
+//
+// Older versions inserted a new row every time a user opened a referral link,
+// so a table can hold several rows for the same user and code. Those are
+// collapsed to the most recent one first: AutoMigrate then adds the unique
+// index on (telegram_id, referral_code), which would fail on duplicates and
+// stop the bot from starting.
+func migrateReferrals(db *gorm.DB) error {
+	if db.Migrator().HasTable(&ReferralEntry{}) {
+		latest := db.Model(&ReferralEntry{}).Select("MAX(id)").Group("telegram_id, referral_code")
+		if err := db.Where("id NOT IN (?)", latest).Delete(&ReferralEntry{}).Error; err != nil {
+			return fmt.Errorf("remove duplicate referral entries: %w", err)
+		}
+	}
+	return db.AutoMigrate(&ReferralEntry{})
+}
+
+// RecordReferral saves that a user opened the bot with a referral code. A
+// repeat click by the same user with the same code refreshes the existing row
+// instead of adding another, so a user cannot inflate a code's count.
+func RecordReferral(db *gorm.DB, entry ReferralEntry) error {
+	return db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "telegram_id"}, {Name: "referral_code"}},
+		DoUpdates: clause.AssignmentColumns([]string{"username", "created_at"}),
+	}).Create(&entry).Error
 }
 
 const (
@@ -144,10 +181,24 @@ func AutoMigration() *Databases {
 		panic(err)
 	}
 
+	referralsDbPath := internal.Configuration.Database.ReferralsDbPath
+	if referralsDbPath == "" {
+		referralsDbPath = "data/referrals.db"
+	}
+	referralsDb, err := gorm.Open(sqlite.Open(referralsDbPath), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
+	if err != nil {
+		panic("Initialize referrals orm failed.")
+	}
+	err = migrateReferrals(referralsDb)
+	if err != nil {
+		panic(err)
+	}
+
 	return &Databases{
 		Users:        orm,
 		Transactions: txLogger,
 		Groups:       groupsDb,
+		Referrals:    referralsDb,
 	}
 }
 

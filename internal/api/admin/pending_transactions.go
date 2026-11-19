@@ -3,9 +3,10 @@ package admin
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
+	"github.com/LightningTipBot/LightningTipBot/internal"
 	"github.com/LightningTipBot/LightningTipBot/internal/api"
+	"github.com/LightningTipBot/LightningTipBot/internal/netutil"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
 	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 	"github.com/gorilla/mux"
@@ -197,28 +198,8 @@ func (s Service) executePendingTransaction(pendingTx *api.PendingTransaction) er
 	return nil
 }
 
-// getClientIP extracts the real client IP from the request
+// getClientIP returns the request's client address for audit records. It only
+// believes forwarding headers from bot.trusted_proxies.
 func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header first
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// X-Forwarded-For can contain multiple IPs, take the first one
-		if ips := strings.Split(xff, ","); len(ips) > 0 {
-			return strings.TrimSpace(ips[0])
-		}
-	}
-
-	// Check X-Real-IP header
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
-
-	// Fall back to RemoteAddr
-	if host := r.RemoteAddr; host != "" {
-		if idx := strings.LastIndex(host, ":"); idx != -1 {
-			return host[:idx]
-		}
-		return host
-	}
-
-	return "unknown"
+	return netutil.ClientIPString(r, internal.Configuration.Bot.TrustedProxyNets)
 }

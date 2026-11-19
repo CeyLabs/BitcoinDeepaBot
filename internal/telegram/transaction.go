@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/LightningTipBot/LightningTipBot/internal/dca"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	tb "gopkg.in/lightningtipbot/telebot.v3"
 )
@@ -73,6 +74,7 @@ func (t *Transaction) Send() (success bool, err error) {
 	success, err = t.SendTransaction(t.Bot, t.From, t.To, t.Amount, t.Memo)
 	if success {
 		t.Success = success
+		go dca.NotifyDeposit(t.ToUser)
 	}
 
 	// save transaction to db
@@ -102,7 +104,7 @@ func (t *Transaction) SendTransaction(bot *TipBot, from *lnbits.User, to *lnbits
 	if balance < amount {
 		errmsg := fmt.Sprintf("available balance too low.")
 		log.Warnf("Available balance of user %s too low", fromUserStr)
-		return false, fmt.Errorf(errmsg)
+		return false, fmt.Errorf("%s", errmsg)
 	}
 
 	t.ToWallet = to.ID
@@ -125,7 +127,7 @@ func (t *Transaction) SendTransaction(bot *TipBot, from *lnbits.User, to *lnbits
 	_, err = from.Wallet.Pay(lnbits.PaymentParams{Out: true, Bolt11: invoice.PaymentRequest}, bot.Client)
 	if err != nil {
 		errmsg := fmt.Sprintf("[Send] Payment failed (%s to %s of %d sat): %s", fromUserStr, toUserStr, amount, err.Error())
-		log.Warnf(errmsg)
+		log.Warn(errmsg)
 		return false, err
 	}
 

@@ -24,13 +24,16 @@ func IsWhitelistedWallet(walletID string) bool {
 	return exists
 }
 
-// GetInternalNetworkCIDR returns the allowed internal network range
-func GetInternalNetworkCIDR() string {
-	return internal.Configuration.API.Send.InternalNetwork
+// GetMaxAPITransactionAmount returns the global maximum transaction amount
+func GetMaxAPITransactionAmount() int64 {
+	return internal.Configuration.API.Send.MaxAmount
 }
 
-// GetMaxAPITransactionAmount returns the maximum transaction amount
-func GetMaxAPITransactionAmount() int64 {
+// GetWalletMaxAmount returns the max amount for a specific wallet, falling back to global if not set
+func GetWalletMaxAmount(walletID string) int64 {
+	if wallet, exists := internal.Configuration.API.Send.WhitelistedWallets[walletID]; exists && wallet.MaxAmount > 0 {
+		return wallet.MaxAmount
+	}
 	return internal.Configuration.API.Send.MaxAmount
 }
 
@@ -39,8 +42,16 @@ func GetMinAPITransactionAmount() int64 {
 	return internal.Configuration.API.Send.MinAmount
 }
 
-// GetAdminApprovalThreshold returns the admin approval threshold
+// GetAdminApprovalThreshold returns the global admin approval threshold
 func GetAdminApprovalThreshold() int64 {
+	return internal.Configuration.API.Send.AdminApprovalThreshold
+}
+
+// GetWalletAdminApprovalThreshold returns the admin approval threshold for a specific wallet, falling back to global if not set
+func GetWalletAdminApprovalThreshold(walletID string) int64 {
+	if wallet, exists := internal.Configuration.API.Send.WhitelistedWallets[walletID]; exists && wallet.AdminApprovalThreshold > 0 {
+		return wallet.AdminApprovalThreshold
+	}
 	return internal.Configuration.API.Send.AdminApprovalThreshold
 }
 
