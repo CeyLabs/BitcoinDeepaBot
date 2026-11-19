@@ -1,7 +1,9 @@
 package internal
 
 import (
+	"crypto/ed25519"
 	"crypto/subtle"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"net/url"
@@ -215,7 +217,7 @@ type APISendConfiguration struct {
 	// InternalNetwork is deprecated and was never enforced. Use AllowedNetworks.
 	InternalNetwork string `yaml:"internal_network"`
 	// AllowedNetworks, when set, limits the send API to these CIDRs or IPs.
-	// Empty means no network restriction (HMAC still applies).
+	// Empty means no network restriction (signatures still apply).
 	AllowedNetworks        []string                     `yaml:"allowed_networks"`
 	AllowedNets            []*net.IPNet                 `yaml:"-"`
 	MaxAmount              int64                        `yaml:"max_amount"`
@@ -230,9 +232,28 @@ type APISendConfiguration struct {
 
 type WhitelistedWallet struct {
 	Username               string `yaml:"username"`                 // Telegram username without @
-	HMACSecret             string `yaml:"hmac_secret"`              // Unique HMAC secret for this wallet
 	AdminApprovalThreshold int64  `yaml:"admin_approval_threshold"` // 0 = use global
 	MaxAmount              int64  `yaml:"max_amount"`               // 0 = use global
+	// Ed25519PublicKey is the base64 32-byte public key the wallet signs with.
+	// The bot never sees the private key, so a config leak cannot forge sends.
+	Ed25519PublicKey string            `yaml:"ed25519_public_key"`
+	PublicKey        ed25519.PublicKey `yaml:"-"`
+	// HMACSecret is no longer supported. It is read only so that a leftover
+	// value stops the send API instead of being silently ignored.
+	HMACSecret string `yaml:"hmac_secret"`
+}
+
+// DecodeBase64Any decodes standard or URL-safe base64, padded or not.
+func DecodeBase64Any(s string) ([]byte, error) {
+	s = strings.TrimSpace(s)
+	var err error
+	for _, enc := range []*base64.Encoding{base64.StdEncoding, base64.RawStdEncoding, base64.URLEncoding, base64.RawURLEncoding} {
+		var b []byte
+		if b, err = enc.DecodeString(s); err == nil {
+			return b, nil
+		}
+	}
+	return nil, err
 }
 
 func init() {
@@ -457,7 +478,7 @@ func setAPISendDefaults() {
 		if len(Configuration.API.Send.AllowedNetworks) > 0 {
 			limits = append(limits, "send: "+strings.Join(Configuration.API.Send.AllowedNetworks, ", "))
 		}
-		network := "any (HMAC only)"
+		network := "any (signature only)"
 		if len(limits) > 0 {
 			network = strings.Join(limits, " AND ")
 		}
@@ -476,12 +497,18 @@ func validateAPISend(cfg *APISendConfiguration) error {
 		return fmt.Errorf("no whitelisted_wallets configured")
 	}
 	for id, w := range cfg.WhitelistedWallets {
-		if WeakHMACSecret(w.HMACSecret) {
-			return fmt.Errorf("whitelisted wallet %q has an insecure hmac_secret (placeholder or shorter than 32 characters); generate one with: openssl rand -hex 32", id)
+		if w.HMACSecret != "" {
+			return fmt.Errorf("whitelisted wallet %q has hmac_secret, which is no longer supported; remove it and set ed25519_public_key (see docs/send-api-ed25519.md)", id)
 		}
+		key, err := DecodeBase64Any(w.Ed25519PublicKey)
+		if w.Ed25519PublicKey == "" || err != nil || len(key) != ed25519.PublicKeySize {
+			return fmt.Errorf("whitelisted wallet %q needs a valid ed25519_public_key (base64 of 32 bytes; see docs/send-api-ed25519.md)", id)
+		}
+		w.PublicKey = ed25519.PublicKey(key)
 		if strings.TrimSpace(w.Username) == "" {
 			return fmt.Errorf("whitelisted wallet %q has no username", id)
 		}
+		cfg.WhitelistedWallets[id] = w
 	}
 	nets, err := netutil.ParseNetworks(cfg.AllowedNetworks)
 	if err != nil {

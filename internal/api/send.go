@@ -51,7 +51,7 @@ type SendResponse struct {
 }
 
 // NetworkAllowlistMiddleware limits the send API to api.send.allowed_networks.
-// With no networks configured it lets everything through and the HMAC check
+// With no networks configured it lets everything through and the Ed25519 signature check
 // is the only gate. The client address comes from netutil.ClientIP, which only
 // believes forwarding headers from bot.trusted_proxies.
 func NetworkAllowlistMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -117,7 +117,7 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get authenticated wallet from context (set by WalletHMACMiddleware)
+	// Get authenticated wallet from context (set by WalletAuthMiddleware)
 	authenticatedWallet := r.Context().Value("authenticated_wallet")
 	if authenticatedWallet == nil {
 		log.Error("[api/send] No authenticated wallet found in request context")
@@ -662,7 +662,7 @@ func (s Service) sendToInvoice(w http.ResponseWriter, r *http.Request, walletID,
 	//
 	// The budget is measured from when the request entered the handler chain,
 	// not from the Pay call: the server's write deadline is already ticking
-	// through HMAC verification, the user lookup and the balance check.
+	// through signature verification, the user lookup and the balance check.
 	elapsedSince := payStart
 	if start, ok := RequestStart(r.Context()); ok {
 		elapsedSince = start
