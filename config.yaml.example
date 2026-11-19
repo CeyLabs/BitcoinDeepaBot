@@ -85,8 +85,7 @@ api:
     max_amount: 100000        # sats per transfer
     daily_limit: 500000       # sats per sender per UTC day
     rate_limit_per_minute: 10
-    init_data_max_age: 3600   # seconds
-    spend_init_data_max_age: 600  # seconds; shorter window for /send and /invoice/pay
+    init_data_max_age: 3600   # seconds; max age of the Telegram login sent to /api/v1/init
     max_memo_length: 280
     # Required when enabled: base64 Ed25519 P2P public key of the DCA backend,
     # which signs every call. Not the same key as its send wallet key.
@@ -100,11 +99,6 @@ api:
     # request the "openid profile" scopes.
     oidc_enabled: false
     # oidc_client_id: ""  # bot ID the web app logs in with; empty = this bot
-    # Let the DCA backend name the user with X-BDB-User (signature V2) instead of
-    # sending a Telegram credential on every call. Only users linked by a
-    # Telegram-verified POST /api/v1/init. Until passkeys exist, the P2P key can
-    # then pay from linked users' wallets (up to daily_limit). See docs/p2p-api.md.
-    service_user_auth: false
   # Analytics API - data export endpoints, authenticated with Ed25519
   # signatures (see docs/send-api-ed25519.md). Each consumer keeps its
   # private key; only the public key goes here.

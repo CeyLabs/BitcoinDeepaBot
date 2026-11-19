@@ -48,18 +48,18 @@ func withP2PConfig(t *testing.T) {
 	t.Cleanup(func() { internal.Configuration.Telegram, internal.Configuration.API.P2P = savedTG, savedP2P })
 	internal.Configuration.Telegram.ApiKey = "123:REAL"
 	internal.Configuration.API.P2P.InitDataMaxAge = 3600
-	internal.Configuration.API.P2P.SpendInitDataMaxAge = 600
 	internal.Configuration.API.P2P.ServiceKey = testServiceKey.Public().(ed25519.PublicKey)
 }
 
-// serveP2PAuth runs r through Auth or AuthSpend and reports the status, error
-// code and whether the handler was reached.
-func serveP2PAuth(r *http.Request, spend bool) (int, string, bool) {
+// serveP2PAuth runs r through AuthNewUser (login, Telegram credential) or
+// Auth (X-BDB-User) and reports the status, error code and whether the
+// handler was reached.
+func serveP2PAuth(r *http.Request, login bool) (int, string, bool) {
 	reached := false
 	p := &P2PService{}
 	h := p.Auth
-	if spend {
-		h = p.AuthSpend
+	if login {
+		h = p.AuthNewUser
 	}
 	rec := httptest.NewRecorder()
 	h(func(w http.ResponseWriter, r *http.Request) { reached = true })(rec, r)
@@ -73,18 +73,16 @@ func TestP2PAuthRejectsBadInitData(t *testing.T) {
 	user := tma.User{ID: 42, FirstName: "Eve"}
 	cases := map[string]struct {
 		initData string
-		spend    bool
 	}{
-		"no init data":       {"", false},
-		"garbage":            {"hello", false},
-		"other bot's token":  {tma.Sign(user, "999:OTHER", time.Now(), nil), false},
-		"expired":            {tma.Sign(user, "123:REAL", time.Now().Add(-2*time.Hour), nil), false},
-		"too old for spends": {tma.Sign(user, "123:REAL", time.Now().Add(-20*time.Minute), nil), true},
+		"no init data":      {""},
+		"garbage":           {"hello"},
+		"other bot's token": {tma.Sign(user, "999:OTHER", time.Now(), nil)},
+		"expired":           {tma.Sign(user, "123:REAL", time.Now().Add(-2*time.Hour), nil)},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			r := p2pRequest(http.MethodPost, "/api/v1/p2p/send", "{}", tc.initData, time.Now(), p2pNonce(), testServiceKey)
-			code, errCode, reached := serveP2PAuth(r, tc.spend)
+			r := p2pRequest(http.MethodPost, "/api/v1/init", "{}", tc.initData, time.Now(), p2pNonce(), testServiceKey)
+			code, errCode, reached := serveP2PAuth(r, true)
 			if code != http.StatusUnauthorized || reached || errCode != "unauthorized" {
 				t.Fatalf("got %d %q, reached=%v; want 401 unauthorized", code, errCode, reached)
 			}
@@ -124,7 +122,7 @@ func TestP2PAuthRejectsBadServiceSignature(t *testing.T) {
 	for name, req := range cases {
 		t.Run(name, func(t *testing.T) {
 			internal.Configuration.API.P2P.ServiceKey = testServiceKey.Public().(ed25519.PublicKey)
-			code, errCode, reached := serveP2PAuth(req(), true)
+			code, errCode, reached := serveP2PAuth(req(), false)
 			if code != http.StatusUnauthorized || reached || errCode != "bad_service_signature" {
 				t.Fatalf("got %d %q, reached=%v; want 401 bad_service_signature", code, errCode, reached)
 			}
@@ -142,13 +140,13 @@ func TestP2PAuthIPAllowlist(t *testing.T) {
 
 	r := p2pRequest(http.MethodPost, "/api/v1/p2p/send", "{}", initData, time.Now(), p2pNonce(), testServiceKey)
 	r.RemoteAddr = "198.51.100.4:1"
-	if code, errCode, reached := serveP2PAuth(r, true); code != http.StatusForbidden || errCode != "forbidden" || reached {
+	if code, errCode, reached := serveP2PAuth(r, false); code != http.StatusForbidden || errCode != "forbidden" || reached {
 		t.Fatalf("outside IP: got %d %q reached=%v, want 403 forbidden", code, errCode, reached)
 	}
 
 	// From the allowed IP the request gets past the IP check (and then fails
 	// on the expired init data).
-	r = p2pRequest(http.MethodPost, "/api/v1/p2p/send", "{}", initData, time.Now(), p2pNonce(), testServiceKey)
+	r = p2pRequest(http.MethodPost, "/api/v1/init", "{}", initData, time.Now(), p2pNonce(), testServiceKey)
 	r.RemoteAddr = "203.0.113.7:1"
 	if code, errCode, _ := serveP2PAuth(r, true); code != http.StatusUnauthorized || errCode != "unauthorized" {
 		t.Fatalf("allowed IP: got %d %q, want 401 unauthorized", code, errCode)
@@ -372,19 +370,19 @@ func TestP2PIdentifyWithIDToken(t *testing.T) {
 	}
 }
 
-func TestP2PAuthSpendWithIDToken(t *testing.T) {
+func TestP2PLoginWithIDToken(t *testing.T) {
 	withP2PConfig(t)
 	priv := withTestOIDC(t)
 
-	// A login older than spend_init_data_max_age can't send.
-	old := testIDToken(priv, 987654321, time.Now().Add(-20*time.Minute))
-	if code, errCode, reached := serveP2PAuth(p2pTokenRequest("/api/v1/p2p/send", old, testServiceKey), true); code != http.StatusUnauthorized || errCode != "unauthorized" || reached {
+	// A login older than init_data_max_age can't log in.
+	old := testIDToken(priv, 987654321, time.Now().Add(-2*time.Hour))
+	if code, errCode, reached := serveP2PAuth(p2pTokenRequest("/api/v1/init", old, testServiceKey), true); code != http.StatusUnauthorized || errCode != "unauthorized" || reached {
 		t.Fatalf("old login: got %d %q reached=%v", code, errCode, reached)
 	}
 
 	// The service signature covers the ID token: swapping in another
 	// user's token breaks it.
-	r := p2pTokenRequest("/api/v1/p2p/send", testIDToken(priv, 1, time.Now()), testServiceKey)
+	r := p2pTokenRequest("/api/v1/init", testIDToken(priv, 1, time.Now()), testServiceKey)
 	r.Header.Set(IDTokenHeader, testIDToken(priv, 2, time.Now()))
 	if code, errCode, _ := serveP2PAuth(r, true); code != http.StatusUnauthorized || errCode != "bad_service_signature" {
 		t.Fatalf("swapped token: got %d %q, want 401 bad_service_signature", code, errCode)
