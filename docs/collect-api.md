@@ -2,15 +2,12 @@
 
 A whitelisted wallet (for example the DCA backend's) can ask a user to **pay
 it**: for example, a user who sells bitcoin. The API only creates the
-request. **Nothing moves until the user approves it**, so a leaked key can
-send prompts but can never take sats.
+request. **Nothing moves until the user approves it** in the Mini App or web
+app, through the DCA backend with the user's own Telegram credential (see
+[P2P API](p2p-api.md)). A leaked wallet key alone can't take sats.
 
-The user approves in one of two ways:
-
-- **Bot chat:** the bot sends the user a message with **✅ Pay** and **🚫 Decline**.
-  Pressing Pay is the approval.
-- **Mini App or web app:** through the DCA backend, with the user's own
-  Telegram credential (see [P2P API](p2p-api.md)).
+The bot sends no message about the request: the DCA backend shows it in the
+Mini App or web app.
 
 Approving creates a normal P2P transfer from the user to the wallet, so
 balance checks, settlement and status work the same as for `/p2p/send`.
@@ -39,23 +36,17 @@ gets `403 collect_not_allowed`.
 ### `POST /api/v1/collect`
 
 ```json
-{ "to": "@alice", "amount": 50000, "memo": "Sell order #812", "external_id": "6b1f…uuid", "chat_prompt": false }
+{ "to": "@alice", "amount": 50000, "memo": "Sell order #812", "external_id": "6b1f…uuid" }
 ```
 
 - `to`: a Telegram `@username` or numeric ID. Prefer the ID: usernames can
   change hands. The user must have started the bot.
-- `chat_prompt`: optional, default `true`. `true` sends the user **Pay / Decline**
-  buttons in the bot chat. Set `false` when the user approves in the Mini App
-  or web app and you don't want a chat message.
 - `external_id`: 8–128 characters, unique per request (use your order ID or a
   UUID). Retrying with the same `external_id` returns the same request (`200`
   instead of `201`). The same `external_id` with a different user, amount or
   memo is refused with `409 idempotency_conflict`.
 
 Returns `201` with a [request](#request). It expires after **15 minutes**.
-`notified: false` means no chat message was sent: either `chat_prompt`
-was `false`, or the bot could not message the user (for example, they blocked the
-bot). They can still approve in the Mini App.
 
 At most 10 requests per wallet per user per hour (`429 rate_limited`).
 
@@ -63,7 +54,7 @@ At most 10 requests per wallet per user per hour (`429 rate_limited`).
 
 The current state of one of your requests. Poll every 3–5 seconds while
 `status` is `pending`, and while `approved` but `paid` is `false` and the
-transfer is still `processing`, `awaiting_confirmation` or `in_flight`.
+transfer is still `processing` or `in_flight`.
 
 ### `POST /api/v1/collect/{id}/cancel`
 
@@ -84,11 +75,10 @@ request is for can see or answer it; anyone else gets `404`.
 Both bodies are empty (`{}` is fine). The request ID reaches the Mini App
 from the DCA backend, which created it.
 
-Like any Mini App send, an amount above the user's daily no-confirmation
-allowance also needs Confirm in the bot chat: the transfer is then
-`awaiting_confirmation`. The P2P daily limit does not apply to collect
-requests, since each one is approved by the user; the wallet's `max_amount`
-does.
+`approve` pays straight away; there is no confirmation in the bot chat, so
+show the user a review screen first. The P2P daily limit does not apply to
+collect requests, since each one is approved by the user; the wallet's
+`max_amount` does.
 
 ## Request
 
@@ -98,7 +88,7 @@ does.
   "amount": 50000, "amount_lkr": "…", "memo": "Sell order #812", "external_id": "6b1f…uuid",
   "payer": { "telegram_id": 111, "username": "alice" },
   "collector": { "telegram_id": 999, "username": "BiccoindeepaDSA", "name": "…" },
-  "notified": true, "expires_at": "…", "created_at": "…",
+  "expires_at": "…", "created_at": "…",
   "transfer": { "id": "p2p-col-…", "status": "completed", "…": "…" }
 }
 ```

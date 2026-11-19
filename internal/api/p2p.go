@@ -282,7 +282,7 @@ func decodeBody(w http.ResponseWriter, r *http.Request, v interface{}) bool {
 	return true
 }
 
-// RecipientResponse is what the Mini App shows on the confirm screen.
+// RecipientResponse is what the Mini App shows on its review screen.
 type RecipientResponse struct {
 	TelegramID int64  `json:"telegram_id"`
 	Username   string `json:"username,omitempty"`
@@ -327,7 +327,6 @@ type TransferResponse struct {
 	Description string             `json:"description,omitempty"`
 	Preimage    string             `json:"preimage,omitempty"`
 	Error       string             `json:"error,omitempty"`
-	ConfirmBy   *time.Time         `json:"confirm_by,omitempty"`
 	CreatedAt   time.Time          `json:"created_at"`
 }
 
@@ -342,14 +341,12 @@ func toTransferResponse(t *telegram.P2PTransfer) TransferResponse {
 	if t.Status == telegram.P2PCompleted {
 		resp.Preimage = t.Preimage
 	}
-	if t.Status == telegram.P2PAwaitingConfirmation {
-		c := t.ConfirmBy
-		resp.ConfirmBy = &c
-	}
 	return resp
 }
 
-// statusCode: 200 done (either way), 202 still pending (confirm or settle).
+// statusCode: 200 done (either way), 202 still running or settling.
+// awaiting_confirmation only appears on transfers from before confirmations
+// were removed.
 func statusCode(t *telegram.P2PTransfer) int {
 	switch t.Status {
 	case telegram.P2PAwaitingConfirmation, telegram.P2PProcessing, telegram.P2PInFlight:
@@ -406,7 +403,6 @@ func (p *P2PService) DecodeInvoice(w http.ResponseWriter, r *http.Request) {
 	p2pWriteJSON(w, http.StatusOK, map[string]interface{}{
 		"amount": dec.Amount, "amount_lkr": thirdparty.FormatSatsWithLKR(dec.Amount),
 		"description": dec.Description, "payment_hash": dec.PaymentHash, "expires_at": dec.ExpiresAt,
-		"needs_confirmation": dec.Amount > p.Bot.P2PUnconfirmedRemaining(sender.Telegram.ID),
 		"over_limit":         dec.Amount > cfg.MaxAmount,
 	})
 }
@@ -489,8 +485,7 @@ func (p *P2PService) meBody(sender *lnbits.User) (map[string]interface{}, error)
 		"balance": balance, "balance_lkr": thirdparty.FormatSatsWithLKR(balance),
 		"limits": map[string]int64{
 			"max_amount": cfg.MaxAmount, "daily_limit": cfg.DailyLimit, "daily_used": used,
-			"daily_remaining": remaining, "confirm_threshold": cfg.ConfirmThreshold,
-			"unconfirmed_remaining": p.Bot.P2PUnconfirmedRemaining(sender.Telegram.ID),
+			"daily_remaining": remaining,
 		},
 	}, nil
 }
