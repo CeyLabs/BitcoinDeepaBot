@@ -50,7 +50,7 @@ BDB-P2P-ED25519-V2
 ```
 
 - **Header:** `X-BDB-User: <numeric telegram_id>`.
-- **Built now (interim, behind `api.p2p.service_user_auth`):** V2 works on every P2P endpoint, payments included, but only for users linked by a Telegram-verified `POST /api/v1/init`. `/api/v1/init` itself always needs V1. Until passkeys land, a leaked P2P key can pay from linked users' wallets up to `daily_limit`.
+- **Built now (interim):** V2 is the only mode on every P2P endpoint, payments included, for users linked by a Telegram-verified `POST /api/v1/init`. `/api/v1/init` is the only call that takes the Telegram credential (V1). Until passkeys land, a leaked P2P key can pay from linked users' wallets up to `daily_limit`.
 - **Target, with passkeys:** V2 is allowed for all reads (`/me`, resolve, decode, transfer and collect status), and for **starting** a payment. It never moves sats by itself: every spend also needs a passkey (§6).
 - **V1** (Telegram credential) stays, and is **required** for `/api/v1/init` and for adding a passkey (§5).
 

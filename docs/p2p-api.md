@@ -2,90 +2,88 @@
 
 Lets the BitcoinDeepa Telegram Mini App, and the web app that uses
 "Log In with Telegram", send sats to other bot users and pay Lightning invoices.
+All calls come from the **DCA backend**, which serves both apps.
 
-- **Base URL:** `https://bitcoindeepa.com/api/v1/p2p`
+- **Base URL:** `https://bitcoindeepa.com/api/v1/p2p` (plus `POST /api/v1/init`)
 - **Off by default.** Enable with `api.p2p.enabled: true` (see Configuration).
 
-## Authentication: who is sending
+## Authentication
 
-Every request carries **exactly one** credential signed by Telegram,
-**unchanged**:
+Two parts, on every call:
+
+1. **Who is calling:** the DCA backend signs the request with its P2P key
+   (Ed25519). Only it can call these endpoints.
+2. **Who the user is:**
+   - **Login, `POST /api/v1/init` only:** the user's Telegram login, which the
+     bot checks with Telegram. This links the user.
+   - **Every other call:** `X-BDB-User: <telegram_id>`. The bot trusts the DCA
+     backend's signature for it, but only for **linked** users.
+
+```
+Mini App ──(initData)──► DCA backend ──POST /api/v1/init + X-Telegram-Init-Data──► bot   (login, once)
+web app  ──(id_token)──► DCA backend ──POST /api/v1/init + X-Telegram-ID-Token───► bot   (login, once)
+app      ──(session)───► DCA backend ──/api/v1/p2p/* + X-BDB-User──────────────────► bot   (every other call)
+```
+
+The DCA backend keeps its own session for the user (cookies, refresh tokens).
+The Telegram login is needed again only to log in on a new device, or after a
+link expires (one year without a login).
+
+### Login: the Telegram credential (`POST /api/v1/init` only)
+
+Send **exactly one** credential signed by Telegram, **unchanged**:
 
 | From | Header | Value |
 |---|---|---|
-| Mini App | `X-Telegram-Init-Data` | `window.Telegram.WebApp.initData` |
+| Mini App | `X-Telegram-Init-Data` | `window.Telegram.WebApp.initData` (the raw string, not `initDataUnsafe`) |
 | Web app | `X-Telegram-ID-Token` | the `id_token` from Log In with Telegram (OIDC) |
 
-The bot checks Telegram's signature (the bot token for init data, Telegram's
-published keys for ID tokens), and the sender is **always** the Telegram user
-in that credential. Nothing else in a request can name or change the sender. A
-backend that relays the request cannot send on anyone's behalf. A request with
-both headers is rejected.
+- The bot checks Telegram's signature: the bot token for init data, and
+  Telegram's published keys for ID tokens.
+- The user is **always** the Telegram user in that credential.
+- The login can be at most `init_data_max_age` old (default 1 hour). If it's
+  older, ask the user to reopen the Mini App or log in again.
+- Sending both headers, or `X-BDB-User` on `/api/v1/init`, is rejected.
 
-- Init data older than `init_data_max_age` (default 1 hour) is rejected: ask
-  the user to reopen the Mini App.
-- `/send` and `/invoice/pay` move sats, so they accept only init data younger
-  than `spend_init_data_max_age` (default 10 minutes). Telegram sets
-  `initData` when the Mini App opens, so a user who has had it open longer
-  gets `401 unauthorized` on send: ask them to close and reopen the Mini App,
-  then retry with the **same** `idempotency_key`. Check `auth_date` in
-  `initDataUnsafe` to warn them before they tap Send.
-- Pass `initData` (the raw string), not `initDataUnsafe`.
-
-### Web app: Log In with Telegram (OIDC)
-
-Turn it on with `api.p2p.oidc_enabled: true`. The bot then accepts ID tokens
-from [Log In with Telegram](https://core.telegram.org/bots/telegram-login):
-
-- Log in with **this bot** (@BitcoinDeepaBot) as the client. The token's `aud`
-  must be the bot ID (`oidc_client_id`, by default the number before `:` in the
-  bot token).
-- Request the **`openid profile`** scopes. The bot reads the user from the
-  `id` claim, which only comes with `profile`. (`sub` is not the Telegram ID.)
+**Web app (OIDC).** Turn it on with `api.p2p.oidc_enabled: true`:
+- Log in with **this bot** as the client. The token's `aud` must be the bot ID
+  (`oidc_client_id`, by default the number before `:` in the bot token).
+- Request the **`openid profile`** scopes. The user comes from the `id` claim,
+  which only comes with `profile`. (`sub` is not the Telegram ID.)
 - The bot checks the signature against
   `https://oauth.telegram.org/.well-known/jwks.json` (RS256, ES256 or EdDSA),
-  `iss` = `https://oauth.telegram.org`, `aud`, and `exp`.
-- The same age limits apply to the token's login time (`iat`): up to
-  `init_data_max_age` for reads, and up to `spend_init_data_max_age`
-  (default **10 minutes**) for `/send` and `/invoice/pay`. ID tokens can't be
-  refreshed, so if the login is older than that, ask the user to tap
-  **Log In with Telegram** again before sending, then retry with the same
-  `idempotency_key`. Check `iat` in the token to prompt them before they tap
-  Send.
-- Keep the ID token on the web app server (e.g. in the session), not in the
-  browser's storage.
+  plus `iss` = `https://oauth.telegram.org`, `aud` and `exp`.
 
-### Calling it from the Mini App or web app
+### Every other call: `X-BDB-User`
 
-Call it **from the DCA backend**, which serves both the Mini App and the web
-app. Never call it from the browser. Set `api.p2p.allowed_networks`
-to the DCA backend's IPs so the P2P routes answer only them (`403 forbidden`
-otherwise). If the global `api.allowed_networks` is set too, it also covers
-`/api/v1/p2p/*`, so the DCA backend must be in **both** lists:
+- Header `X-BDB-User: <numeric telegram_id>`, and **no** Telegram credential.
+  A call that sends a credential instead gets `401`.
+- **Linked users only:** users who logged in through `POST /api/v1/init`.
+  Others get `403 login_required`, so call `/api/v1/init` with their Telegram
+  login. A link lasts a year and is renewed by each login.
+- **Security:** the bot trusts the DCA backend about who the user is,
+  **payments included**. If the P2P key leaks, it can pay from any linked
+  user's wallet, up to `daily_limit`. Passkeys will add per-payment approval
+  ([session-passkey-spec.md](session-passkey-spec.md)). Keep the P2P key in a
+  secret store and the user sessions server-side.
 
-```
-Mini App ──(initData)──► DCA backend ──(X-Telegram-Init-Data + service signature)──► bot
-web app  ──(session)───► DCA backend ──(X-Telegram-ID-Token  + service signature)──► bot
-```
+### The service signature
 
-The server forwards the credential as-is and adds nothing that identifies a
-user. One backend and one P2P service key serve both. This key is **separate** from the
-DCA backend's send-wallet key (see `docs/dca-backend-integration.md`).
+Call the bot **from the DCA backend**, never from the browser. Set
+`api.p2p.allowed_networks` to the DCA backend's IPs so these routes answer
+only them (`403 forbidden` otherwise). If the global `api.allowed_networks`
+is set too, the DCA backend must be in **both** lists.
 
-## Authentication: who is calling (service signature)
-
-The DCA backend also signs **every** call with its own Ed25519 key, so only it
-can call `/api/v1/p2p/*`, even if the IP allowlist is wrong or empty. The bot stores
-only the public key (`service_public_key`). P2P stays off until it is set.
-
-Create the key pair on the DCA backend:
+The bot stores only the public key (`service_public_key`). P2P stays off until
+it is set. Create the key pair on the DCA backend:
 
 ```bash
 openssl genpkey -algorithm ed25519 -out p2p-service.pem                        # keep secret, DCA backend only
 openssl pkey -in p2p-service.pem -pubout -outform DER | tail -c 32 | base64    # → service_public_key
 ```
 
-Headers, added by the DCA backend:
+This key is **separate** from the DCA backend's send-wallet key (see
+`docs/dca-backend-integration.md`).
 
 | Header        | Value |
 |---------------|-------|
@@ -93,21 +91,25 @@ Headers, added by the DCA backend:
 | `X-Nonce`     | 16–128 random chars `[A-Za-z0-9_-]`, new for every request |
 | `X-Signature` | Base64 Ed25519 signature of the string below |
 
-Signing string: eight lines joined with `\n`, no trailing newline:
+Signing string: eight lines joined with `\n`, no trailing newline. The first
+line and the seventh line depend on the call:
 
 ```
-BDB-P2P-ED25519-V1
-<METHOD>
-<PATH>                                  exactly as sent, still percent-encoded, e.g. /api/v1/p2p/send
-<QUERY>                                 raw query without "?", or empty
-<TIMESTAMP>
-<NONCE>
-<hex sha256 of the credential>         the X-Telegram-Init-Data or X-Telegram-ID-Token value
-<hex sha256 of the exact body bytes>    (sha256 of empty string for GET)
+BDB-P2P-ED25519-V1  (login)            BDB-P2P-ED25519-V2  (every other call)
+<METHOD>                               <METHOD>
+<PATH>                                 <PATH>
+<QUERY>                                <QUERY>
+<TIMESTAMP>                            <TIMESTAMP>
+<NONCE>                                <NONCE>
+<hex sha256 of the credential>         <telegram_id, exactly as in X-BDB-User>
+<hex sha256 of the exact body bytes>   <hex sha256 of the exact body bytes>
 ```
 
-The credential is signed too, so a captured request can't be reused with
-another user's credential. Each nonce works once.
+- `<PATH>` is exactly as sent, still percent-encoded, e.g. `/api/v1/p2p/send`.
+  `<QUERY>` is the raw query without `?`, or empty.
+- The body hash for an empty body is the SHA-256 of the empty string.
+- The credential and the user ID are signed, so neither can be swapped in
+  transit. Each nonce works once.
 
 ```js
 // DCA backend (Node.js)
@@ -115,56 +117,26 @@ const crypto = require("crypto");
 const key = crypto.createPrivateKey(process.env.P2P_SERVICE_KEY_PEM);
 const sha = (s) => crypto.createHash("sha256").update(s).digest("hex");
 
-// cred: { initData } from the Mini App, or { idToken } from the web app session
-function p2pHeaders(method, path, query, cred, body) {
+// who: { initData } or { idToken } for POST /api/v1/init, { telegramId } for everything else
+function p2pHeaders(method, path, query, who, body) {
   const ts = Math.floor(Date.now() / 1000).toString();
   const nonce = crypto.randomBytes(16).toString("hex");
-  const value = cred.initData ?? cred.idToken;
-  const msg = ["BDB-P2P-ED25519-V1", method, path, query, ts, nonce, sha(value), sha(body)].join("\n");
-  return {
-    "Content-Type": "application/json",
-    [cred.initData ? "X-Telegram-Init-Data" : "X-Telegram-ID-Token"]: value,
-    "X-Timestamp": ts,
-    "X-Nonce": nonce,
-    "X-Signature": crypto.sign(null, Buffer.from(msg), key).toString("base64"),
-  };
+  const h = { "Content-Type": "application/json", "X-Timestamp": ts, "X-Nonce": nonce };
+  let lines;
+  if (who.telegramId) {
+    h["X-BDB-User"] = String(who.telegramId);
+    lines = ["BDB-P2P-ED25519-V2", method, path, query, ts, nonce, String(who.telegramId), sha(body)];
+  } else {
+    const value = who.initData ?? who.idToken;
+    h[who.initData ? "X-Telegram-Init-Data" : "X-Telegram-ID-Token"] = value;
+    lines = ["BDB-P2P-ED25519-V1", method, path, query, ts, nonce, sha(value), sha(body)];
+  }
+  h["X-Signature"] = crypto.sign(null, Buffer.from(lines.join("\n")), key).toString("base64");
+  return h;
 }
-// fetch(`${BOT}/api/v1/p2p/send`, { method: "POST", headers: p2pHeaders("POST", "/api/v1/p2p/send", "", { initData }, body), body })
+// login: fetch(`${BOT}/api/v1/init`, { method: "POST", headers: p2pHeaders("POST", "/api/v1/init", "", { initData }, "{}"), body: "{}" })
+// send:  fetch(`${BOT}/api/v1/p2p/send`, { method: "POST", headers: p2pHeaders("POST", "/api/v1/p2p/send", "", { telegramId: 111 }, body), body })
 ```
-
-## Without a Telegram credential on each call (V2)
-
-With `api.p2p.service_user_auth: true`, the DCA backend can name the user
-itself, so it keeps its own long session and doesn't forward a Telegram
-login on every call:
-
-- Header `X-BDB-User: <numeric telegram_id>`, and **no**
-  `X-Telegram-Init-Data` / `X-Telegram-ID-Token`.
-- The service signature uses version `BDB-P2P-ED25519-V2`, and its seventh
-  line is the user ID exactly as sent, instead of the credential hash:
-
-```
-BDB-P2P-ED25519-V2
-<METHOD>
-<PATH>
-<QUERY>
-<TIMESTAMP>
-<NONCE>
-<telegram_id>
-<hex sha256 of the exact body bytes>
-```
-
-- **Linked users only.** V2 works only for users who made a call with a
-  Telegram credential the bot verified, normally `POST /api/v1/init`. Others
-  get `403 login_required`: call `/api/v1/init` with their Mini App init data
-  or ID token first. A link lasts a year and is renewed by each V1 call.
-- **`/api/v1/init` always needs the Telegram credential (V1).** V2 there gets
-  `401 login_required`.
-- V1 keeps working on every endpoint.
-- **Security:** with V2 the bot trusts the DCA backend about who the user is,
-  payments included. A leaked P2P key could spend from any linked user's
-  wallet, up to `daily_limit`, until passkeys are added
-  ([session-passkey-spec.md](session-passkey-spec.md)).
 
 ## Rules
 
@@ -200,11 +172,11 @@ BDB-P2P-ED25519-V2
 ## Endpoints
 
 ### `POST /api/v1/init`
-Creates the user's wallet if they never pressed Start in the bot, the same
-way `/start` does. Note the path: it is not under `/p2p/`, but it is signed and
-authenticated exactly like the P2P endpoints (service signature + init data or
-ID token, and `api.p2p.allowed_networks`). Every other P2P endpoint answers
-`403 sender_not_found` until the user has a wallet, so call this first.
+The **login** call, and the only one that carries the Telegram credential (see
+Authentication). It creates the user's wallet if they never pressed Start in
+the bot, the same way `/start` does, and links the user for `X-BDB-User`. It's
+safe to call on every login. Note the path: it is not under `/p2p/`, but the
+P2P service signature and `api.p2p.allowed_networks` apply.
 
 ```json
 { "referral_code": "PROMO2024" }
@@ -276,8 +248,8 @@ seconds anyway. Polls are limited to 30 per minute per sender.
 
 ### Collect requests
 `GET /collect/{id}`, `POST /collect/{id}/approve` and `POST /collect/{id}/decline`
-let the user answer a request from a wallet to pay it. `approve` needs a fresh
-login, like `/send`. See [collect-api.md](collect-api.md).
+let the user answer a request from a wallet to pay it. See
+[collect-api.md](collect-api.md).
 
 ## Transfer
 
@@ -311,7 +283,8 @@ login, like `/send`. See [collect-api.md](collect-api.md).
 | HTTP | `code` |
 |---|---|
 | 400 | `invalid_json`, `invalid_amount`, `amount_too_large`, `memo_too_long`, `invalid_idempotency_key`, `invalid_recipient`, `self_send`, `invalid_invoice`, `amountless_invoice`, `invoice_expired` |
-| 401 | `unauthorized`: credential missing, invalid or expired, both credentials sent, or (for spends) the login is older than `spend_init_data_max_age`. Mini App: reopen it. Web app: log in with Telegram again. |
+| 401 | `unauthorized`: on `/api/v1/init`, the Telegram login is missing, invalid, too old or sent twice (Mini App: reopen it; web app: log in again). On other calls, `X-BDB-User` is missing or not a number, or a Telegram credential was sent instead. |
+| 401 / 403 | `login_required`: `X-BDB-User` sent to `/api/v1/init` (401), or the user isn't linked yet (403): log them in with `POST /api/v1/init`. |
 | 401 | `bad_service_signature`: the DCA backend's P2P signature is missing, wrong, expired or replayed. A server bug, not a user error. |
 | 403 | `forbidden` (caller's IP not in `api.p2p.allowed_networks`), `sender_not_found` (no wallet yet: call `POST /api/v1/init`), `sender_not_allowed` |
 | 503 | `wallet_unavailable` (wallet creation failed; retry) |
@@ -332,11 +305,9 @@ api:
     max_amount: 100000
     daily_limit: 500000
     rate_limit_per_minute: 10
-    init_data_max_age: 3600
-    spend_init_data_max_age: 600   # /send and /invoice/pay
+    init_data_max_age: 3600        # max age of the Telegram login sent to /api/v1/init
     max_memo_length: 280
     service_public_key: "<base64 Ed25519 P2P public key of the DCA backend>"   # required
     oidc_enabled: true    # accept Log In with Telegram ID tokens from the web app
     # oidc_client_id: "1234567890"   # bot ID the web app logs in with; default: this bot
-    service_user_auth: false   # true: accept X-BDB-User (V2) for users linked via /api/v1/init
 ```

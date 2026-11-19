@@ -1,9 +1,15 @@
-# Init API: create a wallet from the Mini App or web app
+# Init API: log in and create a wallet from the Mini App or web app
 
-`POST /api/v1/init` creates a bot wallet for a Telegram user who never pressed
-**Start** in the bot, the same way `/start` does. Until a user has a wallet,
-every `/api/v1/p2p/*` call answers `403 sender_not_found`, and nobody can send
-to them or collect from them.
+`POST /api/v1/init` is the **login** call. It's the only call that carries the
+user's Telegram credential, and the bot checks it with Telegram. It:
+
+- creates a bot wallet for a user who never pressed **Start** in the bot, the
+  same way `/start` does;
+- **links** the user, so the DCA backend can name them with `X-BDB-User` on
+  every other call for a year (renewed by each login).
+
+Until a user has logged in this way, every `/api/v1/p2p/*` call for them
+answers `403 login_required`.
 
 The user is always the one in the Telegram-signed credential, so a caller
 can't create a wallet for anyone else.
@@ -12,8 +18,8 @@ Called by the **DCA backend**, which serves the Mini App and the web app.
 
 ## When to call it
 
-- On first open of the Mini App or web app, or
-- when any P2P call answers `403 sender_not_found`.
+- When the user logs in (first open on a device), or
+- when any P2P call answers `403 login_required` or `403 sender_not_found`.
 
 It's safe to call on every open: for an existing user it creates nothing
 and returns `200`.
@@ -24,8 +30,9 @@ and returns `200`.
 POST /api/v1/init
 ```
 
-Note the path: it is **not** under `/p2p/`, but it is authenticated exactly
-like the P2P endpoints (see [p2p-api.md](p2p-api.md)).
+Note the path: it is **not** under `/p2p/`, but the P2P service signature
+applies (see [p2p-api.md](p2p-api.md)). Unlike the other calls, it takes the
+Telegram credential, not `X-BDB-User`.
 
 ### Headers
 
