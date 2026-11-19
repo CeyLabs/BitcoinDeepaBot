@@ -903,6 +903,36 @@ func (bot TipBot) getHandler() []InterceptionWrapper {
 			},
 		},
 		{
+			Endpoints: []interface{}{&btnCollectPay},
+			Handler:   bot.collectPayHandler,
+			Interceptor: &Interceptor{
+				Before: []intercept.Func{
+					bot.localizerInterceptor,
+					bot.requireUserInterceptor,
+					bot.answerCallbackInterceptor,
+					bot.lockInterceptor,
+				},
+				OnDefer: []intercept.Func{
+					bot.unlockInterceptor,
+				},
+			},
+		},
+		{
+			Endpoints: []interface{}{&btnCollectReject},
+			Handler:   bot.collectDeclineHandler,
+			Interceptor: &Interceptor{
+				Before: []intercept.Func{
+					bot.localizerInterceptor,
+					bot.requireUserInterceptor,
+					bot.answerCallbackInterceptor,
+					bot.lockInterceptor,
+				},
+				OnDefer: []intercept.Func{
+					bot.unlockInterceptor,
+				},
+			},
+		},
+		{
 			Endpoints: []interface{}{&btnApproveAPITx},
 			Handler:   bot.approveAPITransactionHandler,
 			Interceptor: &Interceptor{

@@ -70,8 +70,14 @@ func p2pWriteErr(w http.ResponseWriter, err error) {
 		status = http.StatusForbidden
 	case "recipient_not_found":
 		status = http.StatusNotFound
-	case "idempotency_conflict", "in_progress":
+	case "idempotency_conflict", "in_progress", "request_closed":
 		status = http.StatusConflict
+	case "not_found":
+		status = http.StatusNotFound
+	case "rate_limited":
+		status = http.StatusTooManyRequests
+	case "collector_not_allowed":
+		status = http.StatusForbidden
 	}
 	p2pFail(w, status, pe.Code, pe.Message)
 }
