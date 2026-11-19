@@ -98,7 +98,7 @@ Signing string: eight lines joined with `\n`, no trailing newline:
 ```
 BDB-P2P-ED25519-V1
 <METHOD>
-<PATH>                                  e.g. /api/v1/p2p/send
+<PATH>                                  exactly as sent, still percent-encoded, e.g. /api/v1/p2p/send
 <QUERY>                                 raw query without "?", or empty
 <TIMESTAMP>
 <NONCE>

@@ -161,7 +161,14 @@ func (p *P2PService) auth(next http.HandlerFunc, spend bool) http.HandlerFunc {
 		}
 		if err := verifyP2PServiceSig(w, r, cfg.ServiceKey, now); err != nil {
 			log.Warnf("[api/p2p] Rejected service signature from %s: %v", getClientIP(r), err)
-			p2pFail(w, http.StatusUnauthorized, "bad_service_signature", "Request could not be verified.")
+			switch {
+			case errors.Is(err, errP2PBodyTooLarge):
+				p2pFail(w, http.StatusRequestEntityTooLarge, "too_large", "Request too large.")
+			case errors.Is(err, errP2PBodyRead):
+				p2pFail(w, http.StatusBadRequest, "invalid_request", "Could not read the request.")
+			default:
+				p2pFail(w, http.StatusUnauthorized, "bad_service_signature", "Request could not be verified.")
+			}
 			return
 		}
 		maxAge := cfg.InitDataMaxAge
