@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -43,9 +44,17 @@ func P2PSigningString(method, path, rawQuery, timestamp, nonce, credential strin
 	}, "\n")
 }
 
+// Body errors that are not signature failures, so the caller can answer
+// 413 or 400 instead of 401.
+var (
+	errP2PBodyTooLarge = errors.New("body too large")
+	errP2PBodyRead     = errors.New("could not read body")
+)
+
 // verifyP2PServiceSig checks the Mini App server's signature. It reads the body
 // (at most p2pMaxBodySize) and puts it back for the handler. On failure it
-// returns a reason for the log; the caller answers 401.
+// returns a reason for the log; the caller answers 401, or 413 / 400 for
+// errP2PBodyTooLarge / errP2PBodyRead.
 func verifyP2PServiceSig(w http.ResponseWriter, r *http.Request, key ed25519.PublicKey, now time.Time) error {
 	if len(key) != ed25519.PublicKeySize {
 		return fmt.Errorf("no service key configured")
@@ -68,15 +77,23 @@ func verifyP2PServiceSig(w http.ResponseWriter, r *http.Request, key ed25519.Pub
 	}
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, p2pMaxBodySize))
 	if err != nil {
-		return fmt.Errorf("body read: %v", err)
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			return errP2PBodyTooLarge
+		}
+		return fmt.Errorf("%w: %v", errP2PBodyRead, err)
 	}
 	r.Body = io.NopCloser(bytes.NewReader(body))
 
-	msg := P2PSigningString(r.Method, r.URL.Path, r.URL.RawQuery, tsStr, nonce, p2pCredential(r), body)
+	// The path is signed exactly as sent (still percent-encoded), the same
+	// rule as the query string.
+	msg := P2PSigningString(r.Method, r.URL.EscapedPath(), r.URL.RawQuery, tsStr, nonce, p2pCredential(r), body)
 	if !ed25519.Verify(key, []byte(msg), sig) {
 		return fmt.Errorf("signature check failed")
 	}
-	if !usedSignatures.claim("p2p:"+nonce, 2*p2pSigMaxSkew*time.Second) {
+	// Keep the nonce until the signed timestamp can no longer pass the check
+	// above, plus a second for the whole-second rounding.
+	if !usedSignatures.claim("p2p:"+nonce, time.Unix(ts+p2pSigMaxSkew+1, 0).Sub(now)) {
 		return fmt.Errorf("replayed nonce")
 	}
 	return nil
