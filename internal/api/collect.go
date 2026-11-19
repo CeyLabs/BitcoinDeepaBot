@@ -22,7 +22,6 @@ type CollectResponse struct {
 	ExternalID string            `json:"external_id,omitempty"`
 	Payer      RecipientResponse `json:"payer"`
 	Collector  RecipientResponse `json:"collector"`
-	Notified   bool              `json:"notified"`
 	ExpiresAt  time.Time         `json:"expires_at"`
 	CreatedAt  time.Time         `json:"created_at"`
 	Transfer   *TransferResponse `json:"transfer,omitempty"`
@@ -33,7 +32,7 @@ func (p *P2PService) collectResponse(c *telegram.CollectRequest, withExternalID 
 		ID: c.ID, Status: c.Status, Amount: c.Amount, AmountLKR: thirdparty.FormatSatsWithLKR(c.Amount), Memo: c.Memo,
 		Payer:     RecipientResponse{TelegramID: c.PayerTelegramID, Username: c.PayerUsername},
 		Collector: RecipientResponse{TelegramID: c.ToTelegramID, Username: c.ToUsername, Name: c.ToName},
-		Notified:  c.Notified, ExpiresAt: c.ExpiresAt, CreatedAt: c.CreatedAt,
+		ExpiresAt: c.ExpiresAt, CreatedAt: c.CreatedAt,
 	}
 	if withExternalID {
 		resp.ExternalID = c.ExternalID
@@ -77,9 +76,6 @@ func (p *P2PService) Collect(w http.ResponseWriter, r *http.Request) {
 		Amount     int64  `json:"amount"`
 		Memo       string `json:"memo"`
 		ExternalID string `json:"external_id"`
-		// ChatPrompt sends the user Pay / Decline buttons in the bot chat.
-		// Default true; false when the user approves in the Mini App.
-		ChatPrompt *bool `json:"chat_prompt"`
 	}
 	if !decodeBody(w, r, &req) {
 		return
@@ -95,8 +91,7 @@ func (p *P2PService) Collect(w http.ResponseWriter, r *http.Request) {
 		p2pWriteErr(w, err)
 		return
 	}
-	chatPrompt := req.ChatPrompt == nil || *req.ChatPrompt
-	c, created, err := p.Bot.CollectCreate(walletID, collector, payer, req.Amount, GetWalletMaxAmount(walletID), req.Memo, req.ExternalID, GetMaxMemoLength(), chatPrompt)
+	c, created, err := p.Bot.CollectCreate(walletID, collector, payer, req.Amount, GetWalletMaxAmount(walletID), req.Memo, req.ExternalID, GetMaxMemoLength())
 	if err != nil {
 		p2pWriteErr(w, err)
 		return

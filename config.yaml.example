@@ -84,7 +84,6 @@ api:
     enabled: false
     max_amount: 100000        # sats per transfer
     daily_limit: 500000       # sats per sender per UTC day
-    confirm_threshold: 50000  # daily total a sender can send without confirming in the bot chat
     rate_limit_per_minute: 10
     init_data_max_age: 3600   # seconds
     spend_init_data_max_age: 600  # seconds; shorter window for /send and /invoice/pay

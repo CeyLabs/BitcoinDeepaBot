@@ -128,7 +128,7 @@ func TestCollectStaleSaveDoesNotHideDecision(t *testing.T) {
 	if _, ok, err := bot.collectApprove(c, testPayer(111)); err != nil || !ok {
 		t.Fatal("approve failed", err)
 	}
-	stale.Notified = true
+	stale.Memo = "edited"
 	bot.collectSave(stale) // writes status "pending" back
 	if got, _ := bot.CollectGet(c.ID); got.Status != CollectApproved {
 		t.Errorf("status %s, want approved", got.Status)

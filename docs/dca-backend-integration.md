@@ -260,26 +260,22 @@ Remember the query string is signed: sign `code=PROMO2024` exactly as sent.
 
 ### 4.7 Collect: ask a user to pay you
 
-Needs `can_collect: true` on the wallet. Nothing moves until the user approves, in the bot chat or in the Mini App / web app (§5.3). Full reference: [`docs/collect-api.md`](collect-api.md).
+Needs `can_collect: true` on the wallet. Nothing moves until the user approves in the Mini App / web app (§5.3). Full reference: [`docs/collect-api.md`](collect-api.md).
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /api/v1/collect` `{ to, amount, memo, external_id, chat_prompt? }` | Create a request (expires in 15 min). The bot sends the user **Pay / Decline** buttons, unless `chat_prompt: false` (Mini App-only flow). |
+| `POST /api/v1/collect` `{ to, amount, memo, external_id }` | Create a request (expires in 15 min). The bot sends no message; show it in the Mini App / web app. |
 | `GET /api/v1/collect/{id}` | Poll it: `pending`, `approved` (see `paid` and `transfer`), `declined`, `cancelled`, `expired` |
 | `POST /api/v1/collect/{id}/cancel` | Withdraw a pending request |
 
 Use your order ID as `external_id`; retries with it return the same request.
 
-The user approves in one of two places:
-
-- **Bot chat:** they press **✅ Pay**. Nothing for DCA BE to do but poll.
-- **Mini App / web app:** DCA BE shows the request and relays approve or decline with the user's credential (§5.3). DCA BE knows the request ID because it created it, so pass the ID to the Mini App (for example in the page URL).
+The user approves in the Mini App / web app: DCA BE shows the request and relays approve or decline with the user's credential (§5.3). DCA BE knows the request ID because it created it, so pass the ID to the Mini App (for example in the page URL). The bot sends no chat message.
 
 Rules:
 
 - Per-request cap is the wallet's `max_amount`. The P2P daily limit does not apply.
 - At most 10 requests per wallet per user per hour (`429 rate_limited`).
-- `notified: false` means no chat message was sent: `chat_prompt: false`, or the bot could not message the user (for example, they blocked the bot). Point them to the Mini App.
 - A `failed` transfer (for example, the seller's balance is too low) is final. Create a new request with a new `external_id`.
 - Errors use the P2P shape `{ "code", "message" }`: `403 collect_not_allowed` (no `can_collect`), `404 recipient_not_found`, `409 idempotency_conflict` / `request_closed`.
 
@@ -343,12 +339,12 @@ export async function bdbP2P(method: "GET" | "POST", path: string, cred: { initD
 | Endpoint | Purpose |
 |---|---|
 | `POST /api/v1/init` `{ referral_code? }` | Create the user's wallet if they never pressed Start (P2P-signed, but not under `/p2p/`). Call it when another endpoint answers `403 sender_not_found`, or on first open. See `can_message` below. |
-| `GET /api/v1/p2p/me` | The user's balance and limits (`daily_remaining`, `unconfirmed_remaining`) |
-| `POST /api/v1/p2p/resolve` `{ "to": "@bob" }` | Find the recipient; show `name` on the confirm screen |
+| `GET /api/v1/p2p/me` | The user's balance and limits (`daily_remaining`) |
+| `POST /api/v1/p2p/resolve` `{ "to": "@bob" }` | Find the recipient; show `name` on the review screen |
 | `POST /api/v1/p2p/send` `{ to_telegram_id, amount, memo, idempotency_key }` | Send to another bot user |
-| `POST /api/v1/p2p/invoice/decode` `{ invoice }` | Show an invoice before paying (`needs_confirmation`, `over_limit`) |
+| `POST /api/v1/p2p/invoice/decode` `{ invoice }` | Show an invoice before paying (`over_limit`) |
 | `POST /api/v1/p2p/invoice/pay` `{ invoice, memo, idempotency_key }` | Pay a bolt11 invoice |
-| `GET /api/v1/p2p/transfers/{id}` | Poll a transfer. Every 2–3 s while `processing` / `awaiting_confirmation`, every 15–30 s while `in_flight` |
+| `GET /api/v1/p2p/transfers/{id}` | Poll a transfer. Every 2–3 s while `processing`, every 15–30 s while `in_flight` |
 | `GET /api/v1/p2p/collect/{id}` | Show a collect request (§4.7) to the user it is for |
 | `POST /api/v1/p2p/collect/{id}/approve` | The user pays the collect request (fresh login needed). Returns a transfer. |
 | `POST /api/v1/p2p/collect/{id}/decline` | The user declines it |
@@ -356,9 +352,9 @@ export async function bdbP2P(method: "GET" | "POST", path: string, cred: { initD
 ### 5.4 Rules DCA BE's UI must handle
 
 - **Fresh login for spends.** `/send` and `/invoice/pay` need a credential issued in the last **10 minutes**. If it's older the bot answers `401 unauthorized`. Mini App: ask the user to reopen it. Web app: ask them to tap **Log In with Telegram** again. Then retry with the **same** `idempotency_key`. Check `auth_date` (Mini App) or `iat` (web) to warn before they tap Send.
-- **`idempotency_key`:** a new UUID per payment, reused on every retry of that payment. `failed`, `cancelled` and `expired` are final for their key.
-- **New users:** a user who never pressed Start has no wallet. Call `POST /api/v1/init` (it's idempotent). If it returns `can_message: false`, the bot can't message them, so Confirm buttons and collect prompts won't reach them. In the Mini App, call `Telegram.WebApp.requestWriteAccess()` before `init`; in the web app, ask for message permission at Log In with Telegram.
-- **Confirmation:** past the daily no-confirmation allowance (50k sats by default), the bot asks the user to Confirm in the Telegram chat, and the transfer shows `awaiting_confirmation` until then.
+- **`idempotency_key`:** a new UUID per payment, reused on every retry of that payment. `failed` is final for its key.
+- **New users:** a user who never pressed Start has no wallet. Call `POST /api/v1/init` (it's idempotent). If it returns `can_message: false`, the bot can't message them, so they won't get receipts in the chat (payments still work). In the Mini App, call `Telegram.WebApp.requestWriteAccess()` before `init`; in the web app, ask for message permission at Log In with Telegram.
+- **No bot-chat confirmation:** the signed request is the approval and pays straight away. Show the user a review screen (amount, recipient, memo) before calling `/send`, `/invoice/pay` or a collect `approve`. Passkey (WebAuthn) approval through DCA BE is planned.
 - **Error codes:** `401 unauthorized` (user credential), `401 bad_service_signature` (DCA BE's P2P signing: a server bug), `403 forbidden` (IP), `429 rate_limited`.
 
 ---
@@ -411,13 +407,13 @@ The memo is your idempotency key: one memo per order, reused on every retry of t
 
 ```
 1. POST /collect { to: "<telegram_id>", amount, memo, external_id: "<orderId>" }
-     201 → pending; the user gets Pay / Decline in the bot chat
+     201 → pending; show it to the user in the Mini App / web app
      4xx → nothing created (reason in message)
      timeout / 5xx → resend with the SAME external_id; you get the same request back
 2. Poll GET /collect/{id} every 3–5 s:
      pending                         → keep polling (expires after 15 min)
      approved, paid: true            → sats received: settle the order (pay the user LKR)
-     approved, transfer processing / awaiting_confirmation / in_flight → keep polling
+     approved, transfer processing / in_flight → keep polling
      approved, transfer failed       → order failed, nothing received
      declined | cancelled | expired  → order closed, nothing received
 3. (optional) POST /collect/{id}/cancel to withdraw a request the user hasn't answered
@@ -441,7 +437,7 @@ Only pay the user out (LKR) after `paid: true`.
 | Collect in the Mini App (new) | Screen that shows a request and relays approve / decline (§5.3) |
 | P2P relay (new) | Routes for the Mini App and web app that forward the user's credential and sign with the P2P key (§5.2), for each P2P endpoint (§5.3) |
 | Web app login | Log In with Telegram (OIDC, scopes `openid profile`, client = the bot); keep the `id_token` in the server session (§5.1) |
-| P2P UI | Re-login prompt when the credential is over 10 min old for spends, `idempotency_key` per payment, the confirmation state, polling (§5.4) |
+| P2P UI | Re-login prompt when the credential is over 10 min old for spends, `idempotency_key` per payment, a review screen before each payment, polling (§5.4) |
 | Callback | Make `reset-retry-counts` safe to call repeatedly (§6) |
 | Secrets | `BDB_SEND_PRIVATE_KEY_PEM` and `BDB_P2P_PRIVATE_KEY_PEM` (§2.1) |
 

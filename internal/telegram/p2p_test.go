@@ -24,7 +24,7 @@ func withP2PConfig(t *testing.T) {
 	saved := internal.Configuration.API.P2P
 	t.Cleanup(func() { internal.Configuration.API.P2P = saved })
 	internal.Configuration.API.P2P = internal.APIP2PConfiguration{
-		Enabled: true, MaxAmount: 100000, DailyLimit: 500000, ConfirmThreshold: 50000,
+		Enabled: true, MaxAmount: 100000, DailyLimit: 500000,
 		RateLimitPerMinute: 10, InitDataMaxAge: 3600, MaxMemoLength: 20,
 	}
 }

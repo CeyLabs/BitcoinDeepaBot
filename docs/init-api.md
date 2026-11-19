@@ -86,9 +86,7 @@ Any other field is refused with `400 invalid_json`.
     "max_amount": 100000,
     "daily_limit": 500000,
     "daily_used": 0,
-    "daily_remaining": 500000,
-    "confirm_threshold": 50000,
-    "unconfirmed_remaining": 50000
+    "daily_remaining": 500000
   },
   "created": true,
   "can_message": false
@@ -104,8 +102,8 @@ Any other field is refused with `400 invalid_json`.
 ## Let the bot message the user
 
 Telegram doesn't let a bot message a user who never started it or allowed it
-to. Without that, the user gets no **Confirm** buttons for larger sends, no
-**collect** prompts and no receipts in the chat.
+to. Without that, the user gets no payment receipts in the chat. Payments
+themselves work either way.
 
 - **Mini App:** call `Telegram.WebApp.requestWriteAccess()` **before** `init`.
 - **Web app:** request message permission in Log In with Telegram.

@@ -255,26 +255,26 @@ func TestP2PWriteErrStatus(t *testing.T) {
 
 func TestTransferResponse(t *testing.T) {
 	tr := &telegram.P2PTransfer{
-		Base: storage.New(storage.ID("p2p-1")), Kind: telegram.P2PKindInternal, Status: telegram.P2PAwaitingConfirmation,
+		Base: storage.New(storage.ID("p2p-1")), Kind: telegram.P2PKindInternal, Status: telegram.P2PProcessing,
 		ToTelegramID: 7, ToUsername: "bob", ToName: "Bob", Amount: 60000, Preimage: "secret",
-		ConfirmBy: time.Now().Add(time.Minute), IdempotencyKey: "never-shown",
+		IdempotencyKey: "never-shown",
 	}
 	resp := toTransferResponse(tr)
 	if resp.Preimage != "" {
 		t.Fatal("preimage shown before completion")
 	}
-	if resp.ConfirmBy == nil || resp.To == nil || resp.To.TelegramID != 7 {
+	if resp.To == nil || resp.To.TelegramID != 7 {
 		t.Fatalf("bad response: %+v", resp)
 	}
 	if statusCode(tr) != http.StatusAccepted {
-		t.Fatal("awaiting confirmation should be 202")
+		t.Fatal("processing should be 202")
 	}
 	b, _ := json.Marshal(resp)
 	if json.Valid(b) && contains(string(b), "never-shown") {
 		t.Fatal("idempotency key leaked in the response")
 	}
 	tr.Status = telegram.P2PCompleted
-	if r := toTransferResponse(tr); r.Preimage != "secret" || r.ConfirmBy != nil || statusCode(tr) != http.StatusOK {
+	if r := toTransferResponse(tr); r.Preimage != "secret" || statusCode(tr) != http.StatusOK {
 		t.Fatalf("completed response wrong: %+v", r)
 	}
 }
