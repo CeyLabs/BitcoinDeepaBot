@@ -1,10 +1,10 @@
 package internal
 
 import (
-	"errors"
 	"crypto/ed25519"
 	"crypto/subtle"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -174,8 +174,8 @@ type DatabaseConfiguration struct {
 }
 
 type LnbitsConfiguration struct {
-	AdminId                string   `yaml:"admin_id"`
-	AdminKey               string   `yaml:"admin_key"`
+	AdminId  string `yaml:"admin_id"`
+	AdminKey string `yaml:"admin_key"`
 	// AdminToken is an lnbits ACL token, scoped to /users/api/v1. Account
 	// management moved behind account-level auth in lnbits 1.x, where a wallet
 	// api key no longer grants it, so creating users needs a bearer token.
@@ -205,7 +205,7 @@ type APIConfiguration struct {
 }
 
 type APIAnalyticsConfiguration struct {
-	Enabled            bool                      `yaml:"enabled"`
+	Enabled            bool                       `yaml:"enabled"`
 	APIKeys            map[string]AnalyticsAPIKey `yaml:"api_keys"`
 	TimestampTolerance int64                      `yaml:"timestamp_tolerance"` // seconds
 }
