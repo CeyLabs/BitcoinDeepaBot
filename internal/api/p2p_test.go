@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/LightningTipBot/LightningTipBot/internal"
+	"github.com/LightningTipBot/LightningTipBot/internal/netutil"
 	"github.com/LightningTipBot/LightningTipBot/internal/storage"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
 	"github.com/LightningTipBot/LightningTipBot/internal/tma"
@@ -120,6 +121,29 @@ func TestP2PAuthRejectsBadServiceSignature(t *testing.T) {
 				t.Fatalf("got %d %q, reached=%v; want 401 bad_service_signature", code, errCode, reached)
 			}
 		})
+	}
+}
+
+func TestP2PAuthIPAllowlist(t *testing.T) {
+	withP2PConfig(t)
+	savedBot := internal.Configuration.Bot
+	t.Cleanup(func() { internal.Configuration.Bot = savedBot })
+	internal.Configuration.Bot.TrustedProxyNets = nil
+	internal.Configuration.API.P2P.AllowedNets, _ = netutil.ParseNetworks([]string{"203.0.113.7"})
+	initData := tma.Sign(tma.User{ID: 42, FirstName: "Eve"}, "123:REAL", time.Now().Add(-2*time.Hour), nil)
+
+	r := p2pRequest(http.MethodPost, "/api/v1/p2p/send", "{}", initData, time.Now(), p2pNonce(), testServiceKey)
+	r.RemoteAddr = "198.51.100.4:1"
+	if code, errCode, reached := serveP2PAuth(r, true); code != http.StatusForbidden || errCode != "forbidden" || reached {
+		t.Fatalf("outside IP: got %d %q reached=%v, want 403 forbidden", code, errCode, reached)
+	}
+
+	// From the allowed IP the request gets past the IP check (and then fails
+	// on the expired init data).
+	r = p2pRequest(http.MethodPost, "/api/v1/p2p/send", "{}", initData, time.Now(), p2pNonce(), testServiceKey)
+	r.RemoteAddr = "203.0.113.7:1"
+	if code, errCode, _ := serveP2PAuth(r, true); code != http.StatusUnauthorized || errCode != "unauthorized" {
+		t.Fatalf("allowed IP: got %d %q, want 401 unauthorized", code, errCode)
 	}
 }
 

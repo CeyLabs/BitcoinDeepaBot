@@ -591,6 +591,11 @@ type APIP2PConfiguration struct {
 	// server. Every P2P call must be signed with its private key. Required.
 	ServicePublicKey string            `yaml:"service_public_key"`
 	ServiceKey       ed25519.PublicKey `yaml:"-"`
+	// AllowedNetworks limits /api/v1/p2p/* to these IPs or CIDRs (the Mini
+	// App server). Empty means any IP; the service signature still applies.
+	// The client address is resolved through bot.trusted_proxies.
+	AllowedNetworks []string     `yaml:"allowed_networks"`
+	AllowedNets     []*net.IPNet `yaml:"-"`
 }
 
 // DecodeKeyBase64 decodes standard or URL-safe base64, padded or not.
@@ -639,6 +644,22 @@ func setAPIP2PDefaults(c *APIP2PConfiguration) {
 			return
 		}
 		c.ServiceKey = ed25519.PublicKey(key)
+		nets, err := netutil.ParseNetworks(c.AllowedNetworks)
+		if err != nil {
+			log.Errorf("Disabling P2P API: api.p2p.allowed_networks: %v", err)
+			c.Enabled = false
+			return
+		}
+		// Entries that are all blank (e.g. an unset env var) would mean "any IP".
+		if len(c.AllowedNetworks) > 0 && len(nets) == 0 {
+			log.Errorf("Disabling P2P API: api.p2p.allowed_networks has only blank entries")
+			c.Enabled = false
+			return
+		}
+		c.AllowedNets = nets
+		if len(nets) == 0 {
+			log.Warnf("P2P API: api.p2p.allowed_networks is empty, so any IP can call it (the service signature still applies)")
+		}
 	}
 	if c.Enabled {
 		log.Infof("P2P API enabled: max %d sat per transfer, %d sat per day, confirm above %d sat", c.MaxAmount, c.DailyLimit, c.ConfirmThreshold)

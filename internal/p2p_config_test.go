@@ -31,4 +31,17 @@ func TestSetAPIP2PDefaults(t *testing.T) {
 			t.Errorf("%s service key: P2P left enabled", name)
 		}
 	}
+
+	c = APIP2PConfiguration{Enabled: true, ServicePublicKey: key, AllowedNetworks: []string{"203.0.113.7", "10.0.0.0/8"}}
+	setAPIP2PDefaults(&c)
+	if !c.Enabled || len(c.AllowedNets) != 2 {
+		t.Fatalf("allowed networks: enabled=%v nets=%v", c.Enabled, c.AllowedNets)
+	}
+	for name, nets := range map[string][]string{"invalid": {"10.0.0.0/99"}, "only blank": {"", " "}} {
+		c := APIP2PConfiguration{Enabled: true, ServicePublicKey: key, AllowedNetworks: nets}
+		setAPIP2PDefaults(&c)
+		if c.Enabled {
+			t.Errorf("%s allowed_networks: P2P left enabled", name)
+		}
+	}
 }
