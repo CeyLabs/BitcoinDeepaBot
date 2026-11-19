@@ -123,10 +123,16 @@ func Verify(token string, keys *KeySet, clientID string, maxAge time.Duration, n
 	if err != nil || id <= 0 {
 		return User{}, errors.New("no Telegram user id (request the profile scope)")
 	}
-	return User{
-		ID: id, Username: c.PreferredUsername, Name: c.Name,
-		FirstName: c.GivenName, LastName: c.FamilyName, IssuedAt: issued,
-	}, nil
+	u := User{
+		ID: id, Username: c.PreferredUsername, Name: strings.TrimSpace(c.Name),
+		FirstName: strings.TrimSpace(c.GivenName), LastName: strings.TrimSpace(c.FamilyName), IssuedAt: issued,
+	}
+	// Some logins carry only "name". Telegram always has a first name, so use
+	// the full name there rather than leave the user nameless.
+	if u.FirstName == "" && u.LastName == "" {
+		u.FirstName = u.Name
+	}
+	return u, nil
 }
 
 func decodeSegment(seg string, v interface{}) error {

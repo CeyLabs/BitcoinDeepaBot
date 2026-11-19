@@ -150,6 +150,32 @@ func TestVerify(t *testing.T) {
 	}
 }
 
+// A token with only "name" still gives the user a first name.
+func TestVerifyNameFallback(t *testing.T) {
+	keys := newTestKeys(t)
+	ks, _ := serveKeys(t, keys)
+	now := time.Now()
+	check := func(name string, edit func(map[string]interface{}), first, last string) {
+		c := goodClaims(now)
+		edit(c)
+		u, err := Verify(keys.sign(t, "RS256", "rsa1", c), ks, "123456", 10*time.Minute, now)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if u.FirstName != first || u.LastName != last {
+			t.Errorf("%s: first=%q last=%q, want %q %q", name, u.FirstName, u.LastName, first, last)
+		}
+	}
+	check("given and family", func(map[string]interface{}) {}, "Alice", "Doe")
+	check("only name", func(c map[string]interface{}) { delete(c, "given_name"); delete(c, "family_name") }, "Alice Doe", "")
+	check("only family", func(c map[string]interface{}) { delete(c, "given_name") }, "", "Doe")
+	check("nothing", func(c map[string]interface{}) {
+		delete(c, "given_name")
+		delete(c, "family_name")
+		delete(c, "name")
+	}, "", "")
+}
+
 // Keys are cached; an unknown kid refetches at most once per refetchGap.
 func TestKeySetCaching(t *testing.T) {
 	keys := newTestKeys(t)
