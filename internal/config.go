@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -193,8 +194,9 @@ type LnbitsConfiguration struct {
 type APIConfiguration struct {
 	Send      APISendConfiguration      `yaml:"send"`
 	Analytics APIAnalyticsConfiguration `yaml:"analytics"`
+	P2P       APIP2PConfiguration       `yaml:"p2p"`
 	// AllowedNetworks, when set, limits every /api/v1/ endpoint to these IPs
-	// or CIDRs: the send API, analytics and the per-user wallet API. Empty
+	// or CIDRs: the send API, analytics, P2P and the per-user wallet API. Empty
 	// means no restriction. The client address is resolved through
 	// bot.trusted_proxies.
 	AllowedNetworks []string     `yaml:"allowed_networks"`
@@ -325,6 +327,7 @@ func init() {
 	}
 	setAPISendDefaults()
 	setAPIAnalyticsDefaults()
+	setAPIP2PDefaults(&Configuration.API.P2P)
 }
 
 // WebhookSecretParam is the query parameter that carries the webhook secret.
@@ -609,4 +612,116 @@ func validateAPIAnalytics(cfg *APIAnalyticsConfiguration) error {
 // IsAPIAnalyticsEnabled returns whether the Analytics API is enabled
 func IsAPIAnalyticsEnabled() bool {
 	return Configuration.API.Analytics.Enabled
+}
+
+// APIP2PConfiguration configures sending from the Telegram Mini App
+// (/api/v1/p2p/*). The sender is always the Telegram user in the Mini App's
+// signed init data. Amounts are in sats.
+type APIP2PConfiguration struct {
+	Enabled            bool  `yaml:"enabled"`
+	MaxAmount          int64 `yaml:"max_amount"`            // per transfer
+	DailyLimit         int64 `yaml:"daily_limit"`           // per sender, per UTC day
+	ConfirmThreshold   int64 `yaml:"confirm_threshold"`     // above this, the sender confirms in the bot chat
+	RateLimitPerMinute int   `yaml:"rate_limit_per_minute"` // sends and invoice payments per sender
+	InitDataMaxAge     int64 `yaml:"init_data_max_age"`     // seconds
+	// SpendInitDataMaxAge is a shorter init data age for /send and
+	// /invoice/pay, so leaked init data can't move sats for long.
+	SpendInitDataMaxAge int64 `yaml:"spend_init_data_max_age"` // seconds
+	MaxMemoLength       int   `yaml:"max_memo_length"`
+	// ServicePublicKey is the base64 Ed25519 public key of the Mini App
+	// server. Every P2P call must be signed with its private key. Required.
+	ServicePublicKey string            `yaml:"service_public_key"`
+	ServiceKey       ed25519.PublicKey `yaml:"-"`
+	// AllowedNetworks limits /api/v1/p2p/* to these IPs or CIDRs (the Mini
+	// App server). Empty means any IP; the service signature still applies.
+	// The client address is resolved through bot.trusted_proxies.
+	AllowedNetworks []string     `yaml:"allowed_networks"`
+	AllowedNets     []*net.IPNet `yaml:"-"`
+	// OIDCEnabled lets the web app identify the user with a "Log In with
+	// Telegram" ID token (X-Telegram-ID-Token) instead of Mini App init
+	// data. init_data_max_age and spend_init_data_max_age apply to the
+	// login time of the token too.
+	OIDCEnabled bool `yaml:"oidc_enabled"`
+	// OIDCClientID is the ID token audience: the bot ID the web app logs in
+	// with. Empty means this bot's ID (the number before ":" in its token).
+	OIDCClientID string `yaml:"oidc_client_id"`
+}
+
+// DecodeKeyBase64 decodes standard or URL-safe base64, padded or not.
+func DecodeKeyBase64(s string) ([]byte, error) {
+	s = strings.TrimSpace(s)
+	var err error
+	for _, enc := range []*base64.Encoding{base64.StdEncoding, base64.RawStdEncoding, base64.URLEncoding, base64.RawURLEncoding} {
+		var b []byte
+		if b, err = enc.DecodeString(s); err == nil {
+			return b, nil
+		}
+	}
+	return nil, err
+}
+
+func setAPIP2PDefaults(c *APIP2PConfiguration) {
+	if c.MaxAmount <= 0 {
+		c.MaxAmount = 100000
+	}
+	if c.DailyLimit <= 0 {
+		c.DailyLimit = 500000
+	}
+	if c.ConfirmThreshold <= 0 {
+		c.ConfirmThreshold = 50000
+	}
+	if c.RateLimitPerMinute <= 0 {
+		c.RateLimitPerMinute = 10
+	}
+	if c.InitDataMaxAge <= 0 {
+		c.InitDataMaxAge = 3600
+	}
+	if c.MaxMemoLength <= 0 {
+		c.MaxMemoLength = 280
+	}
+	if c.SpendInitDataMaxAge <= 0 {
+		c.SpendInitDataMaxAge = 600
+	}
+	if c.SpendInitDataMaxAge > c.InitDataMaxAge {
+		c.SpendInitDataMaxAge = c.InitDataMaxAge
+	}
+	if c.Enabled {
+		key, err := DecodeKeyBase64(c.ServicePublicKey)
+		if c.ServicePublicKey == "" || err != nil || len(key) != ed25519.PublicKeySize {
+			log.Errorf("Disabling P2P API: api.p2p.service_public_key must be a base64 Ed25519 public key (see docs/p2p-api.md)")
+			c.Enabled = false
+			return
+		}
+		c.ServiceKey = ed25519.PublicKey(key)
+		nets, err := netutil.ParseNetworks(c.AllowedNetworks)
+		if err != nil {
+			log.Errorf("Disabling P2P API: api.p2p.allowed_networks: %v", err)
+			c.Enabled = false
+			return
+		}
+		// Entries that are all blank (e.g. an unset env var) would mean "any IP".
+		if len(c.AllowedNetworks) > 0 && len(nets) == 0 {
+			log.Errorf("Disabling P2P API: api.p2p.allowed_networks has only blank entries")
+			c.Enabled = false
+			return
+		}
+		c.AllowedNets = nets
+		if len(nets) == 0 {
+			log.Warnf("P2P API: api.p2p.allowed_networks is empty, so any IP can call it (the service signature still applies)")
+		}
+		if c.OIDCEnabled {
+			if c.OIDCClientID == "" {
+				c.OIDCClientID, _, _ = strings.Cut(Configuration.Telegram.ApiKey, ":")
+			}
+			if _, err := strconv.ParseInt(c.OIDCClientID, 10, 64); err != nil {
+				log.Errorf("P2P API: Telegram login turned off: api.p2p.oidc_client_id must be the numeric bot ID")
+				c.OIDCEnabled = false
+			} else {
+				log.Infof("P2P API: Telegram login (web app) enabled for bot %s", c.OIDCClientID)
+			}
+		}
+	}
+	if c.Enabled {
+		log.Infof("P2P API enabled: max %d sat per transfer, %d sat per day, confirm above %d sat", c.MaxAmount, c.DailyLimit, c.ConfirmThreshold)
+	}
 }
