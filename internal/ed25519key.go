@@ -7,28 +7,21 @@ import (
 	"filippo.io/edwards25519"
 )
 
-// ParseEd25519PublicKey decodes a base64 Ed25519 public key and rejects keys
-// that can't be safe. A small-order key (for example 32 zero bytes, a common
+// ValidateEd25519PublicKey reports why b can't be used as an Ed25519 public
+// key, or nil. A small-order key (for example 32 zero bytes, a common
 // placeholder) lets anyone forge signatures without a private key, because
-// ed25519.Verify does not reject such keys. Keys that are not a valid curve
+// ed25519.Verify does not reject such keys. Bytes that are not a valid curve
 // point are rejected too.
-func ParseEd25519PublicKey(s string) (ed25519.PublicKey, error) {
-	if s == "" {
-		return nil, errors.New("empty")
-	}
-	b, err := DecodeBase64Any(s)
-	if err != nil {
-		return nil, errors.New("not base64")
-	}
+func ValidateEd25519PublicKey(b []byte) error {
 	if len(b) != ed25519.PublicKeySize {
-		return nil, errors.New("not 32 bytes")
+		return errors.New("not 32 bytes")
 	}
 	p, err := new(edwards25519.Point).SetBytes(b)
 	if err != nil {
-		return nil, errors.New("not a valid Ed25519 point")
+		return errors.New("not a valid Ed25519 point")
 	}
 	if new(edwards25519.Point).MultByCofactor(p).Equal(edwards25519.NewIdentityPoint()) == 1 {
-		return nil, errors.New("weak key (small order); generate a real key pair")
+		return errors.New("weak key (small order); generate a real key pair")
 	}
-	return ed25519.PublicKey(b), nil
+	return nil
 }

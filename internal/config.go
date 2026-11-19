@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"errors"
 	"crypto/ed25519"
 	"crypto/subtle"
 	"encoding/base64"
@@ -491,7 +492,7 @@ func validateAPISend(cfg *APISendConfiguration) error {
 		if w.HMACSecret != "" {
 			return fmt.Errorf("whitelisted wallet %q has hmac_secret, which is no longer supported; remove it and set ed25519_public_key (see docs/send-api-ed25519.md)", id)
 		}
-		key, err := ParseEd25519PublicKey(w.Ed25519PublicKey)
+		key, err := parseEd25519Key(w.Ed25519PublicKey)
 		if err != nil {
 			return fmt.Errorf("whitelisted wallet %q needs a valid ed25519_public_key (%v; see docs/send-api-ed25519.md)", id, err)
 		}
@@ -581,7 +582,7 @@ func validateAPIAnalytics(cfg *APIAnalyticsConfiguration) error {
 		if k.HMACSecret != "" {
 			return fmt.Errorf("api key %q has hmac_secret, which is no longer supported; remove it and set ed25519_public_key (see docs/send-api-ed25519.md)", id)
 		}
-		key, err := ParseEd25519PublicKey(k.Ed25519PublicKey)
+		key, err := parseEd25519Key(k.Ed25519PublicKey)
 		if err != nil {
 			return fmt.Errorf("api key %q needs a valid ed25519_public_key (%v; see docs/send-api-ed25519.md)", id, err)
 		}
@@ -589,6 +590,21 @@ func validateAPIAnalytics(cfg *APIAnalyticsConfiguration) error {
 		cfg.APIKeys[id] = k
 	}
 	return nil
+}
+
+// parseEd25519Key decodes a base64 Ed25519 public key and refuses weak keys.
+func parseEd25519Key(s string) (ed25519.PublicKey, error) {
+	if s == "" {
+		return nil, errors.New("empty")
+	}
+	b, err := DecodeBase64Any(s)
+	if err != nil {
+		return nil, errors.New("not base64")
+	}
+	if err := ValidateEd25519PublicKey(b); err != nil {
+		return nil, err
+	}
+	return ed25519.PublicKey(b), nil
 }
 
 // IsAPIAnalyticsEnabled returns whether the Analytics API is enabled
