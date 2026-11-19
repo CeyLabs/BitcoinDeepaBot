@@ -167,6 +167,28 @@ function p2pHeaders(method, path, query, cred, body) {
 
 ## Endpoints
 
+### `POST /api/v1/init`
+Creates the user's wallet if they never pressed Start in the bot, the same
+way `/start` does. Note the path: it is not under `/p2p/`, but it is signed and
+authenticated exactly like the P2P endpoints (service signature + init data or
+ID token, and `api.p2p.allowed_networks`). Every other P2P endpoint answers
+`403 sender_not_found` until the user has a wallet, so call this first.
+
+```json
+{ "referral_code": "PROMO2024" }
+```
+The body is optional. `referral_code` (letters, digits, `_`, `-`, up to 64) is
+recorded like a `/start` payload, for new users only.
+
+Returns `201` for a new wallet and `200` if the user already had one, with the
+same fields as `/me` plus `created`. A new wallet also has `can_message`:
+`false` means the bot can't message the user yet, so they won't get Confirm
+buttons, collect prompts or receipts in the chat. Ask for it first with
+`Telegram.WebApp.requestWriteAccess()` in the Mini App, or the "allow messages"
+option of Log In with Telegram, or send them to the bot with a Start link.
+
+Limits: 30 new wallets per minute across all users; banned users get `403`.
+
 ### `GET /me`
 ```json
 {
@@ -265,7 +287,8 @@ login, like `/send`. See [collect-api.md](collect-api.md).
 | 400 | `invalid_json`, `invalid_amount`, `amount_too_large`, `memo_too_long`, `invalid_idempotency_key`, `invalid_recipient`, `self_send`, `invalid_invoice`, `amountless_invoice`, `invoice_expired` |
 | 401 | `unauthorized`: credential missing, invalid or expired, both credentials sent, or (for spends) the login is older than `spend_init_data_max_age`. Mini App: reopen it. Web app: log in with Telegram again. |
 | 401 | `bad_service_signature`: the DCA backend's P2P signature is missing, wrong, expired or replayed. A server bug, not a user error. |
-| 403 | `forbidden` (caller's IP not in `api.p2p.allowed_networks`), `sender_not_found` (user must start the bot first), `sender_not_allowed` |
+| 403 | `forbidden` (caller's IP not in `api.p2p.allowed_networks`), `sender_not_found` (no wallet yet: call `POST /api/v1/init`), `sender_not_allowed` |
+| 503 | `wallet_unavailable` (wallet creation failed; retry) |
 | 404 | `recipient_not_found`, `not_found` |
 | 409 | `idempotency_conflict`, `in_progress` |
 | 429 | `rate_limited` |
