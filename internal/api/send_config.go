@@ -4,18 +4,9 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal"
 )
 
-// GetWhitelistedWallets returns the map of whitelisted wallets with their HMAC secrets
+// GetWhitelistedWallets returns the map of whitelisted wallets
 func GetWhitelistedWallets() map[string]internal.WhitelistedWallet {
 	return internal.Configuration.API.Send.WhitelistedWallets
-}
-
-// GetWalletHMACSecret returns the HMAC secret for a specific wallet
-func GetWalletHMACSecret(walletID string) (string, bool) {
-	wallet, exists := internal.Configuration.API.Send.WhitelistedWallets[walletID]
-	if !exists {
-		return "", false
-	}
-	return wallet.HMACSecret, true
 }
 
 // IsWhitelistedWallet checks if a wallet ID is whitelisted

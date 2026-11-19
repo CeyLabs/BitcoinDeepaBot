@@ -24,7 +24,7 @@ type ReferralLookupResponse struct {
 
 // ReferralLookup handles GET /api/v1/referral/lookup?code=<referral_code>
 // Returns all users who joined using the given referral code.
-// Authenticated with the same wallet HMAC used by the send API.
+// Authenticated with the same wallet Ed25519 signature used by the send API.
 func (s Service) ReferralLookup(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	if code == "" {
