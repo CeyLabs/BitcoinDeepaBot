@@ -137,8 +137,8 @@ func testPublicKey() string {
 }
 
 // Small-order keys verify forged signatures, so they must be refused.
-func TestParseEd25519PublicKeyRejectsWeakKeys(t *testing.T) {
-	if _, err := ParseEd25519PublicKey(testPublicKey()); err != nil {
+func TestParseEd25519KeyRejectsWeakKeys(t *testing.T) {
+	if _, err := parseEd25519Key(testPublicKey()); err != nil {
 		t.Fatalf("real key rejected: %v", err)
 	}
 	one := make([]byte, 32)
@@ -154,12 +154,12 @@ func TestParseEd25519PublicKeyRejectsWeakKeys(t *testing.T) {
 		"order 2":  order2,
 		"short":    make([]byte, 31),
 	} {
-		if _, err := ParseEd25519PublicKey(base64.StdEncoding.EncodeToString(b)); err == nil {
+		if _, err := parseEd25519Key(base64.StdEncoding.EncodeToString(b)); err == nil {
 			t.Errorf("%s: weak key accepted", name)
 		}
 	}
 	for _, s := range []string{"", "not base64!"} {
-		if _, err := ParseEd25519PublicKey(s); err == nil {
+		if _, err := parseEd25519Key(s); err == nil {
 			t.Errorf("%q accepted", s)
 		}
 	}
