@@ -115,6 +115,7 @@ func startApiServer(bot *telegram.TipBot) {
 		MemoCache: utils.NewCache(time.Minute * 5),
 	}
 	api.RegisterUpdatePendingTxHook(bot)
+	p2p := api.NewP2PService(bot)
 	s.AppendAuthorizedRoute(`/api/v1/paymentstatus/{payment_hash}`, api.AuthTypeBasic, api.AccessKeyTypeInvoice, bot.DB.Users, apiService.PaymentStatus, http.MethodPost)
 	s.AppendAuthorizedRoute(`/api/v1/invoicestatus/{payment_hash}`, api.AuthTypeBasic, api.AccessKeyTypeInvoice, bot.DB.Users, apiService.InvoiceStatus, http.MethodPost)
 	s.AppendAuthorizedRoute(`/api/v1/payinvoice`, api.AuthTypeBasic, api.AccessKeyTypeAdmin, bot.DB.Users, apiService.PayInvoice, http.MethodPost)
@@ -155,19 +156,27 @@ func startApiServer(bot *telegram.TipBot) {
 		// Payment settlement endpoint — resolve an invoice payment left in flight
 		s.AppendRoute(`/api/v1/send/payment/{payment_hash}`, api.NetworkAllowlistMiddleware(api.WalletAuthMiddleware(apiService.SendPaymentStatus)), http.MethodGet)
 		log.Infof("API SendPaymentStatus endpoint registered at /api/v1/send/payment/{payment_hash} with wallet Ed25519 signatures")
+
+		// Collect: ask a user to pay a wallet with can_collect. The user approves each request.
+		s.AppendRoute(`/api/v1/collect`, api.NetworkAllowlistMiddleware(api.WalletAuthMiddleware(p2p.Collect)), http.MethodPost)
+		s.AppendRoute(`/api/v1/collect/{id}`, api.NetworkAllowlistMiddleware(api.WalletAuthMiddleware(p2p.CollectStatus)), http.MethodGet)
+		s.AppendRoute(`/api/v1/collect/{id}/cancel`, api.NetworkAllowlistMiddleware(api.WalletAuthMiddleware(p2p.CollectCancel)), http.MethodPost)
+		log.Infof("API Collect endpoints registered at /api/v1/collect with wallet Ed25519 signatures")
 	} else {
 		log.Infof("API Send endpoint disabled in configuration")
 	}
 
 	// Telegram Mini App sending. The sender is the user in the signed init data.
 	if internal.Configuration.API.P2P.Enabled {
-		p2p := api.NewP2PService(bot)
 		s.AppendRoute(`/api/v1/p2p/me`, p2p.Auth(p2p.Me), http.MethodGet)
 		s.AppendRoute(`/api/v1/p2p/resolve`, p2p.Auth(p2p.Resolve), http.MethodPost)
 		s.AppendRoute(`/api/v1/p2p/send`, p2p.AuthSpend(p2p.Send), http.MethodPost)
 		s.AppendRoute(`/api/v1/p2p/invoice/decode`, p2p.Auth(p2p.DecodeInvoice), http.MethodPost)
 		s.AppendRoute(`/api/v1/p2p/invoice/pay`, p2p.AuthSpend(p2p.PayInvoice), http.MethodPost)
 		s.AppendRoute(`/api/v1/p2p/transfers/{id}`, p2p.Auth(p2p.Transfer), http.MethodGet)
+		s.AppendRoute(`/api/v1/p2p/collect/{id}`, p2p.Auth(p2p.MiniAppCollect), http.MethodGet)
+		s.AppendRoute(`/api/v1/p2p/collect/{id}/approve`, p2p.AuthSpend(p2p.MiniAppCollectApprove), http.MethodPost)
+		s.AppendRoute(`/api/v1/p2p/collect/{id}/decline`, p2p.Auth(p2p.MiniAppCollectDecline), http.MethodPost)
 		log.Infof("P2P API endpoints registered at /api/v1/p2p/*")
 	}
 	// Start serving only after every middleware and route is added.
