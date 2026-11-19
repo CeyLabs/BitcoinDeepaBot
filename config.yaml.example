@@ -101,19 +101,20 @@ api:
     # request the "openid profile" scopes.
     oidc_enabled: false
     # oidc_client_id: ""  # bot ID the web app logs in with; empty = this bot
-  # Analytics API - HMAC authenticated endpoints for data export
-  # Generate secrets with: openssl rand -hex 32
+  # Analytics API - data export endpoints, authenticated with Ed25519
+  # signatures (see docs/send-api-ed25519.md). Each consumer keeps its
+  # private key; only the public key goes here.
   analytics:
     enabled: true
     timestamp_tolerance: 300  # seconds (5 minutes)
     api_keys:
       data-team:
         name: "Data Team"
-        hmac_secret: "change-me"  # generate with: openssl rand -hex 32
+        ed25519_public_key: "base64-public-key"
       # Add more keys for different consumers:
       # dashboard:
       #   name: "Internal Dashboard"
-      #   hmac_secret: "change-me"  # generate with: openssl rand -hex 32
+      #   ed25519_public_key: "base64-public-key"
 
   # Send API - wallet endpoints authenticated with Ed25519 signatures
   # (see docs/send-api-ed25519.md)

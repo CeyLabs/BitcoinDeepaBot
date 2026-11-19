@@ -210,8 +210,14 @@ type APIAnalyticsConfiguration struct {
 }
 
 type AnalyticsAPIKey struct {
-	Name       string `yaml:"name"`        // Descriptive name (e.g. "data-team")
-	HMACSecret string `yaml:"hmac_secret"` // HMAC secret for this key
+	Name string `yaml:"name"` // Descriptive name (e.g. "data-team")
+	// Ed25519PublicKey is the base64 32-byte public key this consumer signs
+	// with. The bot never sees the private key.
+	Ed25519PublicKey string            `yaml:"ed25519_public_key"`
+	PublicKey        ed25519.PublicKey `yaml:"-"`
+	// HMACSecret is no longer supported. It is read only so that a leftover
+	// value disables the analytics API instead of being silently ignored.
+	HMACSecret string `yaml:"hmac_secret"`
 }
 
 type APISendConfiguration struct {
@@ -557,23 +563,32 @@ func setAPIAnalyticsDefaults() {
 		Configuration.API.Analytics.TimestampTolerance = 300 // 5 minutes
 	}
 
-	if len(Configuration.API.Analytics.APIKeys) == 0 {
-		log.Errorf("Analytics API enabled but no API keys configured. Disabling analytics API.")
+	if err := validateAPIAnalytics(&Configuration.API.Analytics); err != nil {
+		log.Errorf("Disabling analytics API: %v", err)
 		Configuration.API.Analytics.Enabled = false
 		return
 	}
 
-	// Reject placeholder/insecure secrets
-	for keyID, apiKey := range Configuration.API.Analytics.APIKeys {
-		if WeakHMACSecret(apiKey.HMACSecret) {
-			log.Errorf("Analytics API key '%s' has an insecure HMAC secret (placeholder or too short). "+
-				"Generate a secure secret with: openssl rand -hex 32. Disabling analytics API.", keyID)
-			Configuration.API.Analytics.Enabled = false
-			return
-		}
-	}
-
 	log.Infof("Analytics API enabled with %d API keys", len(Configuration.API.Analytics.APIKeys))
+}
+
+// validateAPIAnalytics checks every analytics key and parses its public key.
+func validateAPIAnalytics(cfg *APIAnalyticsConfiguration) error {
+	if len(cfg.APIKeys) == 0 {
+		return fmt.Errorf("no api_keys configured")
+	}
+	for id, k := range cfg.APIKeys {
+		if k.HMACSecret != "" {
+			return fmt.Errorf("api key %q has hmac_secret, which is no longer supported; remove it and set ed25519_public_key (see docs/send-api-ed25519.md)", id)
+		}
+		key, err := DecodeBase64Any(k.Ed25519PublicKey)
+		if k.Ed25519PublicKey == "" || err != nil || len(key) != ed25519.PublicKeySize {
+			return fmt.Errorf("api key %q needs a valid ed25519_public_key (base64 of 32 bytes)", id)
+		}
+		k.PublicKey = ed25519.PublicKey(key)
+		cfg.APIKeys[id] = k
+	}
+	return nil
 }
 
 // IsAPIAnalyticsEnabled returns whether the Analytics API is enabled

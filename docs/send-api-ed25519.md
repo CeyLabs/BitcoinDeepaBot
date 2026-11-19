@@ -130,7 +130,49 @@ headers = {"Content-Type": "application/json", **signed_headers("CeycubeBank", "
 requests.post("https://bitcoindeepa.com/api/v1/send", data=body, headers=headers)
 ```
 
-## 6. Errors
+## 6. Analytics API
+
+The analytics endpoints (`GET /api/v1/analytics/transactions`, `GET /api/v1/analytics/user/{user_id}/transactions`) use the same scheme, with two differences:
+
+- Send `X-Key-ID` (the key under `api.analytics.api_keys`) instead of `X-Wallet-ID`.
+- The first line of the signing string is `BDB-ANALYTICS-ED25519-V1`. A signature made for one API is not valid on the other.
+
+The query string is signed, so the filters can't be changed after signing. GET requests have an empty body, so the last line is the SHA-256 of the empty string.
+
+```yaml
+api:
+  analytics:
+    api_keys:
+      data-team:
+        name: "Data Team"
+        ed25519_public_key: "<base64 public key>"
+```
+
+A key with no valid `ed25519_public_key`, or one that still has `hmac_secret`, disables the analytics API at startup, and the error is logged.
+
+Bash, reusing the helper above:
+
+```bash
+# in bdb_request: use "BDB-ANALYTICS-ED25519-V1" and -H "X-Key-ID: $KEY_ID"
+bdb_request GET "/api/v1/analytics/transactions?start_date=2026-11-01&end_date=2026-11-19"
+```
+
+Python:
+
+```python
+def analytics_headers(key_id, method, path, query):
+    ts = str(int(time.time()))
+    nonce = os.urandom(16).hex()
+    msg = "\n".join(["BDB-ANALYTICS-ED25519-V1", method, path, query, ts, nonce, hashlib.sha256(b"").hexdigest()])
+    sig = base64.b64encode(key.sign(msg.encode())).decode()
+    return {"X-Key-ID": key_id, "X-Timestamp": ts, "X-Nonce": nonce, "X-Signature": sig}
+
+q = "start_date=2026-11-01&end_date=2026-11-19"
+requests.get(f"https://bitcoindeepa.com/api/v1/analytics/transactions?{q}",
+             headers=analytics_headers("data-team", "GET", "/api/v1/analytics/transactions", q))
+```
+
+## 7. Errors
 
 | Status | Message | Cause |
 |--------|---------|-------|
