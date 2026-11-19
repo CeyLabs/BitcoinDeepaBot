@@ -13,6 +13,9 @@ openssl pkey -in send-ed25519.pem -pubout -outform DER | tail -c 32 | base64    
 
 Send the base64 public key to the Bitcoin Deepa operator. Never share the `.pem` file.
 
+- **Use a separate key pair for each environment** (dev, staging, production). The host is not signed, so with a shared key a request captured on one environment would be accepted on another within the 5-minute window.
+- Generate the key as above. The bot refuses placeholder or weak public keys (for example 32 zero bytes) at startup.
+
 ## 2. Operator config
 
 ```yaml
@@ -42,7 +45,7 @@ Seven lines joined with `\n` (no trailing newline):
 ```
 BDB-SEND-ED25519-V1
 <METHOD>             e.g. POST
-<PATH>               e.g. /api/v1/send
+<PATH>               exactly as sent, still percent-encoded, e.g. /api/v1/send
 <QUERY>              raw query without "?", exactly as sent, or empty
 <TIMESTAMP>          same as X-Timestamp
 <NONCE>              same as X-Nonce
