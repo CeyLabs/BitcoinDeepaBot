@@ -167,7 +167,7 @@ See [Error reference](#4-error-reference) for the full list.
 Returns the current status of a payment that was held for admin approval (`202` response).
 The `{transaction_id}` is the ID from the `202` response `message`.
 
-`GET` requests sign over an **empty body**: `MESSAGE = "GET" + "/api/v1/send/status/{transaction_id}" + TIMESTAMP + ""`.
+`GET` requests have an empty body, so the last line of the signing string is the SHA-256 of the empty string (see §1).
 
 #### Response — `200 OK`
 
@@ -216,7 +216,7 @@ If an approved payment is accepted by the node but has not settled within `settl
 
 Resolves an outgoing invoice payment — use it whenever `POST /api/v1/send` returned `202` with `status: "pending"`, and for reconciliation after a network timeout.
 
-`GET` requests sign over an **empty body**: `MESSAGE = "GET" + "/api/v1/send/payment/{payment_hash}" + TIMESTAMP + ""`.
+`GET` requests have an empty body, so the last line of the signing string is the SHA-256 of the empty string (see §1).
 
 This checks the node live and waits up to ~5 seconds for the payment to resolve before answering. If it is still `pending` or `unknown`, poll again with backoff until the status is terminal.
 
