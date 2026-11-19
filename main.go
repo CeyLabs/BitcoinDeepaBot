@@ -159,7 +159,7 @@ func startApiServer(bot *telegram.TipBot) {
 		log.Infof("API SendPaymentStatus endpoint registered at /api/v1/send/payment/{payment_hash} with wallet Ed25519 signatures")
 
 		// Collect: charge a user for a wallet with can_collect. No approval step.
-		s.AppendRoute(`/api/v1/collect`, api.NetworkAllowlistMiddleware(api.WalletAuthMiddleware(p2p.Collect)), http.MethodPost)
+		s.AppendRoute(`/api/v1/collect`, api.NetworkAllowlistMiddleware(api.CollectAuthMiddleware(p2p.Collect)), http.MethodPost)
 		s.AppendRoute(`/api/v1/collect/{id}`, api.NetworkAllowlistMiddleware(api.WalletAuthMiddleware(p2p.CollectStatus)), http.MethodGet)
 		log.Infof("API Collect endpoints registered at /api/v1/collect with wallet Ed25519 signatures")
 	} else {

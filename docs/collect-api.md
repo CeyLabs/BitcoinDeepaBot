@@ -30,19 +30,36 @@ logged in through `POST /api/v1/init`, so `api.p2p.enabled` is needed too.
 
 ## Wallet endpoints (DCA backend)
 
-Signed with the wallet's send key, exactly like `/api/v1/send` (see
-[send-api-ed25519.md](send-api-ed25519.md)). A wallet without `can_collect`
-gets `403 collect_not_allowed`.
+Signed with the wallet's send key, with the same headers and rules as
+`/api/v1/send` (see [send-api-ed25519.md](send-api-ed25519.md)). A wallet
+without `can_collect` gets `403 collect_not_allowed`.
 
 ### `POST /api/v1/collect`
 
-```json
-{ "to": "@alice", "amount": 50000, "memo": "Sell order #812", "external_id": "6b1f…uuid" }
+The user to charge goes in the **`X-BDB-User: <telegram_id>`** header, not in
+the body. The signed text has its own first line and adds that ID as the
+seventh line, so it can't be changed in transit:
+
+```
+BDB-COLLECT-ED25519-V1
+POST
+/api/v1/collect
+                                  (empty query line)
+<TIMESTAMP>
+<NONCE>
+<telegram_id>                     exactly as in X-BDB-User
+<hex sha256 of the exact body bytes>
 ```
 
-- `to`: the user to charge, a Telegram `@username` or numeric ID. Prefer the
-  ID: usernames can change hands. The user must have logged in through
-  `POST /api/v1/init`, otherwise `403 payer_not_linked`.
+A send signature (`BDB-SEND-ED25519-V1`) is refused here.
+
+```json
+{ "amount": 50000, "memo": "Sell order #812", "external_id": "6b1f…uuid" }
+```
+
+- `X-BDB-User`: the payer's numeric Telegram ID. They must have logged in
+  through `POST /api/v1/init`, otherwise `403 payer_not_linked`. Missing or
+  not a number → `401`. A `to` field in the body is refused (`400 invalid_json`).
 - `external_id`: 8–128 characters, unique per charge (use your order ID or a
   UUID). Retrying with the same `external_id` returns the same request (`200`
   instead of `201`) and **never charges twice**. The same `external_id` with
@@ -55,7 +72,7 @@ At most 10 charges per wallet per user per hour (`429 rate_limited`).
 
 ### `GET /api/v1/collect/{id}`
 
-The current state of one of your requests. Poll every 3–5 seconds while
+Signed exactly like `/api/v1/send` (no `X-BDB-User`). The current state of one of your requests. Poll every 3–5 seconds while
 `paid` is `false` and the transfer is `processing` or `in_flight`.
 
 ## Mini App / web app endpoint
