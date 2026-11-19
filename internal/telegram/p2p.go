@@ -107,8 +107,9 @@ type P2PTransfer struct {
 	// internal send. It is saved before paying, so the outcome can be looked
 	// up if the send is cut off.
 	InternalPaymentHash string `json:"internal_payment_hash,omitempty"`
-	// CollectID is set when the transfer pays a collect request. The payer
-	// approved that exact payment, so the P2P daily limit does not apply.
+	// CollectID is set when the transfer pays a collect request. The P2P
+	// daily limit does not apply; the wallet's max_amount and the collect
+	// rate limit do.
 	CollectID string `json:"collect_id,omitempty"`
 }
 

@@ -86,7 +86,7 @@ This is the only step that needs a **fresh Telegram login** checked by the bot. 
 Two steps. The challenge is tied to one transfer on the bot's side, so a signature for one payment can't approve another.
 
 ```
-1. POST /api/v1/p2p/send | /invoice/pay | /collect/{id}/approve    (V2)
+1. POST /api/v1/p2p/send | /invoice/pay    (V2)
    → 202 { id, status: "awaiting_passkey", amount, to | invoice,
            passkey: { challenge, allowCredentials, rpId, timeout } }
    Nothing has moved yet. The transfer waits up to 5 min.
@@ -142,7 +142,7 @@ Library: `github.com/go-webauthn/webauthn`. Storage: buntdb, keyed by `telegram_
    This needs a device test before building.
 2. **`rp_id` domain:** passkeys only work on the domain they were created for, so this choice is permanent. Pick the final web domain before launch.
 3. **A new passkey while an older one exists:** should large payments wait, for example 24 hours, after a passkey is added? This is optional extra protection against a stolen Telegram login.
-4. **Collect from the bot chat:** removed in #101. Approval is passkey-only through the app.
+4. **Collect:** charges at once with the wallet's key, with no user approval, so passkeys don't cover it.
 
 ## 10. Rollout
 
