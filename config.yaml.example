@@ -74,6 +74,10 @@ dca:
 
 # API Configuration
 api:
+  # Optional. When set, every /api/v1/ endpoint (send, analytics, per-user wallet API)
+  # only answers these IPs/CIDRs. Behind a reverse proxy, the proxy must be in
+  # bot.trusted_proxies and pass the real client IP in X-Forwarded-For.
+  allowed_networks: []
   # Analytics API - HMAC authenticated endpoints for data export
   # Generate secrets with: openssl rand -hex 32
   analytics:
