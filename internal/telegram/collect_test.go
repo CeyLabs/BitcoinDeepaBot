@@ -57,36 +57,24 @@ func TestCollectApproveOnce(t *testing.T) {
 	if err != nil || tr.CollectID != c.ID || tr.FromTelegramID != 111 || tr.ToTelegramID != 999 || tr.Amount != 20000 {
 		t.Fatalf("bad transfer %+v, %v", tr, err)
 	}
-	if _, err := bot.CollectDecline(c.ID, 111); err == nil {
-		t.Error("declined an approved request")
-	}
 	if got, _ := bot.CollectGet(c.ID); got.Status != CollectApproved {
 		t.Errorf("status %s, want approved", got.Status)
 	}
 }
 
-// A request only the payer can approve or decline; the wallet only cancels its own.
+// Only the payer named on the request is charged.
 func TestCollectOwnership(t *testing.T) {
 	withP2PConfig(t)
 	bot := buntBot(t)
 	c := newTestCollect(t, bot, time.Minute)
 	if _, _, err := bot.collectApprove(c, testPayer(222)); err == nil {
-		t.Error("another user approved the request")
+		t.Error("charged another user")
 	}
-	if _, err := bot.CollectDecline(c.ID, 222); err == nil {
-		t.Error("another user declined the request")
-	}
-	if _, err := bot.CollectCancel(c.ID, "other"); err == nil {
-		t.Error("another wallet cancelled the request")
-	}
-	if _, err := bot.CollectCancel(c.ID, "dca"); err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := bot.collectApprove(c, testPayer(111)); err == nil {
-		t.Error("approved a cancelled request")
+	if _, err := bot.CollectCharge(c.ID, testPayer(222)); err == nil {
+		t.Error("charged another user")
 	}
 	if _, err := bot.P2PGet(c.TransferID()); err == nil {
-		t.Error("cancelled request has a transfer")
+		t.Error("request has a transfer after a wrong payer")
 	}
 }
 
@@ -109,13 +97,13 @@ func TestCollectDecisionSurvivesStaleRecord(t *testing.T) {
 	withP2PConfig(t)
 	bot := buntBot(t)
 	c := newTestCollect(t, bot, time.Minute)
-	bot.Bunt.GetOrSet(collectDecideKey(c.ID), CollectDeclined, time.Hour) // record still says pending
+	bot.Bunt.GetOrSet(collectDecideKey(c.ID), CollectExpired, time.Hour) // record still says pending
 	stale, _ := bot.CollectGet(c.ID)
 	if _, _, err := bot.collectApprove(stale, testPayer(111)); err == nil {
-		t.Fatal("approved a declined request")
+		t.Fatal("charged an expired request")
 	}
-	if got, _ := bot.CollectGet(c.ID); got.Status != CollectDeclined {
-		t.Errorf("status %s, want declined", got.Status)
+	if got, _ := bot.CollectGet(c.ID); got.Status != CollectExpired {
+		t.Errorf("status %s, want expired", got.Status)
 	}
 }
 
