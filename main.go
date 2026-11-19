@@ -158,7 +158,6 @@ func startApiServer(bot *telegram.TipBot) {
 	} else {
 		log.Infof("API Send endpoint disabled in configuration")
 	}
-	s.ListenAndServe()
 
 	// Telegram Mini App sending. The sender is the user in the signed init data.
 	if internal.Configuration.API.P2P.Enabled {
@@ -171,6 +170,8 @@ func startApiServer(bot *telegram.TipBot) {
 		s.AppendRoute(`/api/v1/p2p/transfers/{id}`, p2p.Auth(p2p.Transfer), http.MethodGet)
 		log.Infof("P2P API endpoints registered at /api/v1/p2p/*")
 	}
+	// Start serving only after every middleware and route is added.
+	s.ListenAndServe()
 
 	// start internal admin server
 	adminHost, adminToken := internal.Configuration.Bot.AdminAPIHost, internal.Configuration.Bot.AdminAPIToken
