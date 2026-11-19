@@ -122,13 +122,34 @@ func NewP2PService(bot *telegram.TipBot) *P2PService {
 	}
 }
 
-// Auth verifies the Mini App init data and loads the sender. Nothing else in
-// the request can name or change the sender.
+// Auth checks the Mini App server's signature, then the Mini App init data,
+// and loads the sender. Nothing else in the request can name or change the
+// sender. Use it for read endpoints.
 func (p *P2PService) Auth(next http.HandlerFunc) http.HandlerFunc {
+	return p.auth(next, false)
+}
+
+// AuthSpend is Auth for endpoints that move sats. It accepts only fresh init
+// data (spend_init_data_max_age), so leaked init data can't spend for long.
+func (p *P2PService) AuthSpend(next http.HandlerFunc) http.HandlerFunc {
+	return p.auth(next, true)
+}
+
+func (p *P2PService) auth(next http.HandlerFunc, spend bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cfg := internal.Configuration.API.P2P
+		now := time.Now()
+		if err := verifyP2PServiceSig(w, r, cfg.ServiceKey, now); err != nil {
+			log.Warnf("[api/p2p] Rejected service signature from %s: %v", getClientIP(r), err)
+			p2pFail(w, http.StatusUnauthorized, "bad_service_signature", "Request could not be verified.")
+			return
+		}
+		maxAge := cfg.InitDataMaxAge
+		if spend {
+			maxAge = cfg.SpendInitDataMaxAge
+		}
 		tgUser, err := tma.Verify(r.Header.Get(InitDataHeader), internal.Configuration.Telegram.ApiKey,
-			time.Duration(cfg.InitDataMaxAge)*time.Second, time.Now())
+			time.Duration(maxAge)*time.Second, now)
 		if err != nil {
 			log.Warnf("[api/p2p] Rejected init data from %s: %v", getClientIP(r), err)
 			p2pFail(w, http.StatusUnauthorized, "unauthorized", "Your session expired. Close and reopen the Mini App.")
@@ -139,7 +160,6 @@ func (p *P2PService) Auth(next http.HandlerFunc) http.HandlerFunc {
 			p2pWriteErr(w, err)
 			return
 		}
-		r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
 		next(w, r.WithContext(context.WithValue(r.Context(), p2pCtxKey{}, sender)))
 	}
 }

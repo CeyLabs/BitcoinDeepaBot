@@ -21,6 +21,12 @@ the request cannot send on anyone's behalf.
 
 - Init data older than `init_data_max_age` (default 1 hour) is rejected: ask
   the user to reopen the Mini App.
+- `/send` and `/invoice/pay` move sats, so they accept only init data younger
+  than `spend_init_data_max_age` (default 10 minutes). Telegram sets
+  `initData` when the Mini App opens, so a user who has had it open longer
+  gets `401 unauthorized` on send: ask them to close and reopen the Mini App,
+  then retry with the **same** `idempotency_key`. Check `auth_date` in
+  `initDataUnsafe` to warn them before they tap Send.
 - Pass `initData` (the raw string), not `initDataUnsafe`.
 
 ### Calling it from the Mini App
@@ -29,11 +35,70 @@ the request cannot send on anyone's behalf.
 **from the TMA server**, not the browser:
 
 ```
-browser ──(initData)──► TMA server route ──(X-Telegram-Init-Data: same string)──► bot
+browser ──(initData)──► TMA server route ──(X-Telegram-Init-Data: same string
+                                            + service signature)──► bot
 ```
 
 The server route forwards the header as-is and adds nothing that identifies a
 user.
+
+## Authentication: who is calling (service signature)
+
+The TMA server also signs **every** call with its own Ed25519 key, so only it
+can call `/api/v1/p2p/*`, even if the IP allowlist is wrong. The bot stores
+only the public key (`service_public_key`). P2P stays off until it is set.
+
+Create the key pair on the TMA server:
+
+```bash
+openssl genpkey -algorithm ed25519 -out p2p-service.pem                        # keep secret, TMA server only
+openssl pkey -in p2p-service.pem -pubout -outform DER | tail -c 32 | base64    # → service_public_key
+```
+
+Headers, added by the TMA server:
+
+| Header        | Value |
+|---------------|-------|
+| `X-Timestamp` | Unix time in seconds (within ±300 s of server time) |
+| `X-Nonce`     | 16–128 random chars `[A-Za-z0-9_-]`, new for every request |
+| `X-Signature` | Base64 Ed25519 signature of the string below |
+
+Signing string: eight lines joined with `\n`, no trailing newline:
+
+```
+BDB-P2P-ED25519-V1
+<METHOD>
+<PATH>                                  e.g. /api/v1/p2p/send
+<QUERY>                                 raw query without "?", or empty
+<TIMESTAMP>
+<NONCE>
+<hex sha256 of the X-Telegram-Init-Data value>
+<hex sha256 of the exact body bytes>    (sha256 of empty string for GET)
+```
+
+The init data is signed too, so a captured request can't be reused with
+another user's init data. Each nonce works once.
+
+```js
+// TMA server (Node.js)
+const crypto = require("crypto");
+const key = crypto.createPrivateKey(process.env.P2P_SERVICE_KEY_PEM);
+const sha = (s) => crypto.createHash("sha256").update(s).digest("hex");
+
+function p2pHeaders(method, path, query, initData, body) {
+  const ts = Math.floor(Date.now() / 1000).toString();
+  const nonce = crypto.randomBytes(16).toString("hex");
+  const msg = ["BDB-P2P-ED25519-V1", method, path, query, ts, nonce, sha(initData), sha(body)].join("\n");
+  return {
+    "Content-Type": "application/json",
+    "X-Telegram-Init-Data": initData,
+    "X-Timestamp": ts,
+    "X-Nonce": nonce,
+    "X-Signature": crypto.sign(null, Buffer.from(msg), key).toString("base64"),
+  };
+}
+// fetch(`${BOT}/api/v1/p2p/send`, { method: "POST", headers: p2pHeaders("POST", "/api/v1/p2p/send", "", initData, body), body })
+```
 
 ## Rules
 
@@ -141,7 +206,8 @@ Current state of one of **your** transfers (others get `404`). Poll it every
 | HTTP | `code` |
 |---|---|
 | 400 | `invalid_json`, `invalid_amount`, `amount_too_large`, `memo_too_long`, `invalid_idempotency_key`, `invalid_recipient`, `recipient_not_allowed`, `self_send`, `invalid_invoice`, `amountless_invoice`, `invoice_expired` |
-| 401 | `unauthorized`: init data missing, invalid or expired. Reopen the Mini App. |
+| 401 | `unauthorized`: init data missing, invalid or expired (for spends: older than `spend_init_data_max_age`). Reopen the Mini App. |
+| 401 | `bad_service_signature`: the TMA server's signature is missing, wrong, expired or replayed. A server bug, not a user error. |
 | 403 | `sender_not_found` (user must start the bot first), `sender_not_allowed` |
 | 404 | `recipient_not_found`, `not_found` |
 | 409 | `idempotency_conflict`, `in_progress` |
@@ -162,5 +228,7 @@ api:
     confirm_threshold: 50000
     rate_limit_per_minute: 10
     init_data_max_age: 3600
+    spend_init_data_max_age: 600   # /send and /invoice/pay
     max_memo_length: 280
+    service_public_key: "<base64 Ed25519 public key of the TMA server>"   # required
 ```
