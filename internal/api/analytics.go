@@ -502,7 +502,7 @@ func (s Service) GetUserTransactionHistory(w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(response)
 }
 
-// fetchPaymentsWithRateLimit waits for the shared LNbits rate limiter token, then fetches
+// fetchPaymentsWithRateLimit waits for the analytics LNbits rate limiter token, then fetches
 // payments for the given user. On HTTP 429 it retries up to 3 times with exponential backoff
 // (2s, 4s, 8s) before giving up.
 func fetchPaymentsWithRateLimit(ctx context.Context, s Service, user *lnbits.User, count int) ([]lnbits.Payment, error) {
