@@ -74,10 +74,33 @@ dca:
 
 # API Configuration
 api:
-  # Optional. When set, every /api/v1/ endpoint (send, analytics, per-user wallet API)
+  # Optional. When set, every /api/v1/ endpoint (send, analytics, P2P, per-user wallet API)
   # only answers these IPs/CIDRs. Behind a reverse proxy, the proxy must be in
   # bot.trusted_proxies and pass the real client IP in X-Forwarded-For.
   allowed_networks: []
+  # Telegram Mini App sending (/api/v1/p2p/*). Off by default. The sender is
+  # always the user in the Mini App's signed initData. See docs/p2p-api.md.
+  p2p:
+    enabled: false
+    max_amount: 100000        # sats per transfer
+    daily_limit: 500000       # sats per sender per UTC day
+    confirm_threshold: 50000  # daily total a sender can send without confirming in the bot chat
+    rate_limit_per_minute: 10
+    init_data_max_age: 3600   # seconds
+    spend_init_data_max_age: 600  # seconds; shorter window for /send and /invoice/pay
+    max_memo_length: 280
+    # Required when enabled: base64 Ed25519 P2P public key of the DCA backend,
+    # which signs every call. Not the same key as its send wallet key.
+    # See docs/p2p-api.md.
+    service_public_key: ""
+    # Only these IPs/CIDRs (the DCA backend) can call /api/v1/p2p/*.
+    # Empty means any IP; the service signature still applies.
+    allowed_networks: []
+    # Accept "Log In with Telegram" (OIDC) ID tokens from the web app, as
+    # well as Mini App init data. The web app must log in with this bot and
+    # request the "openid profile" scopes.
+    oidc_enabled: false
+    # oidc_client_id: ""  # bot ID the web app logs in with; empty = this bot
   # Analytics API - HMAC authenticated endpoints for data export
   # Generate secrets with: openssl rand -hex 32
   analytics:
