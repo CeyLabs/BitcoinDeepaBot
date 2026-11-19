@@ -89,10 +89,11 @@ api:
     init_data_max_age: 3600   # seconds
     spend_init_data_max_age: 600  # seconds; shorter window for /send and /invoice/pay
     max_memo_length: 280
-    # Required when enabled: base64 Ed25519 public key of the Mini App server,
-    # which signs every call. See docs/p2p-api.md.
+    # Required when enabled: base64 Ed25519 P2P public key of the DCA backend,
+    # which signs every call. Not the same key as its send wallet key.
+    # See docs/p2p-api.md.
     service_public_key: ""
-    # Only these IPs/CIDRs (the Mini App server) can call /api/v1/p2p/*.
+    # Only these IPs/CIDRs (the DCA backend) can call /api/v1/p2p/*.
     # Empty means any IP; the service signature still applies.
     allowed_networks: []
     # Accept "Log In with Telegram" (OIDC) ID tokens from the web app, as

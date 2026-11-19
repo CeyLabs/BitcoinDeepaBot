@@ -57,33 +57,35 @@ from [Log In with Telegram](https://core.telegram.org/bots/telegram-login):
 
 ### Calling it from the Mini App or web app
 
-Call it **from the TMA server**, not the browser. Set `api.p2p.allowed_networks`
-to the TMA server's IPs so the P2P routes answer only them (`403 forbidden`
+Call it **from the DCA backend**, which serves both the Mini App and the web
+app. Never call it from the browser. Set `api.p2p.allowed_networks`
+to the DCA backend's IPs so the P2P routes answer only them (`403 forbidden`
 otherwise). If the global `api.allowed_networks` is set too, it also covers
-`/api/v1/p2p/*`, so the TMA server must be in **both** lists:
+`/api/v1/p2p/*`, so the DCA backend must be in **both** lists:
 
 ```
-Mini App ──(initData)──► TMA server ──(X-Telegram-Init-Data + service signature)──► bot
-web app  ──(session)───► TMA server ──(X-Telegram-ID-Token  + service signature)──► bot
+Mini App ──(initData)──► DCA backend ──(X-Telegram-Init-Data + service signature)──► bot
+web app  ──(session)───► DCA backend ──(X-Telegram-ID-Token  + service signature)──► bot
 ```
 
 The server forwards the credential as-is and adds nothing that identifies a
-user. One server and one service key serve both.
+user. One backend and one P2P service key serve both. This key is **separate** from the
+DCA backend's send-wallet key (see `docs/dca-backend-integration.md`).
 
 ## Authentication: who is calling (service signature)
 
-The TMA server also signs **every** call with its own Ed25519 key, so only it
+The DCA backend also signs **every** call with its own Ed25519 key, so only it
 can call `/api/v1/p2p/*`, even if the IP allowlist is wrong or empty. The bot stores
 only the public key (`service_public_key`). P2P stays off until it is set.
 
-Create the key pair on the TMA server:
+Create the key pair on the DCA backend:
 
 ```bash
-openssl genpkey -algorithm ed25519 -out p2p-service.pem                        # keep secret, TMA server only
+openssl genpkey -algorithm ed25519 -out p2p-service.pem                        # keep secret, DCA backend only
 openssl pkey -in p2p-service.pem -pubout -outform DER | tail -c 32 | base64    # → service_public_key
 ```
 
-Headers, added by the TMA server:
+Headers, added by the DCA backend:
 
 | Header        | Value |
 |---------------|-------|
@@ -108,7 +110,7 @@ The credential is signed too, so a captured request can't be reused with
 another user's credential. Each nonce works once.
 
 ```js
-// TMA server (Node.js)
+// DCA backend (Node.js)
 const crypto = require("crypto");
 const key = crypto.createPrivateKey(process.env.P2P_SERVICE_KEY_PEM);
 const sha = (s) => crypto.createHash("sha256").update(s).digest("hex");
@@ -257,7 +259,7 @@ seconds anyway. Polls are limited to 30 per minute per sender.
 |---|---|
 | 400 | `invalid_json`, `invalid_amount`, `amount_too_large`, `memo_too_long`, `invalid_idempotency_key`, `invalid_recipient`, `self_send`, `invalid_invoice`, `amountless_invoice`, `invoice_expired` |
 | 401 | `unauthorized`: credential missing, invalid or expired, both credentials sent, or (for spends) the login is older than `spend_init_data_max_age`. Mini App: reopen it. Web app: log in with Telegram again. |
-| 401 | `bad_service_signature`: the TMA server's signature is missing, wrong, expired or replayed. A server bug, not a user error. |
+| 401 | `bad_service_signature`: the DCA backend's P2P signature is missing, wrong, expired or replayed. A server bug, not a user error. |
 | 403 | `forbidden` (caller's IP not in `api.p2p.allowed_networks`), `sender_not_found` (user must start the bot first), `sender_not_allowed` |
 | 404 | `recipient_not_found`, `not_found` |
 | 409 | `idempotency_conflict`, `in_progress` |
@@ -272,7 +274,7 @@ status `failed` and the reason in `error`.
 api:
   p2p:
     enabled: true
-    allowed_networks: ["<TMA server IP>"]   # only these IPs can call /api/v1/p2p/*; empty = any IP
+    allowed_networks: ["<DCA backend IP>"]   # only these IPs can call /api/v1/p2p/*; empty = any IP
     max_amount: 100000
     daily_limit: 500000
     confirm_threshold: 50000      # daily total a sender can send without confirming
@@ -280,7 +282,7 @@ api:
     init_data_max_age: 3600
     spend_init_data_max_age: 600   # /send and /invoice/pay
     max_memo_length: 280
-    service_public_key: "<base64 Ed25519 public key of the TMA server>"   # required
+    service_public_key: "<base64 Ed25519 P2P public key of the DCA backend>"   # required
     oidc_enabled: true    # accept Log In with Telegram ID tokens from the web app
     # oidc_client_id: "1234567890"   # bot ID the web app logs in with; default: this bot
 ```
