@@ -18,6 +18,7 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/tma"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	tb "gopkg.in/lightningtipbot/telebot.v3"
 )
 
 // InitDataHeader carries Telegram.WebApp.initData, unchanged, on P2P calls
@@ -66,6 +67,8 @@ func p2pWriteErr(w http.ResponseWriter, err error) {
 	}
 	status := http.StatusBadRequest
 	switch pe.Code {
+	case "wallet_unavailable":
+		status = http.StatusServiceUnavailable
 	case "sender_not_found", "sender_not_allowed":
 		status = http.StatusForbidden
 	case "recipient_not_found":
@@ -125,6 +128,8 @@ type P2PService struct {
 	payRate  *rateLimiter // send + invoice pay
 	readRate *rateLimiter // resolve + decode
 	pollRate *rateLimiter // transfer status
+	// newWallets limits wallets created through /api/v1/init, for all users together.
+	newWallets *rateLimiter
 }
 
 // p2pPollsPerMinute caps GET /transfers/{id} per sender: one poll every 2 s.
@@ -133,10 +138,11 @@ const p2pPollsPerMinute = 30
 func NewP2PService(bot *telegram.TipBot) *P2PService {
 	cfg := internal.Configuration.API.P2P
 	return &P2PService{
-		Bot:      bot,
-		payRate:  newRateLimiter(cfg.RateLimitPerMinute, time.Minute),
-		readRate: newRateLimiter(cfg.RateLimitPerMinute*3, time.Minute),
-		pollRate: newRateLimiter(p2pPollsPerMinute, time.Minute),
+		Bot:        bot,
+		payRate:    newRateLimiter(cfg.RateLimitPerMinute, time.Minute),
+		readRate:   newRateLimiter(cfg.RateLimitPerMinute*3, time.Minute),
+		pollRate:   newRateLimiter(p2pPollsPerMinute, time.Minute),
+		newWallets: newRateLimiter(p2pNewWalletsPerMinute, time.Minute),
 	}
 }
 
@@ -155,37 +161,11 @@ func (p *P2PService) AuthSpend(next http.HandlerFunc) http.HandlerFunc {
 
 func (p *P2PService) auth(next http.HandlerFunc, spend bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		cfg := internal.Configuration.API.P2P
-		now := time.Now()
-		if len(cfg.AllowedNets) > 0 {
-			ip := netutil.ClientIP(r, internal.Configuration.Bot.TrustedProxyNets)
-			if !netutil.Contains(cfg.AllowedNets, ip) {
-				log.Warnf("[api/p2p] Access denied for IP %v (not in api.p2p.allowed_networks)", ip)
-				p2pFail(w, http.StatusForbidden, "forbidden", "Access denied.")
-				return
-			}
-		}
-		if err := verifyP2PServiceSig(w, r, cfg.ServiceKey, now); err != nil {
-			log.Warnf("[api/p2p] Rejected service signature from %s: %v", getClientIP(r), err)
-			switch {
-			case errors.Is(err, errP2PBodyTooLarge):
-				p2pFail(w, http.StatusRequestEntityTooLarge, "too_large", "Request too large.")
-			case errors.Is(err, errP2PBodyRead):
-				p2pFail(w, http.StatusBadRequest, "invalid_request", "Could not read the request.")
-			default:
-				p2pFail(w, http.StatusUnauthorized, "bad_service_signature", "Request could not be verified.")
-			}
-			return
-		}
-		maxAge := cfg.InitDataMaxAge
-		if spend {
-			maxAge = cfg.SpendInitDataMaxAge
-		}
-		telegramID, ok := p2pIdentify(w, r, cfg, time.Duration(maxAge)*time.Second, now)
+		tg, ok := p2pVerifyCaller(w, r, spend)
 		if !ok {
 			return
 		}
-		sender, err := p.Bot.P2PSender(telegramID)
+		sender, err := p.Bot.P2PSender(tg.ID)
 		if err != nil {
 			p2pWriteErr(w, err)
 			return
@@ -194,37 +174,93 @@ func (p *P2PService) auth(next http.HandlerFunc, spend bool) http.HandlerFunc {
 	}
 }
 
+type p2pTelegramCtxKey struct{}
+
+// AuthNewUser is Auth for /api/v1/init: it checks the caller and the credential the
+// same way, but does not need the user to have a wallet yet.
+func (p *P2PService) AuthNewUser(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tg, ok := p2pVerifyCaller(w, r, false)
+		if !ok {
+			return
+		}
+		next(w, r.WithContext(context.WithValue(r.Context(), p2pTelegramCtxKey{}, tg)))
+	}
+}
+
+// p2pVerifyCaller checks the IP allowlist, the DCA backend's service
+// signature and the user's Telegram credential, and returns the user.
+func p2pVerifyCaller(w http.ResponseWriter, r *http.Request, spend bool) (*tb.User, bool) {
+	cfg := internal.Configuration.API.P2P
+	now := time.Now()
+	if len(cfg.AllowedNets) > 0 {
+		ip := netutil.ClientIP(r, internal.Configuration.Bot.TrustedProxyNets)
+		if !netutil.Contains(cfg.AllowedNets, ip) {
+			log.Warnf("[api/p2p] Access denied for IP %v (not in api.p2p.allowed_networks)", ip)
+			p2pFail(w, http.StatusForbidden, "forbidden", "Access denied.")
+			return nil, false
+		}
+	}
+	if err := verifyP2PServiceSig(w, r, cfg.ServiceKey, now); err != nil {
+		log.Warnf("[api/p2p] Rejected service signature from %s: %v", getClientIP(r), err)
+		switch {
+		case errors.Is(err, errP2PBodyTooLarge):
+			p2pFail(w, http.StatusRequestEntityTooLarge, "too_large", "Request too large.")
+		case errors.Is(err, errP2PBodyRead):
+			p2pFail(w, http.StatusBadRequest, "invalid_request", "Could not read the request.")
+		default:
+			p2pFail(w, http.StatusUnauthorized, "bad_service_signature", "Request could not be verified.")
+		}
+		return nil, false
+	}
+	maxAge := cfg.InitDataMaxAge
+	if spend {
+		maxAge = cfg.SpendInitDataMaxAge
+	}
+	return p2pIdentifyUser(w, r, cfg, time.Duration(maxAge)*time.Second, now)
+}
+
 // p2pIdentify returns the Telegram user a request is for, from exactly one
 // Telegram-signed credential: Mini App init data, or a "Log In with Telegram"
 // ID token from the web app. The login must be no older than maxAge. On
 // failure it answers 401 and returns false.
 func p2pIdentify(w http.ResponseWriter, r *http.Request, cfg internal.APIP2PConfiguration, maxAge time.Duration, now time.Time) (int64, bool) {
+	u, ok := p2pIdentifyUser(w, r, cfg, maxAge, now)
+	if !ok {
+		return 0, false
+	}
+	return u.ID, true
+}
+
+// p2pIdentifyUser is p2pIdentify, returning the user's Telegram profile from
+// the credential.
+func p2pIdentifyUser(w http.ResponseWriter, r *http.Request, cfg internal.APIP2PConfiguration, maxAge time.Duration, now time.Time) (*tb.User, bool) {
 	initData, idToken := r.Header.Get(InitDataHeader), r.Header.Get(IDTokenHeader)
 	switch {
 	case initData != "" && idToken != "":
 		log.Warnf("[api/p2p] Rejected request from %s with both init data and an ID token", getClientIP(r))
 		p2pFail(w, http.StatusUnauthorized, "unauthorized", "Send either Mini App init data or a Telegram login, not both.")
-		return 0, false
+		return nil, false
 	case idToken != "":
 		if !cfg.OIDCEnabled {
 			p2pFail(w, http.StatusUnauthorized, "unauthorized", "Telegram login is not enabled for this API.")
-			return 0, false
+			return nil, false
 		}
 		u, err := tgoidc.Verify(idToken, tgoidc.Default, cfg.OIDCClientID, maxAge, now)
 		if err != nil {
 			log.Warnf("[api/p2p] Rejected ID token from %s: %v", getClientIP(r), err)
 			p2pFail(w, http.StatusUnauthorized, "unauthorized", "Your Telegram login expired. Log in with Telegram again.")
-			return 0, false
+			return nil, false
 		}
-		return u.ID, true
+		return &tb.User{ID: u.ID, Username: u.Username, FirstName: u.FirstName, LastName: u.LastName}, true
 	default:
 		u, err := tma.Verify(initData, internal.Configuration.Telegram.ApiKey, maxAge, now)
 		if err != nil {
 			log.Warnf("[api/p2p] Rejected init data from %s: %v", getClientIP(r), err)
 			p2pFail(w, http.StatusUnauthorized, "unauthorized", "Your session expired. Close and reopen the Mini App.")
-			return 0, false
+			return nil, false
 		}
-		return u.ID, true
+		return &tb.User{ID: u.ID, Username: u.Username, FirstName: u.FirstName, LastName: u.LastName, LanguageCode: u.LanguageCode, IsBot: u.IsBot}, true
 	}
 }
 
@@ -429,11 +465,18 @@ func (p *P2PService) Transfer(w http.ResponseWriter, r *http.Request) {
 
 // Me: GET /api/v1/p2p/me. Balance and what is left of today's limit.
 func (p *P2PService) Me(w http.ResponseWriter, r *http.Request) {
-	sender := p2pSender(r)
-	balance, err := p.Bot.GetUserAvailableBalance(sender)
+	body, err := p.meBody(p2pSender(r))
 	if err != nil {
 		p2pFail(w, http.StatusServiceUnavailable, "balance_unavailable", "Could not load your balance. Try again.")
 		return
+	}
+	p2pWriteJSON(w, http.StatusOK, body)
+}
+
+func (p *P2PService) meBody(sender *lnbits.User) (map[string]interface{}, error) {
+	balance, err := p.Bot.GetUserAvailableBalance(sender)
+	if err != nil {
+		return nil, err
 	}
 	used, _ := p.Bot.P2PDailyUsed(sender.Telegram.ID)
 	cfg := internal.Configuration.API.P2P
@@ -441,7 +484,7 @@ func (p *P2PService) Me(w http.ResponseWriter, r *http.Request) {
 	if remaining < 0 {
 		remaining = 0
 	}
-	p2pWriteJSON(w, http.StatusOK, map[string]interface{}{
+	return map[string]interface{}{
 		"telegram_id": sender.Telegram.ID, "username": sender.Telegram.Username, "name": telegram.DisplayName(sender.Telegram),
 		"balance": balance, "balance_lkr": thirdparty.FormatSatsWithLKR(balance),
 		"limits": map[string]int64{
@@ -449,5 +492,50 @@ func (p *P2PService) Me(w http.ResponseWriter, r *http.Request) {
 			"daily_remaining": remaining, "confirm_threshold": cfg.ConfirmThreshold,
 			"unconfirmed_remaining": p.Bot.P2PUnconfirmedRemaining(sender.Telegram.ID),
 		},
-	})
+	}, nil
+}
+
+// p2pNewWalletsPerMinute caps wallets created through /api/v1/init across all users,
+// so a leaked service key can't mass-create lnbits accounts.
+const p2pNewWalletsPerMinute = 30
+
+// Init: POST /api/v1/init {"referral_code"?}. Creates the user's wallet
+// if they never pressed Start, then answers like /me with "created" and,
+// for a new wallet, "can_message".
+func (p *P2PService) Init(w http.ResponseWriter, r *http.Request) {
+	tg, _ := r.Context().Value(p2pTelegramCtxKey{}).(*tb.User)
+	if tg == nil {
+		p2pFail(w, http.StatusUnauthorized, "unauthorized", "Request could not be verified.")
+		return
+	}
+	if !p.readRate.allow("init:"+strconv.FormatInt(tg.ID, 10), time.Now()) {
+		p2pFail(w, http.StatusTooManyRequests, "rate_limited", "Too many requests. Wait a minute and try again.")
+		return
+	}
+	var req struct {
+		ReferralCode string `json:"referral_code"`
+	}
+	if r.ContentLength != 0 && !decodeBody(w, r, &req) {
+		return
+	}
+	if _, err := p.Bot.P2PSender(tg.ID); err != nil && !p.newWallets.allow("all", time.Now()) {
+		p2pFail(w, http.StatusTooManyRequests, "rate_limited", "Too many new wallets right now. Try again in a minute.")
+		return
+	}
+	u, created, canMessage, err := p.Bot.P2PInit(tg, req.ReferralCode)
+	if err != nil {
+		p2pWriteErr(w, err)
+		return
+	}
+	body, err := p.meBody(u)
+	if err != nil {
+		body = map[string]interface{}{"telegram_id": u.Telegram.ID, "username": u.Telegram.Username, "name": telegram.DisplayName(u.Telegram)}
+	}
+	body["created"] = created
+	status := http.StatusOK
+	if created {
+		body["can_message"] = canMessage
+		status = http.StatusCreated
+	}
+	p2pWriteJSON(w, status, body)
 }
