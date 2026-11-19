@@ -11,6 +11,7 @@ import (
 
 	"github.com/LightningTipBot/LightningTipBot/internal"
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
+	"github.com/LightningTipBot/LightningTipBot/internal/netutil"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
 	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 	"github.com/LightningTipBot/LightningTipBot/internal/tma"
@@ -111,7 +112,11 @@ type P2PService struct {
 	Bot      *telegram.TipBot
 	payRate  *rateLimiter // send + invoice pay
 	readRate *rateLimiter // resolve + decode
+	pollRate *rateLimiter // transfer status
 }
+
+// p2pPollsPerMinute caps GET /transfers/{id} per sender: one poll every 2 s.
+const p2pPollsPerMinute = 30
 
 func NewP2PService(bot *telegram.TipBot) *P2PService {
 	cfg := internal.Configuration.API.P2P
@@ -119,6 +124,7 @@ func NewP2PService(bot *telegram.TipBot) *P2PService {
 		Bot:      bot,
 		payRate:  newRateLimiter(cfg.RateLimitPerMinute, time.Minute),
 		readRate: newRateLimiter(cfg.RateLimitPerMinute*3, time.Minute),
+		pollRate: newRateLimiter(p2pPollsPerMinute, time.Minute),
 	}
 }
 
@@ -139,6 +145,14 @@ func (p *P2PService) auth(next http.HandlerFunc, spend bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cfg := internal.Configuration.API.P2P
 		now := time.Now()
+		if len(cfg.AllowedNets) > 0 {
+			ip := netutil.ClientIP(r, internal.Configuration.Bot.TrustedProxyNets)
+			if !netutil.Contains(cfg.AllowedNets, ip) {
+				log.Warnf("[api/p2p] Access denied for IP %v (not in api.p2p.allowed_networks)", ip)
+				p2pFail(w, http.StatusForbidden, "forbidden", "Access denied.")
+				return
+			}
+		}
 		if err := verifyP2PServiceSig(w, r, cfg.ServiceKey, now); err != nil {
 			log.Warnf("[api/p2p] Rejected service signature from %s: %v", getClientIP(r), err)
 			p2pFail(w, http.StatusUnauthorized, "bad_service_signature", "Request could not be verified.")
@@ -287,7 +301,8 @@ func (p *P2PService) Send(w http.ResponseWriter, r *http.Request) {
 
 // DecodeInvoice: POST /api/v1/p2p/invoice/decode {"invoice"}
 func (p *P2PService) DecodeInvoice(w http.ResponseWriter, r *http.Request) {
-	if p.limited(w, p.readRate, p2pSender(r)) {
+	sender := p2pSender(r)
+	if p.limited(w, p.readRate, sender) {
 		return
 	}
 	var req struct {
@@ -305,7 +320,8 @@ func (p *P2PService) DecodeInvoice(w http.ResponseWriter, r *http.Request) {
 	p2pWriteJSON(w, http.StatusOK, map[string]interface{}{
 		"amount": dec.Amount, "amount_lkr": thirdparty.FormatSatsWithLKR(dec.Amount),
 		"description": dec.Description, "payment_hash": dec.PaymentHash, "expires_at": dec.ExpiresAt,
-		"needs_confirmation": dec.Amount > cfg.ConfirmThreshold, "over_limit": dec.Amount > cfg.MaxAmount,
+		"needs_confirmation": dec.Amount > p.Bot.P2PUnconfirmedRemaining(sender.Telegram.ID),
+		"over_limit":         dec.Amount > cfg.MaxAmount,
 	})
 }
 
@@ -345,8 +361,13 @@ func (p *P2PService) reload(t *telegram.P2PTransfer) (*telegram.P2PTransfer, err
 }
 
 // Transfer: GET /api/v1/p2p/transfers/{id}. Only the sender can read it.
+// lnbits is asked about a payment at most once per transfer every 20 s,
+// however often this is polled.
 func (p *P2PService) Transfer(w http.ResponseWriter, r *http.Request) {
 	sender := p2pSender(r)
+	if p.limited(w, p.pollRate, sender) {
+		return
+	}
 	t, err := p.Bot.P2PGet(mux.Vars(r)["id"])
 	if err != nil || t.FromTelegramID != sender.Telegram.ID {
 		p2pFail(w, http.StatusNotFound, "not_found", "Transfer not found.")
@@ -376,6 +397,7 @@ func (p *P2PService) Me(w http.ResponseWriter, r *http.Request) {
 		"limits": map[string]int64{
 			"max_amount": cfg.MaxAmount, "daily_limit": cfg.DailyLimit, "daily_used": used,
 			"daily_remaining": remaining, "confirm_threshold": cfg.ConfirmThreshold,
+			"unconfirmed_remaining": p.Bot.P2PUnconfirmedRemaining(sender.Telegram.ID),
 		},
 	})
 }

@@ -19,7 +19,7 @@ var (
 	p2pConfirmMenu   = &tb.ReplyMarkup{ResizeKeyboard: true}
 	btnP2PConfirm    = p2pConfirmMenu.Data("✅ Confirm", "p2p_confirm")
 	btnP2PCancel     = p2pConfirmMenu.Data("🚫 Cancel", "p2p_cancel")
-	p2pConfirmFormat = "🔐 *Confirm payment from the Mini App*\n\n💸 Amount: %s\n%s%s\n\n⏳ Expires at %s UTC. If you didn't start this, press Cancel."
+	p2pConfirmFormat = "🔐 *Confirm payment from the Mini App*\n\n💸 Amount: %s\n%s%s\n\n⏳ Expires in %s. If you didn't start this, press Cancel."
 )
 
 func p2pMarkup(id string) *tb.ReplyMarkup {
@@ -48,7 +48,7 @@ func (bot *TipBot) sendP2PConfirmation(from *lnbits.User, t *P2PTransfer) error 
 	if t.Memo != "" {
 		memo = "\n✉️ " + str.MarkdownEscape(t.Memo)
 	}
-	text := fmt.Sprintf(p2pConfirmFormat, thirdparty.FormatSatsWithLKR(t.Amount), p2pTarget(t), memo, t.ConfirmBy.UTC().Format("15:04"))
+	text := fmt.Sprintf(p2pConfirmFormat, thirdparty.FormatSatsWithLKR(t.Amount), p2pTarget(t), memo, p2pExpiresIn(time.Until(t.ConfirmBy)))
 	_, err := bot.Telegram.Send(from.Telegram, text, p2pMarkup(t.ID), tb.ModeMarkdown)
 	return err
 }
@@ -93,21 +93,35 @@ func (bot *TipBot) p2pConfirmHandler(ctx intercept.Context) (intercept.Context, 
 	}
 	t.Status = P2PProcessing
 	if err := bot.p2pSave(t); err != nil {
+		bot.p2pEnd(t, P2PFailed, "Could not start the payment. Nothing was sent.", nil)
 		bot.tryEditMessage(msg, "❌ Could not start the payment. Nothing was sent.", &tb.ReplyMarkup{})
 		return ctx, err
 	}
 	bot.tryEditMessage(msg, "⏳ Sending…", &tb.ReplyMarkup{})
-	bot.p2pRun(t)
-
-	switch t.Status {
-	case P2PCompleted:
-		bot.tryEditMessage(msg, fmt.Sprintf("✅ Confirmed and sent: %s", thirdparty.FormatSatsWithLKR(t.Amount)), &tb.ReplyMarkup{})
-	case P2PInFlight:
-		bot.tryEditMessage(msg, "⏳ Confirmed. The payment is in flight.", &tb.ReplyMarkup{})
-	default:
-		bot.tryEditMessage(msg, "❌ "+t.Error, &tb.ReplyMarkup{})
-	}
+	// Run the payment in the background: an invoice can take a minute to
+	// settle, and holding this user's lock that long blocks their other
+	// commands.
+	bot.p2pInBackground(t, func() {
+		bot.p2pRun(t)
+		switch t.Status {
+		case P2PCompleted:
+			bot.tryEditMessage(msg, fmt.Sprintf("✅ Confirmed and sent: %s", thirdparty.FormatSatsWithLKR(t.Amount)), &tb.ReplyMarkup{})
+		case P2PInFlight:
+			bot.tryEditMessage(msg, "⏳ Confirmed. The payment is in flight.", &tb.ReplyMarkup{})
+		default:
+			bot.tryEditMessage(msg, "❌ "+t.Error, &tb.ReplyMarkup{})
+		}
+	})
 	return ctx, nil
+}
+
+// p2pExpiresIn says how long is left, in whole minutes (at least 1).
+func p2pExpiresIn(d time.Duration) string {
+	m := int((d + time.Minute - 1) / time.Minute)
+	if m <= 1 {
+		return "1 minute"
+	}
+	return fmt.Sprintf("%d minutes", m)
 }
 
 func (bot *TipBot) p2pCancelHandler(ctx intercept.Context) (intercept.Context, error) {
@@ -125,10 +139,7 @@ func (bot *TipBot) p2pCancelHandler(ctx intercept.Context) (intercept.Context, e
 		bot.tryEditMessage(ctx.Callback().Message, "ℹ️ This request was already handled.", &tb.ReplyMarkup{})
 		return ctx, nil
 	}
-	if t.Kind == P2PKindInvoice {
-		bot.Bunt.DeleteKey(p2pInvoiceLock(t.PaymentHash))
-	}
-	bot.p2pFinish(t, P2PCancelled, "Cancelled in the bot chat. Nothing was sent.")
+	bot.p2pEnd(t, P2PCancelled, "Cancelled in the bot chat. Nothing was sent.", nil)
 	bot.tryEditMessage(ctx.Callback().Message, "🚫 Cancelled. Nothing was sent.", &tb.ReplyMarkup{})
 	log.Infof("[p2p] Transfer %s cancelled by %d", t.ID, t.FromTelegramID)
 	return ctx, nil

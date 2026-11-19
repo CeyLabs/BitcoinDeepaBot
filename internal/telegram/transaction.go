@@ -32,6 +32,9 @@ type Transaction struct {
 	FromLNbitsID string         `json:"from_lnbits"`
 	ToLNbitsID   string         `json:"to_lnbits"`
 	Invoice      lnbits.Invoice `gorm:"embedded;embeddedPrefix:invoice_"`
+	// OnInvoice, if set, runs after the recipient's invoice is created and
+	// before it is paid, so a caller can record the payment hash first.
+	OnInvoice func(lnbits.Invoice) `json:"-" gorm:"-"`
 }
 
 type TransactionOption func(t *Transaction)
@@ -123,6 +126,9 @@ func (t *Transaction) SendTransaction(bot *TipBot, from *lnbits.User, to *lnbits
 		return false, err
 	}
 	t.Invoice = invoice
+	if t.OnInvoice != nil {
+		t.OnInvoice(invoice)
+	}
 	// pay invoice
 	_, err = from.Wallet.Pay(lnbits.PaymentParams{Out: true, Bolt11: invoice.PaymentRequest}, bot.Client)
 	if err != nil {

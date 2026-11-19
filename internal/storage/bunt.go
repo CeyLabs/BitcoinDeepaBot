@@ -146,6 +146,56 @@ func (db *DB) CounterValue(key string) (int64, error) {
 	return n, err
 }
 
+// SetWithTTL stores object under its key. It expires after ttl.
+func (db *DB) SetWithTTL(object Storable, ttl time.Duration) error {
+	b, err := json.Marshal(object)
+	if err != nil {
+		return err
+	}
+	return db.Update(func(tx *buntdb.Tx) error {
+		_, _, err := tx.Set(object.Key(), string(b), &buntdb.SetOptions{Expires: true, TTL: ttl})
+		return err
+	})
+}
+
+// SetWithTTLUnless stores object like SetWithTTL, but only if guard does not
+// exist. Check and write are one transaction. It reports whether it wrote.
+func (db *DB) SetWithTTLUnless(object Storable, guard string, ttl time.Duration) (bool, error) {
+	b, err := json.Marshal(object)
+	if err != nil {
+		return false, err
+	}
+	wrote := false
+	err = db.Update(func(tx *buntdb.Tx) error {
+		if _, err := tx.Get(guard); err == nil {
+			return nil
+		} else if err != buntdb.ErrNotFound {
+			return err
+		}
+		if _, _, err := tx.Set(object.Key(), string(b), &buntdb.SetOptions{Expires: true, TTL: ttl}); err != nil {
+			return err
+		}
+		wrote = true
+		return nil
+	})
+	return wrote, err
+}
+
+// DeleteIfValue removes key only if it currently holds value, so a caller can
+// release a lock it owns without releasing someone else's.
+func (db *DB) DeleteIfValue(key, value string) error {
+	return db.Update(func(tx *buntdb.Tx) error {
+		v, err := tx.Get(key)
+		if err == buntdb.ErrNotFound || (err == nil && v != value) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		_, err = tx.Delete(key)
+		return err
+	})
+}
+
 // DeleteKey removes key if present. A missing key is not an error.
 func (db *DB) DeleteKey(key string) error {
 	return db.Update(func(tx *buntdb.Tx) error {
