@@ -132,6 +132,40 @@ function p2pHeaders(method, path, query, cred, body) {
 // fetch(`${BOT}/api/v1/p2p/send`, { method: "POST", headers: p2pHeaders("POST", "/api/v1/p2p/send", "", { initData }, body), body })
 ```
 
+## Without a Telegram credential on each call (V2)
+
+With `api.p2p.service_user_auth: true`, the DCA backend can name the user
+itself, so it keeps its own long session and doesn't forward a Telegram
+login on every call:
+
+- Header `X-BDB-User: <numeric telegram_id>`, and **no**
+  `X-Telegram-Init-Data` / `X-Telegram-ID-Token`.
+- The service signature uses version `BDB-P2P-ED25519-V2`, and its seventh
+  line is the user ID exactly as sent, instead of the credential hash:
+
+```
+BDB-P2P-ED25519-V2
+<METHOD>
+<PATH>
+<QUERY>
+<TIMESTAMP>
+<NONCE>
+<telegram_id>
+<hex sha256 of the exact body bytes>
+```
+
+- **Linked users only.** V2 works only for users who made a call with a
+  Telegram credential the bot verified, normally `POST /api/v1/init`. Others
+  get `403 login_required`: call `/api/v1/init` with their Mini App init data
+  or ID token first. A link lasts a year and is renewed by each V1 call.
+- **`/api/v1/init` always needs the Telegram credential (V1).** V2 there gets
+  `401 login_required`.
+- V1 keeps working on every endpoint.
+- **Security:** with V2 the bot trusts the DCA backend about who the user is,
+  payments included. A leaked P2P key could spend from any linked user's
+  wallet, up to `daily_limit`, until passkeys are added
+  ([session-passkey-spec.md](session-passkey-spec.md)).
+
 ## Rules
 
 | Rule | Default |
@@ -304,4 +338,5 @@ api:
     service_public_key: "<base64 Ed25519 P2P public key of the DCA backend>"   # required
     oidc_enabled: true    # accept Log In with Telegram ID tokens from the web app
     # oidc_client_id: "1234567890"   # bot ID the web app logs in with; default: this bot
+    service_user_auth: false   # true: accept X-BDB-User (V2) for users linked via /api/v1/init
 ```
