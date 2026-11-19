@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"crypto/ed25519"
 	"encoding/base64"
 	"net"
 	"strings"
@@ -43,7 +44,7 @@ func TestParseTrustedProxies(t *testing.T) {
 }
 
 func TestValidateAPISend(t *testing.T) {
-	pubKey := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	pubKey := testPublicKey()
 	good := func() APISendConfiguration {
 		return APISendConfiguration{WhitelistedWallets: map[string]WhitelistedWallet{
 			"dca": {Username: "BitcoinDeepaDCA", Ed25519PublicKey: pubKey},
@@ -105,7 +106,7 @@ func TestValidateAPISend(t *testing.T) {
 }
 
 func TestValidateAPIAnalytics(t *testing.T) {
-	pubKey := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	pubKey := testPublicKey()
 	cfg := APIAnalyticsConfiguration{APIKeys: map[string]AnalyticsAPIKey{"data": {Name: "Data", Ed25519PublicKey: pubKey}}}
 	if err := validateAPIAnalytics(&cfg); err != nil {
 		t.Fatalf("valid config rejected: %v", err)
@@ -125,5 +126,41 @@ func TestValidateAPIAnalytics(t *testing.T) {
 	}
 	if err := validateAPIAnalytics(&APIAnalyticsConfiguration{}); err == nil {
 		t.Error("no keys: accepted")
+	}
+}
+
+// testPublicKey is a real Ed25519 public key in base64.
+func testPublicKey() string {
+	seed := make([]byte, ed25519.SeedSize)
+	seed[0] = 7
+	return base64.StdEncoding.EncodeToString(ed25519.NewKeyFromSeed(seed).Public().(ed25519.PublicKey))
+}
+
+// Small-order keys verify forged signatures, so they must be refused.
+func TestParseEd25519KeyRejectsWeakKeys(t *testing.T) {
+	if _, err := parseEd25519Key(testPublicKey()); err != nil {
+		t.Fatalf("real key rejected: %v", err)
+	}
+	one := make([]byte, 32)
+	one[0] = 1 // the identity point
+	order2 := make([]byte, 32)
+	for i := range order2 {
+		order2[i] = 0xff
+	}
+	order2[0], order2[31] = 0xec, 0x7f // -1 (order 2)
+	for name, b := range map[string][]byte{
+		"all zero": make([]byte, 32),
+		"identity": one,
+		"order 2":  order2,
+		"short":    make([]byte, 31),
+	} {
+		if _, err := parseEd25519Key(base64.StdEncoding.EncodeToString(b)); err == nil {
+			t.Errorf("%s: weak key accepted", name)
+		}
+	}
+	for _, s := range []string{"", "not base64!"} {
+		if _, err := parseEd25519Key(s); err == nil {
+			t.Errorf("%q accepted", s)
+		}
 	}
 }

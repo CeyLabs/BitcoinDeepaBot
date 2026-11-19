@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -30,7 +31,7 @@ func p2pRequest(method, path, body, initData string, ts time.Time, nonce string,
 		r.Header.Set(InitDataHeader, initData)
 	}
 	tsStr := strconv.FormatInt(ts.Unix(), 10)
-	msg := P2PSigningString(method, r.URL.Path, r.URL.RawQuery, tsStr, nonce, initData, []byte(body))
+	msg := P2PSigningString(method, r.URL.EscapedPath(), r.URL.RawQuery, tsStr, nonce, initData, []byte(body))
 	r.Header.Set("X-Timestamp", tsStr)
 	r.Header.Set("X-Nonce", nonce)
 	r.Header.Set("X-Signature", base64.StdEncoding.EncodeToString(ed25519.Sign(key, []byte(msg))))
@@ -102,10 +103,16 @@ func TestP2PAuthRejectsBadServiceSignature(t *testing.T) {
 	}
 
 	cases := map[string]func() *http.Request{
-		"no signature":      func() *http.Request { r := base(); r.Header.Del("X-Signature"); return r },
-		"wrong key":         func() *http.Request { return p2pRequest(http.MethodPost, "/api/v1/p2p/send", "{}", initData, now, p2pNonce(), otherKey) },
-		"expired":           func() *http.Request { return p2pRequest(http.MethodPost, "/api/v1/p2p/send", "{}", initData, now.Add(-301*time.Second), p2pNonce(), testServiceKey) },
-		"bad nonce":         func() *http.Request { return p2pRequest(http.MethodPost, "/api/v1/p2p/send", "{}", initData, now, "short", testServiceKey) },
+		"no signature": func() *http.Request { r := base(); r.Header.Del("X-Signature"); return r },
+		"wrong key": func() *http.Request {
+			return p2pRequest(http.MethodPost, "/api/v1/p2p/send", "{}", initData, now, p2pNonce(), otherKey)
+		},
+		"expired": func() *http.Request {
+			return p2pRequest(http.MethodPost, "/api/v1/p2p/send", "{}", initData, now.Add(-301*time.Second), p2pNonce(), testServiceKey)
+		},
+		"bad nonce": func() *http.Request {
+			return p2pRequest(http.MethodPost, "/api/v1/p2p/send", "{}", initData, now, "short", testServiceKey)
+		},
 		"body changed":      func() *http.Request { r := base(); r.Body = io.NopCloser(strings.NewReader(`{"amount":9}`)); return r },
 		"path changed":      func() *http.Request { r := base(); r.URL.Path = "/api/v1/p2p/invoice/pay"; return r },
 		"init data swapped": func() *http.Request { r := base(); r.Header.Set(InitDataHeader, other); return r },
@@ -168,6 +175,44 @@ func TestVerifyP2PServiceSig(t *testing.T) {
 		t.Fatal("oversized body accepted")
 	}
 }
+
+// The path is signed as sent, the nonce outlives its timestamp, and body
+// errors are told apart from signature failures.
+func TestVerifyP2PServiceSigEdgeCases(t *testing.T) {
+	key := testServiceKey.Public().(ed25519.PublicKey)
+	initData := "user=x&hash=y"
+	now := time.Now()
+
+	esc := p2pRequest(http.MethodGet, "/api/v1/p2p/transfers/a%20b", "", initData, now, p2pNonce(), testServiceKey)
+	if err := verifyP2PServiceSig(httptest.NewRecorder(), esc, key, now); err != nil {
+		t.Fatalf("escaped path rejected: %v", err)
+	}
+
+	late := p2pRequest(http.MethodPost, "/api/v1/p2p/send", "{}", initData, now.Add(p2pSigMaxSkew*time.Second), p2pNonce(), testServiceKey)
+	if err := verifyP2PServiceSig(httptest.NewRecorder(), late, key, now); err != nil {
+		t.Fatalf("latest timestamp rejected: %v", err)
+	}
+	usedSignatures.mu.Lock()
+	expiry := usedSignatures.seen["p2p:"+late.Header.Get("X-Nonce")]
+	usedSignatures.mu.Unlock()
+	if last := time.Unix(now.Unix()+2*p2pSigMaxSkew+1, 0); expiry.Before(last) {
+		t.Fatalf("nonce forgotten at %v, before its timestamp expires at %v", expiry, last)
+	}
+
+	big := p2pRequest(http.MethodPost, "/api/v1/p2p/send", strings.Repeat("a", p2pMaxBodySize+1), initData, now, p2pNonce(), testServiceKey)
+	if err := verifyP2PServiceSig(httptest.NewRecorder(), big, key, now); !errors.Is(err, errP2PBodyTooLarge) {
+		t.Fatalf("oversized body: %v", err)
+	}
+	broken := p2pRequest(http.MethodPost, "/api/v1/p2p/send", "{}", initData, now, p2pNonce(), testServiceKey)
+	broken.Body = io.NopCloser(iotestErrReader{})
+	if err := verifyP2PServiceSig(httptest.NewRecorder(), broken, key, now); !errors.Is(err, errP2PBodyRead) {
+		t.Fatalf("unreadable body: %v", err)
+	}
+}
+
+type iotestErrReader struct{}
+
+func (iotestErrReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
 
 func TestRateLimiter(t *testing.T) {
 	l := newRateLimiter(3, time.Minute)

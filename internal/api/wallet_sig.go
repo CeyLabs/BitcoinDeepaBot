@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"net/http"
 	"regexp"
@@ -73,50 +74,57 @@ func (c sigCheck) verify(w http.ResponseWriter, r *http.Request) string {
 		return ""
 	}
 
+	// Check everything that doesn't need the key first, so an unknown and a
+	// configured ID get the same answers and IDs can't be probed.
 	id := r.Header.Get(c.idHeader)
-	key, ok := c.key(id)
-	if !ok || len(key) != ed25519.PublicKeySize {
-		return deny(http.StatusUnauthorized, "Invalid signature", "unknown key: %q", id)
-	}
-
 	tsStr := r.Header.Get("X-Timestamp")
 	ts, err := strconv.ParseInt(tsStr, 10, 64)
 	if err != nil {
-		return deny(http.StatusUnauthorized, "Invalid timestamp", "bad timestamp for %s", id)
+		return deny(http.StatusUnauthorized, "Invalid timestamp", "bad timestamp for %q", id)
 	}
 	tolerance := c.tolerance
 	if tolerance <= 0 {
 		tolerance = 300
 	}
 	if age := time.Now().Unix() - ts; age > tolerance || age < -tolerance {
-		return deny(http.StatusUnauthorized, "Request expired", "timestamp outside tolerance for %s (age %ds)", id, age)
+		return deny(http.StatusUnauthorized, "Request expired", "timestamp outside tolerance for %q (age %ds)", id, age)
 	}
 
 	nonce := r.Header.Get("X-Nonce")
 	if !nonceRe.MatchString(nonce) {
-		return deny(http.StatusUnauthorized, "Invalid nonce", "bad nonce for %s", id)
+		return deny(http.StatusUnauthorized, "Invalid nonce", "bad nonce for %q", id)
 	}
 
 	sig, err := internal.DecodeBase64Any(r.Header.Get("X-Signature"))
 	if err != nil || len(sig) != ed25519.SignatureSize {
-		return deny(http.StatusUnauthorized, "Invalid signature", "malformed signature for %s", id)
+		return deny(http.StatusUnauthorized, "Invalid signature", "malformed signature for %q", id)
 	}
 
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxSignedBodySize))
 	if err != nil {
-		return deny(http.StatusRequestEntityTooLarge, "Request too large", "body read failed for %s: %v", id, err)
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			return deny(http.StatusRequestEntityTooLarge, "Request too large", "body over %d bytes for %q", maxSignedBodySize, id)
+		}
+		return deny(http.StatusBadRequest, "Could not read request body", "body read failed for %q: %v", id, err)
 	}
 	r.Body = io.NopCloser(bytes.NewReader(body))
 
-	msg := signingString(c.version, r.Method, r.URL.Path, r.URL.RawQuery, tsStr, nonce, body)
-	if !ed25519.Verify(key, []byte(msg), sig) {
-		return deny(http.StatusUnauthorized, "Invalid signature", "signature check failed for %s", id)
+	// The path is signed exactly as sent (still percent-encoded), the same
+	// rule as the query string.
+	key, ok := c.key(id)
+	msg := signingString(c.version, r.Method, r.URL.EscapedPath(), r.URL.RawQuery, tsStr, nonce, body)
+	if !ok || len(key) != ed25519.PublicKeySize || !ed25519.Verify(key, []byte(msg), sig) {
+		return deny(http.StatusUnauthorized, "Invalid signature", "signature check failed for %q (known id: %v)", id, ok)
 	}
 
 	// Ed25519 signatures are deterministic, so the nonce (not the signature)
-	// is what makes each request single use.
-	if !usedSignatures.claim(c.version+":"+id+":"+nonce, time.Duration(2*tolerance)*time.Second) {
-		return deny(http.StatusUnauthorized, "Request already processed", "replayed nonce for %s", id)
+	// is what makes each request single use. It is kept until the signed
+	// timestamp can no longer pass the check above, plus a second for the
+	// whole-second rounding.
+	ttl := time.Until(time.Unix(ts+tolerance+1, 0))
+	if !usedSignatures.claim(c.version+":"+id+":"+nonce, ttl) {
+		return deny(http.StatusUnauthorized, "Request already processed", "replayed nonce for %q", id)
 	}
 	return id
 }
