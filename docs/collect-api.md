@@ -39,19 +39,23 @@ gets `403 collect_not_allowed`.
 ### `POST /api/v1/collect`
 
 ```json
-{ "to": "@alice", "amount": 50000, "memo": "Sell order #812", "external_id": "6b1f…uuid" }
+{ "to": "@alice", "amount": 50000, "memo": "Sell order #812", "external_id": "6b1f…uuid", "chat_prompt": false }
 ```
 
 - `to`: a Telegram `@username` or numeric ID. Prefer the ID: usernames can
   change hands. The user must have started the bot.
+- `chat_prompt`: optional, default `true`. `true` sends the user **Pay / Decline**
+  buttons in the bot chat. Set `false` when the user approves in the Mini App
+  or web app and you don't want a chat message.
 - `external_id`: 8–128 characters, unique per request (use your order ID or a
   UUID). Retrying with the same `external_id` returns the same request (`200`
   instead of `201`). The same `external_id` with a different user, amount or
   memo is refused with `409 idempotency_conflict`.
 
 Returns `201` with a [request](#request). It expires after **15 minutes**.
-`notified: false` means the bot could not message the user (for example,
-they blocked the bot). They can still approve in the Mini App.
+`notified: false` means no chat message was sent: either `chat_prompt`
+was `false`, or the bot could not message the user (for example, they blocked the
+bot). They can still approve in the Mini App.
 
 At most 10 requests per wallet per user per hour (`429 rate_limited`).
 

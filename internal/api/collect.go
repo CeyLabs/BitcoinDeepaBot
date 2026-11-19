@@ -77,6 +77,9 @@ func (p *P2PService) Collect(w http.ResponseWriter, r *http.Request) {
 		Amount     int64  `json:"amount"`
 		Memo       string `json:"memo"`
 		ExternalID string `json:"external_id"`
+		// ChatPrompt sends the user Pay / Decline buttons in the bot chat.
+		// Default true; false when the user approves in the Mini App.
+		ChatPrompt *bool `json:"chat_prompt"`
 	}
 	if !decodeBody(w, r, &req) {
 		return
@@ -92,7 +95,8 @@ func (p *P2PService) Collect(w http.ResponseWriter, r *http.Request) {
 		p2pWriteErr(w, err)
 		return
 	}
-	c, created, err := p.Bot.CollectCreate(walletID, collector, payer, req.Amount, GetWalletMaxAmount(walletID), req.Memo, req.ExternalID, GetMaxMemoLength())
+	chatPrompt := req.ChatPrompt == nil || *req.ChatPrompt
+	c, created, err := p.Bot.CollectCreate(walletID, collector, payer, req.Amount, GetWalletMaxAmount(walletID), req.Memo, req.ExternalID, GetMaxMemoLength(), chatPrompt)
 	if err != nil {
 		p2pWriteErr(w, err)
 		return
