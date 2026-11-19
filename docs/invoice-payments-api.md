@@ -6,102 +6,50 @@ It is intentionally scoped to the invoice‑payment use case. It covers authenti
 
 - **Base URL:** `https://bitcoindeepa.com`
 - **Content type:** `application/json`
-- **Auth:** HMAC‑SHA256 request signing (see below)
+- **Auth:** Ed25519 request signing (see below and [send-api-ed25519.md](send-api-ed25519.md))
 - **Amounts:** always in **satoshis** unless stated otherwise
 
-> You will be issued two secrets by the Bitcoin Deepa operator:
-> a **wallet ID** (identifies your provider account) and an **HMAC secret** (used to sign requests). Keep the HMAC secret server‑side only.
+> You generate an **Ed25519 key pair** and send only the **public key** to the Bitcoin Deepa operator, who gives you a **wallet ID**. Keep the private key server‑side only; the operator never sees it.
 
 ---
 
-## 1. Authentication (HMAC request signing)
+## 1. Authentication (Ed25519 request signing)
 
-Every request must carry two headers:
+Every request must carry four headers:
 
-| Header             | Description |
-|--------------------|-------------|
-| `X-Timestamp`      | Current Unix time in **seconds** |
-| `X-HMAC-Signature` | Hex‑encoded HMAC‑SHA256 signature of the request (see algorithm) |
+| Header        | Description |
+|---------------|-------------|
+| `X-Wallet-ID` | Your wallet ID |
+| `X-Timestamp` | Current Unix time in **seconds** |
+| `X-Nonce`     | 16–128 random chars `[A-Za-z0-9_-]`, new for every request |
+| `X-Signature` | Base64 Ed25519 signature of the signing string |
 
-### Signing algorithm
+### Signing string
 
-Build the message to sign by concatenating, **in this exact order, with no separators**:
-
-```
-MESSAGE = HTTP_METHOD + REQUEST_PATH + TIMESTAMP + RAW_BODY
-```
-
-- `HTTP_METHOD` — uppercase, e.g. `POST` or `GET`
-- `REQUEST_PATH` — path only, no host, no query string, e.g. `/api/v1/send`
-- `TIMESTAMP` — the same value sent in `X-Timestamp`
-- `RAW_BODY` — the exact JSON body bytes you send (empty string for `GET`)
-
-Then:
+Seven lines joined with `\n` (no trailing newline):
 
 ```
-X-HMAC-Signature = hex( HMAC_SHA256( key = HMAC_SECRET, message = MESSAGE ) )
+BDB-SEND-ED25519-V1
+<METHOD>
+<PATH>
+<QUERY>            raw query without "?", or empty
+<TIMESTAMP>
+<NONCE>
+<hex sha256 of the exact body bytes>
 ```
 
 ### Rules
 
-- **Replay window:** the request is rejected if `now - X-Timestamp` exceeds the configured tolerance (**default 300 seconds / 5 minutes**). Sign and send promptly; do not reuse timestamps/signatures.
-- **Byte‑exact body:** the signature is computed over the literal bytes you transmit. Serialize the JSON once and sign/send the identical bytes — re‑serializing (whitespace, key order changes) will break verification.
-- **Wallet identification:** you do not send your wallet ID. The server identifies your provider account by matching the signature against the registered secret. An unmatched signature returns `401`.
+- **Replay protection:** the timestamp must be within the configured tolerance (**default 300 seconds**) of server time, and each nonce is accepted only once.
+- **Byte‑exact body:** the body hash is computed over the literal bytes you transmit. Serialize the JSON once and sign/send the identical bytes.
+- **Everything is signed:** method, path, query and body cannot be changed after signing.
 
 ### Reference implementations
 
-**Bash / OpenSSL**
+Key setup and full signers for **bash, Node.js and Python** are in [send-api-ed25519.md](send-api-ed25519.md). The bash examples in this guide use its `bdb_request` helper:
 
 ```bash
-TIMESTAMP=$(date +%s)
-BODY='{"to":"lnbc10u1p3xyz..."}'
-METHOD="POST"
-PATH_ONLY="/api/v1/send"
-
-MESSAGE="${METHOD}${PATH_ONLY}${TIMESTAMP}${BODY}"
-SIGNATURE=$(printf '%s' "$MESSAGE" | openssl dgst -sha256 -hmac "$HMAC_SECRET" | awk '{print $2}')
-
-curl -X POST "https://bitcoindeepa.com${PATH_ONLY}" \
-  -H "Content-Type: application/json" \
-  -H "X-Timestamp: ${TIMESTAMP}" \
-  -H "X-HMAC-Signature: ${SIGNATURE}" \
-  -d "$BODY"
-```
-
-**Node.js**
-
-```js
-const crypto = require("crypto");
-
-function signedHeaders(method, path, body, secret) {
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  const message = method + path + timestamp + body;
-  const signature = crypto.createHmac("sha256", secret).update(message).digest("hex");
-  return { "X-Timestamp": timestamp, "X-HMAC-Signature": signature };
-}
-
-const body = JSON.stringify({ to: "lnbc10u1p3xyz..." });
-const headers = {
-  "Content-Type": "application/json",
-  ...signedHeaders("POST", "/api/v1/send", body, process.env.HMAC_SECRET),
-};
-// send `body` unchanged with these headers
-```
-
-**Python**
-
-```python
-import hmac, hashlib, time, json, requests
-
-def signed_headers(method, path, body, secret):
-    ts = str(int(time.time()))
-    msg = f"{method}{path}{ts}{body}"
-    sig = hmac.new(secret.encode(), msg.encode(), hashlib.sha256).hexdigest()
-    return {"X-Timestamp": ts, "X-HMAC-Signature": sig}
-
-body = json.dumps({"to": "lnbc10u1p3xyz..."}, separators=(",", ":"))
-headers = {"Content-Type": "application/json", **signed_headers("POST", "/api/v1/send", body, HMAC_SECRET)}
-requests.post("https://bitcoindeepa.com/api/v1/send", data=body, headers=headers)
+bdb_request POST /api/v1/send '{"to":"lnbc10u1p3xyz..."}'
 ```
 
 ---
@@ -219,7 +167,7 @@ See [Error reference](#4-error-reference) for the full list.
 Returns the current status of a payment that was held for admin approval (`202` response).
 The `{transaction_id}` is the ID from the `202` response `message`.
 
-`GET` requests sign over an **empty body**: `MESSAGE = "GET" + "/api/v1/send/status/{transaction_id}" + TIMESTAMP + ""`.
+`GET` requests have an empty body, so the last line of the signing string is the SHA-256 of the empty string (see §1).
 
 #### Response — `200 OK`
 
@@ -268,7 +216,7 @@ If an approved payment is accepted by the node but has not settled within `settl
 
 Resolves an outgoing invoice payment — use it whenever `POST /api/v1/send` returned `202` with `status: "pending"`, and for reconciliation after a network timeout.
 
-`GET` requests sign over an **empty body**: `MESSAGE = "GET" + "/api/v1/send/payment/{payment_hash}" + TIMESTAMP + ""`.
+`GET` requests have an empty body, so the last line of the signing string is the SHA-256 of the empty string (see §1).
 
 This checks the node live and waits up to ~5 seconds for the payment to resolve before answering. If it is still `pending` or `unknown`, poll again with backoff until the status is terminal.
 
@@ -333,9 +281,9 @@ These apply to invoice payments via `POST /api/v1/send`.
 
 | Constraint | Detail |
 |------------|--------|
-| **Whitelisted wallets only** | Only provider accounts registered by the operator (with an HMAC secret) can call the API. |
-| **HMAC signing required** | Every request must be signed; unsigned or mismatched requests get `401`. |
-| **Replay window** | Requests older than the timestamp tolerance (**default 300s**) are rejected. |
+| **Whitelisted wallets only** | Only provider accounts registered by the operator (with an Ed25519 public key) can call the API. |
+| **Ed25519 signing required** | Every request must be signed; unsigned or mismatched requests get `401`. |
+| **Replay protection** | Timestamps outside the tolerance (**default 300s**) and reused nonces are rejected. |
 | **Amount source** | Amount is taken **from the invoice**. Any `amount` field in the body is ignored. |
 | **Amountless invoices** | **Not supported** — rejected with `400`. The invoice must encode an amount. |
 | **Minimum amount** | Invoice amount must be greater than `min_amount` (default **1 sat**). |
@@ -377,7 +325,7 @@ Errors use a consistent JSON shape:
 | `400` | Could not check for an earlier payment of this invoice — nothing was paid | `Could not check whether this invoice was already paid. Nothing was paid by this request; retry the same invoice.` |
 | `400` | Backend rejected the payment | `Invoice payment failed` |
 | `400` | Accepted but did not route — sats **not** sent | `Invoice payment failed: the payment could not be routed to the destination node` |
-| `401` | Missing/expired timestamp, missing/invalid signature | `Invalid signature` / `Request expired` / `Missing timestamp` / `Request already processed` |
+| `401` | Bad/expired timestamp, bad nonce, missing/invalid signature, reused nonce | `Invalid signature` / `Request expired` / `Invalid timestamp` / `Invalid nonce` / `Request already processed` |
 | `400` | Telegram approval request could not be delivered — nothing was paid | `Could not deliver the approval request via Telegram. Nothing was paid; please retry.` |
 | `429` | Rate limited | — |
 
@@ -439,17 +387,8 @@ An approved payment that does not settle in time lands on `in_flight`. Take the 
 ### Worked example — small payment (immediate)
 
 ```bash
-HMAC_SECRET="your-provisioned-secret"
-TIMESTAMP=$(date +%s)
-BODY='{"to":"lnbc10u1p3xyz...","memo":"order-12345"}'
-MESSAGE="POST/api/v1/send${TIMESTAMP}${BODY}"
-SIGNATURE=$(printf '%s' "$MESSAGE" | openssl dgst -sha256 -hmac "$HMAC_SECRET" | awk '{print $2}')
-
-curl -X POST "https://bitcoindeepa.com/api/v1/send" \
-  -H "Content-Type: application/json" \
-  -H "X-Timestamp: ${TIMESTAMP}" \
-  -H "X-HMAC-Signature: ${SIGNATURE}" \
-  -d "$BODY"
+source bdb.sh   # the helper from send-api-ed25519.md
+bdb_request POST /api/v1/send '{"to":"lnbc10u1p3xyz...","memo":"order-12345"}'
 # → 200 { "success": true, "payment_hash": "…", "fee": 1, ... }
 ```
 
@@ -459,14 +398,8 @@ curl -X POST "https://bitcoindeepa.com/api/v1/send" \
 # 1) Submit — returns 202 with a transaction ID in `message`
 #    e.g. TX_ID="pending-yourprovider-invoice-3d2f...-1699999999"
 
-# 2) Poll status (GET signs over an empty body)
-TIMESTAMP=$(date +%s)
-MESSAGE="GET/api/v1/send/status/${TX_ID}${TIMESTAMP}"
-SIGNATURE=$(printf '%s' "$MESSAGE" | openssl dgst -sha256 -hmac "$HMAC_SECRET" | awk '{print $2}')
-
-curl -X GET "https://bitcoindeepa.com/api/v1/send/status/${TX_ID}" \
-  -H "X-Timestamp: ${TIMESTAMP}" \
-  -H "X-HMAC-Signature: ${SIGNATURE}"
+# 2) Poll status
+bdb_request GET "/api/v1/send/status/${TX_ID}"
 # → { "status": "executed" }  (repeat until executed | rejected | expired | failed)
 # → { "status": "in_flight", "payment_hash": "3d2f...e91a" }
 #   not a terminal state — continue on /api/v1/send/payment/{payment_hash}
@@ -476,9 +409,9 @@ curl -X GET "https://bitcoindeepa.com/api/v1/send/status/${TX_ID}" \
 
 ## 6. Integration checklist
 
-- [ ] Store the wallet ID and HMAC secret server‑side (never ship the secret to clients).
+- [ ] Keep the Ed25519 private key server‑side (never ship it to clients); give the operator only the public key.
 - [ ] Sign over the **exact** transmitted body bytes; send them unchanged.
-- [ ] Use fresh `X-Timestamp` per request (within the tolerance window).
+- [ ] Use a fresh `X-Timestamp` and a new random `X-Nonce` for every request.
 - [ ] Validate the invoice amount against your own limits before sending.
 - [ ] Keep a fee‑reserve buffer (~2%) above the invoice amount in the wallet.
 - [ ] Persist the `payment_hash` for reconciliation; treat it as the source of truth.

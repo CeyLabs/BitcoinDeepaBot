@@ -101,25 +101,27 @@ api:
     # request the "openid profile" scopes.
     oidc_enabled: false
     # oidc_client_id: ""  # bot ID the web app logs in with; empty = this bot
-  # Analytics API - HMAC authenticated endpoints for data export
-  # Generate secrets with: openssl rand -hex 32
+  # Analytics API - data export endpoints, authenticated with Ed25519
+  # signatures (see docs/send-api-ed25519.md). Each consumer keeps its
+  # private key; only the public key goes here.
   analytics:
     enabled: true
     timestamp_tolerance: 300  # seconds (5 minutes)
     api_keys:
       data-team:
         name: "Data Team"
-        hmac_secret: "change-me"  # generate with: openssl rand -hex 32
+        ed25519_public_key: "base64-public-key"
       # Add more keys for different consumers:
       # dashboard:
       #   name: "Internal Dashboard"
-      #   hmac_secret: "change-me"  # generate with: openssl rand -hex 32
+      #   ed25519_public_key: "base64-public-key"
 
-  # Send API - wallet-based HMAC authenticated endpoints
+  # Send API - wallet endpoints authenticated with Ed25519 signatures
+  # (see docs/send-api-ed25519.md)
   send:
     enabled: true
     # Optional. When set, only these IPs/CIDRs may call the send API. Leave
-    # empty if callers have changing IPs (HMAC still applies). The old
+    # empty if callers have changing IPs (signatures still apply). The old
     # internal_network setting was never enforced and is now ignored.
     allowed_networks: []
     max_amount: 1000000
@@ -135,12 +137,12 @@ api:
     whitelisted_wallets:
       BiccoindeepaDSA:
         username: "BiccoindeepaDSA"
-        hmac_secret: "change-me"  # generate with: openssl rand -hex 32
+        ed25519_public_key: "base64-public-key"  # from the caller; see docs/send-api-ed25519.md
         # admin_approval_threshold: 50000  # override global (0 or omit = use global)
         # max_amount: 500000               # override global (0 or omit = use global)
       CeycubeBank:
         username: "CeycubeBank"
-        hmac_secret: "change-me"  # generate with: openssl rand -hex 32
+        ed25519_public_key: "base64-public-key"
         admin_approval_threshold: 200000   # wallet-specific: override global 100000
         max_amount: 2000000                # wallet-specific: override global 1000000
     timestamp_tolerance: 300

@@ -44,7 +44,7 @@ type UserTransactionsResponse struct {
 }
 
 // UserTransactions handles the /api/v1/usertransactions endpoint for fetching a user's
-// internal transaction history by Telegram ID. Authenticated with the same wallet HMAC
+// internal transaction history by Telegram ID. Authenticated with the same wallet Ed25519 signature
 // used by the send API.
 func (s Service) UserTransactions(w http.ResponseWriter, r *http.Request) {
 	var req UserTransactionsRequest

@@ -2,20 +2,25 @@
 # send_api_test.sh — Tests for /api/v1/send, /api/v1/userbalance, /api/v1/referral/lookup
 #
 # Usage:
-#   ./send_api_test.sh [base_url] [hmac_secret] [from_username] [to_username] [to_telegram_id]
+#   ./send_api_test.sh [base_url] [private_key_pem] [wallet_id] [from_username] [to_username] [to_telegram_id]
 #
 # Example:
-#   ./send_api_test.sh http://localhost:5454 your-hmac-secret myservice johndoe 123456789
+#   ./send_api_test.sh http://localhost:5454 send-ed25519.pem myservice myservice johndoe 123456789
 #
-# Requirements: curl, openssl, jq
+# Requests are signed with Ed25519 (see docs/send-api-ed25519.md). The wallet's
+# public key must be set as ed25519_public_key in the bot config.
+#
+# Requirements: curl, OpenSSL 3+
 
 set -uo pipefail
 
 BASE_URL="${1:-http://localhost:5454}"
-HMAC_SECRET="${2:-your-hmac-secret}"
-FROM_USERNAME="${3:-myservice}"
-TO_USERNAME="${4:-testuser}"
-TO_TELEGRAM_ID="${5:-123456789}"
+KEY="${2:-send-ed25519.pem}"
+WALLET_ID="${3:-myservice}"
+FROM_USERNAME="${4:-myservice}"
+TO_USERNAME="${5:-testuser}"
+TO_TELEGRAM_ID="${6:-123456789}"
+ZERO_SIG=$(head -c 64 /dev/zero | base64 | tr -d '\r\n')
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -39,48 +44,44 @@ json_field() {
   grep -qE "\"${key}\"[[:space:]]*:[[:space:]]*\"?${expected}\"?" "$file" 2>/dev/null
 }
 
-hmac_hex() {
-  printf '%s' "$1" | openssl dgst -sha256 -hmac "$HMAC_SECRET" -binary | xxd -p -c 256
+# sign METHOD PATH QUERY BODY [TIMESTAMP] → sets SIG_TS, SIG_NONCE and SIG
+sign() {
+  local method="$1" path="$2" query="$3" body="$4" hash msg
+  SIG_TS="${5:-$(date +%s)}"
+  SIG_NONCE=$(openssl rand -hex 16)
+  hash=$(printf '%s' "$body" | openssl dgst -sha256 -r | cut -d' ' -f1)
+  msg=$(mktemp)
+  printf 'BDB-SEND-ED25519-V1\n%s\n%s\n%s\n%s\n%s\n%s' "$method" "$path" "$query" "$SIG_TS" "$SIG_NONCE" "$hash" > "$msg"
+  SIG=$(openssl pkeyutl -sign -rawin -inkey "$KEY" -in "$msg" | base64 | tr -d '\r\n')
+  rm -f "$msg"
+}
+
+# send_signed METHOD URI BODY SIGNATURE → prints the status code (uses SIG_TS / SIG_NONCE)
+send_signed() {
+  curl -sS -o /tmp/api_resp.json -w "%{http_code}" \
+    -X "$1" \
+    -H "Content-Type: application/json" \
+    -H "X-Wallet-ID: $WALLET_ID" \
+    -H "X-Timestamp: $SIG_TS" \
+    -H "X-Nonce: $SIG_NONCE" \
+    -H "X-Signature: $4" \
+    ${3:+--data-binary "$3"} \
+    "$2" 2>/dev/null || echo "000"
 }
 
 # do_post <path> <json_body>  → prints response body, sets LAST_STATUS
 do_post() {
-  local path="$1"
-  local body="$2"
-  local ts
-  ts=$(date +%s)
-  local sig
-  sig=$(hmac_hex "POST${path}${ts}${body}")
-
-  LAST_STATUS=$(curl -sS -o /tmp/api_resp.json -w "%{http_code}" \
-    -X POST \
-    -H "Content-Type: application/json" \
-    -H "X-Timestamp: $ts" \
-    -H "X-HMAC-Signature: $sig" \
-    -d "$body" \
-    "${BASE_URL}${path}")
-
+  sign POST "$1" "" "$2"
+  LAST_STATUS=$(send_signed POST "${BASE_URL}$1" "$2" "$SIG")
   cat /tmp/api_resp.json
 }
 
 # do_get <path> <query_string>  → prints response body, sets LAST_STATUS
 do_get() {
-  local path="$1"
-  local query="$2"
-  local ts
-  ts=$(date +%s)
-  local sig
-  sig=$(hmac_hex "GET${path}${ts}${query}")
-
-  local uri="${BASE_URL}${path}"
-  [[ -n "$query" ]] && uri="${uri}?${query}"
-
-  LAST_STATUS=$(curl -sS -o /tmp/api_resp.json -w "%{http_code}" \
-    -X GET \
-    -H "X-Timestamp: $ts" \
-    -H "X-HMAC-Signature: $sig" \
-    "${uri}")
-
+  local uri="${BASE_URL}$1"
+  [[ -n "$2" ]] && uri="${uri}?$2"
+  sign GET "$1" "$2" ""
+  LAST_STATUS=$(send_signed GET "$uri" "" "$SIG")
   cat /tmp/api_resp.json
 }
 
@@ -198,37 +199,23 @@ else
   skip "duplicate memo — skipped because happy path send was skipped"
 fi
 
-echo "► Invalid HMAC signature"
-BAD_TS=$(date +%s)
+echo "► Invalid signature"
 BODY='{"to":"someone","amount":10}'
-curl -sS -o /tmp/api_resp.json -w "" \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -H "X-Timestamp: $BAD_TS" \
-  -H "X-HMAC-Signature: 0000000000000000000000000000000000000000000000000000000000000000" \
-  -d "$BODY" \
-  "${BASE_URL}/api/v1/send" > /dev/null 2>&1 || true
-LAST_STATUS=$(curl -sS -o /dev/null -w "%{http_code}" \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -H "X-Timestamp: $BAD_TS" \
-  -H "X-HMAC-Signature: 0000000000000000000000000000000000000000000000000000000000000000" \
-  -d "$BODY" \
-  "${BASE_URL}/api/v1/send" 2>/dev/null || echo "000")
-check "bad HMAC → 401" "401"
+sign POST /api/v1/send "" "$BODY"
+LAST_STATUS=$(send_signed POST "${BASE_URL}/api/v1/send" "$BODY" "$ZERO_SIG")
+check "bad signature → 401" "401"
 
 echo "► Expired timestamp"
-OLD_TS=$(($(date +%s) - 600))
-OLD_BODY='{"to":"someone","amount":10}'
-OLD_SIG=$(hmac_hex "POST/api/v1/send${OLD_TS}${OLD_BODY}")
-LAST_STATUS=$(curl -sS -o /dev/null -w "%{http_code}" \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -H "X-Timestamp: $OLD_TS" \
-  -H "X-HMAC-Signature: $OLD_SIG" \
-  -d "$OLD_BODY" \
-  "${BASE_URL}/api/v1/send" 2>/dev/null || echo "000")
+sign POST /api/v1/send "" "$BODY" $(($(date +%s) - 600))
+LAST_STATUS=$(send_signed POST "${BASE_URL}/api/v1/send" "$BODY" "$SIG")
 check "expired timestamp → 401" "401"
+
+echo "► Replayed request (same nonce twice)"
+REPLAY_BODY="{\"telegram_id\":${TO_TELEGRAM_ID}}"
+sign POST /api/v1/userbalance "" "$REPLAY_BODY"
+send_signed POST "${BASE_URL}/api/v1/userbalance" "$REPLAY_BODY" "$SIG" > /dev/null
+LAST_STATUS=$(send_signed POST "${BASE_URL}/api/v1/userbalance" "$REPLAY_BODY" "$SIG")
+check "replay → 401" "401"
 
 # ── /api/v1/userbalance ───────────────────────────────────────────────────────
 
@@ -262,17 +249,15 @@ check_json "unknown user has success:false" "success" "false"
 header "/api/v1/referral/lookup — happy paths"
 
 # Probe whether the referral endpoint is deployed
-_probe_status=$(curl -sS -o /dev/null -w "%{http_code}" \
-  -H "X-Timestamp: $(date +%s)" \
-  -H "X-HMAC-Signature: 0000000000000000000000000000000000000000000000000000000000000000" \
-  "${BASE_URL}/api/v1/referral/lookup?code=probe" 2>/dev/null || echo "000")
+sign GET /api/v1/referral/lookup "code=probe" ""
+_probe_status=$(send_signed GET "${BASE_URL}/api/v1/referral/lookup?code=probe" "" "$ZERO_SIG")
 
 if [[ "$_probe_status" == "404" ]]; then
   skip "referral lookup valid code — endpoint not deployed yet (deploy new build first)"
   skip "referral lookup empty code"
   skip "referral empty users array"
   skip "referral missing code → 400"
-  skip "referral bad HMAC → 401"
+  skip "referral bad signature → 401"
 else
   echo "► Lookup existing code"
   do_get "/api/v1/referral/lookup" "code=TESTCODE"
@@ -293,14 +278,10 @@ else
   echo ""
   check "missing code → 400" "400"
 
-  echo "► Bad HMAC on referral lookup"
-  BAD_TS=$(date +%s)
-  LAST_STATUS=$(curl -sS -o /dev/null -w "%{http_code}" \
-    -X GET \
-    -H "X-Timestamp: $BAD_TS" \
-    -H "X-HMAC-Signature: 0000000000000000000000000000000000000000000000000000000000000000" \
-    "${BASE_URL}/api/v1/referral/lookup?code=PROMO" 2>/dev/null || echo "000")
-  check "bad HMAC on lookup → 401" "401"
+  echo "► Bad signature on referral lookup"
+  sign GET /api/v1/referral/lookup "code=PROMO" ""
+  LAST_STATUS=$(send_signed GET "${BASE_URL}/api/v1/referral/lookup?code=PROMO" "" "$ZERO_SIG")
+  check "bad signature on lookup → 401" "401"
 fi
 
 # ── summary ───────────────────────────────────────────────────────────────────
