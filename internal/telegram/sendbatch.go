@@ -160,9 +160,9 @@ func (bot *TipBot) sendbatchHandler(ctx intercept.Context) (intercept.Context, e
 	parsed, sharedMemo, err := parseBatchEntries(ctx.Message().Text)
 	if err != nil {
 		helpMsg := fmt.Sprintf("❌ *Batch Send Error*\n\n%s\n\n", str.MarkdownEscape(err.Error()))
-		helpMsg += "*Usage:*\n`/sendbatch [shared memo]`\n`<amount> @user [memo]`\n`<amount> @user [memo]`\n\n"
-		helpMsg += "*Example 1 (Shared Memo):*\n`/sendbatch Salary 2026`\n`1000 @alice`\n`500 @bob`\n\n"
-		helpMsg += "*Example 2 (Individual Memos & LKR):*\n`/sendbatch`\n`1000 @alice Pizza`\n`500lkr @bob Coffee`"
+		helpMsg += "*Usage:*\n```\n/sendbatch [shared memo]\n<amount> @user [memo]\n<amount> @user [memo]\n```\n\n"
+		helpMsg += "*Example 1 (Shared Memo):*\n```\n/sendbatch Salary 2026\n1000 @alice\n500 @bob\n```\n\n"
+		helpMsg += "*Example 2 (Individual Memos & LKR):*\n```\n/sendbatch\n1000 @alice Pizza\n500lkr @bob Coffee\n```"
 
 		bot.trySendMessage(ctx.Message().Sender, helpMsg)
 		return ctx, errors.Create(errors.InvalidSyntaxError)
