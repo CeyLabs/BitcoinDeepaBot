@@ -281,7 +281,7 @@ Headers: `X-Timestamp`, `X-Nonce`, `X-Signature`. There's **no** `X-Wallet-ID`. 
 ```
 BDB-P2P-ED25519-V1
 <METHOD>
-<PATH>                       e.g. /api/v1/p2p/send
+<PATH>                       exactly as sent (percent-encoded), e.g. /api/v1/p2p/send
 <QUERY>
 <TIMESTAMP>
 <NONCE>
