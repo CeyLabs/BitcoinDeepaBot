@@ -13,14 +13,20 @@ import (
 	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/netutil"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
+	"github.com/LightningTipBot/LightningTipBot/internal/tgoidc"
 	"github.com/LightningTipBot/LightningTipBot/internal/thirdparty"
 	"github.com/LightningTipBot/LightningTipBot/internal/tma"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 )
 
-// InitDataHeader carries Telegram.WebApp.initData, unchanged, on every P2P call.
+// InitDataHeader carries Telegram.WebApp.initData, unchanged, on P2P calls
+// from the Mini App.
 const InitDataHeader = "X-Telegram-Init-Data"
+
+// IDTokenHeader carries the "Log In with Telegram" ID token, unchanged, on
+// P2P calls from the web app. A request carries this or InitDataHeader.
+const IDTokenHeader = "X-Telegram-ID-Token"
 
 // p2pInvoiceWait is how long a pay-invoice request waits for settlement
 // before answering "in_flight" and leaving the client to poll.
@@ -162,19 +168,50 @@ func (p *P2PService) auth(next http.HandlerFunc, spend bool) http.HandlerFunc {
 		if spend {
 			maxAge = cfg.SpendInitDataMaxAge
 		}
-		tgUser, err := tma.Verify(r.Header.Get(InitDataHeader), internal.Configuration.Telegram.ApiKey,
-			time.Duration(maxAge)*time.Second, now)
-		if err != nil {
-			log.Warnf("[api/p2p] Rejected init data from %s: %v", getClientIP(r), err)
-			p2pFail(w, http.StatusUnauthorized, "unauthorized", "Your session expired. Close and reopen the Mini App.")
+		telegramID, ok := p2pIdentify(w, r, cfg, time.Duration(maxAge)*time.Second, now)
+		if !ok {
 			return
 		}
-		sender, err := p.Bot.P2PSender(tgUser.ID)
+		sender, err := p.Bot.P2PSender(telegramID)
 		if err != nil {
 			p2pWriteErr(w, err)
 			return
 		}
 		next(w, r.WithContext(context.WithValue(r.Context(), p2pCtxKey{}, sender)))
+	}
+}
+
+// p2pIdentify returns the Telegram user a request is for, from exactly one
+// Telegram-signed credential: Mini App init data, or a "Log In with Telegram"
+// ID token from the web app. The login must be no older than maxAge. On
+// failure it answers 401 and returns false.
+func p2pIdentify(w http.ResponseWriter, r *http.Request, cfg internal.APIP2PConfiguration, maxAge time.Duration, now time.Time) (int64, bool) {
+	initData, idToken := r.Header.Get(InitDataHeader), r.Header.Get(IDTokenHeader)
+	switch {
+	case initData != "" && idToken != "":
+		log.Warnf("[api/p2p] Rejected request from %s with both init data and an ID token", getClientIP(r))
+		p2pFail(w, http.StatusUnauthorized, "unauthorized", "Send either Mini App init data or a Telegram login, not both.")
+		return 0, false
+	case idToken != "":
+		if !cfg.OIDCEnabled {
+			p2pFail(w, http.StatusUnauthorized, "unauthorized", "Telegram login is not enabled for this API.")
+			return 0, false
+		}
+		u, err := tgoidc.Verify(idToken, tgoidc.Default, cfg.OIDCClientID, maxAge, now)
+		if err != nil {
+			log.Warnf("[api/p2p] Rejected ID token from %s: %v", getClientIP(r), err)
+			p2pFail(w, http.StatusUnauthorized, "unauthorized", "Your Telegram login expired. Log in with Telegram again.")
+			return 0, false
+		}
+		return u.ID, true
+	default:
+		u, err := tma.Verify(initData, internal.Configuration.Telegram.ApiKey, maxAge, now)
+		if err != nil {
+			log.Warnf("[api/p2p] Rejected init data from %s: %v", getClientIP(r), err)
+			p2pFail(w, http.StatusUnauthorized, "unauthorized", "Your session expired. Close and reopen the Mini App.")
+			return 0, false
+		}
+		return u.ID, true
 	}
 }
 

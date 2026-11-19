@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -596,6 +597,14 @@ type APIP2PConfiguration struct {
 	// The client address is resolved through bot.trusted_proxies.
 	AllowedNetworks []string     `yaml:"allowed_networks"`
 	AllowedNets     []*net.IPNet `yaml:"-"`
+	// OIDCEnabled lets the web app identify the user with a "Log In with
+	// Telegram" ID token (X-Telegram-ID-Token) instead of Mini App init
+	// data. init_data_max_age and spend_init_data_max_age apply to the
+	// login time of the token too.
+	OIDCEnabled bool `yaml:"oidc_enabled"`
+	// OIDCClientID is the ID token audience: the bot ID the web app logs in
+	// with. Empty means this bot's ID (the number before ":" in its token).
+	OIDCClientID string `yaml:"oidc_client_id"`
 }
 
 // DecodeKeyBase64 decodes standard or URL-safe base64, padded or not.
@@ -659,6 +668,17 @@ func setAPIP2PDefaults(c *APIP2PConfiguration) {
 		c.AllowedNets = nets
 		if len(nets) == 0 {
 			log.Warnf("P2P API: api.p2p.allowed_networks is empty, so any IP can call it (the service signature still applies)")
+		}
+		if c.OIDCEnabled {
+			if c.OIDCClientID == "" {
+				c.OIDCClientID, _, _ = strings.Cut(Configuration.Telegram.ApiKey, ":")
+			}
+			if _, err := strconv.ParseInt(c.OIDCClientID, 10, 64); err != nil {
+				log.Errorf("P2P API: Telegram login turned off: api.p2p.oidc_client_id must be the numeric bot ID")
+				c.OIDCEnabled = false
+			} else {
+				log.Infof("P2P API: Telegram login (web app) enabled for bot %s", c.OIDCClientID)
+			}
 		}
 	}
 	if c.Enabled {

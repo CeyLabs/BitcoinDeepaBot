@@ -45,3 +45,22 @@ func TestSetAPIP2PDefaults(t *testing.T) {
 		}
 	}
 }
+
+func TestSetAPIP2PDefaultsOIDC(t *testing.T) {
+	key := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	saved := Configuration.Telegram.ApiKey
+	t.Cleanup(func() { Configuration.Telegram.ApiKey = saved })
+	Configuration.Telegram.ApiKey = "7654321:secret"
+
+	c := APIP2PConfiguration{Enabled: true, ServicePublicKey: key, OIDCEnabled: true}
+	setAPIP2PDefaults(&c)
+	if !c.OIDCEnabled || c.OIDCClientID != "7654321" {
+		t.Fatalf("client id not taken from the bot token: enabled=%v id=%q", c.OIDCEnabled, c.OIDCClientID)
+	}
+
+	c = APIP2PConfiguration{Enabled: true, ServicePublicKey: key, OIDCEnabled: true, OIDCClientID: "not-a-number"}
+	setAPIP2PDefaults(&c)
+	if c.OIDCEnabled || !c.Enabled {
+		t.Fatalf("bad client id: oidc=%v p2p=%v, want login off and P2P still on", c.OIDCEnabled, c.Enabled)
+	}
+}
