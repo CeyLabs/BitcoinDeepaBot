@@ -264,7 +264,7 @@ Needs `can_collect: true` on the wallet. Nothing moves until the user approves, 
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /api/v1/collect` `{ to, amount, memo, external_id }` | Create a request (expires in 15 min). The bot sends the user **Pay / Decline** buttons. |
+| `POST /api/v1/collect` `{ to, amount, memo, external_id, chat_prompt? }` | Create a request (expires in 15 min). The bot sends the user **Pay / Decline** buttons, unless `chat_prompt: false` (Mini App-only flow). |
 | `GET /api/v1/collect/{id}` | Poll it: `pending`, `approved` (see `paid` and `transfer`), `declined`, `cancelled`, `expired` |
 | `POST /api/v1/collect/{id}/cancel` | Withdraw a pending request |
 
@@ -279,7 +279,7 @@ Rules:
 
 - Per-request cap is the wallet's `max_amount`. The P2P daily limit does not apply.
 - At most 10 requests per wallet per user per hour (`429 rate_limited`).
-- `notified: false` means the bot could not message the user (for example, they blocked the bot). Point them to the Mini App instead.
+- `notified: false` means no chat message was sent: `chat_prompt: false`, or the bot could not message the user (for example, they blocked the bot). Point them to the Mini App.
 - A `failed` transfer (for example, the seller's balance is too low) is final. Create a new request with a new `external_id`.
 - Errors use the P2P shape `{ "code", "message" }`: `403 collect_not_allowed` (no `can_collect`), `404 recipient_not_found`, `409 idempotency_conflict` / `request_closed`.
 
