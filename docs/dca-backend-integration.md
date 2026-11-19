@@ -3,7 +3,7 @@
 Everything the DCA backend (DCA BE) needs to talk to the BitcoinDeepa bot, in one place:
 - **Setup and keys** (§1–§2).
 - **DCA's own wallet:** payouts and collect, for buying from sellers (§3–§4).
-- **Mini App and web app relay:** user wallets, `init`, P2P and collect approval (§5–§6).
+- **Mini App and web app relay:** user wallets, `init` and P2P (§5–§6).
 - **The callback the bot makes** (§7).
 - **Errors and recommended flows** (§8–§9), and a **checklist** (§10).
 
@@ -19,7 +19,7 @@ Detailed references, if you need more: [send-api-ed25519.md](send-api-ed25519.md
              (1) DCA's own wallet: payouts + collect     — signed with the SEND key
  DCA BE ─────────────────────────────────────────────►  Bot  /api/v1/send, /collect, /userbalance, ...
    │
-   │         (2) user wallets: init, P2P, collect approve — signed with the P2P key
+   │         (2) user wallets: init, P2P                   — signed with the P2P key
    ├─────────────────────────────────────────────────►  Bot  /api/v1/init, /api/v1/p2p/*
    │  ▲
    │  └── Mini App (initData) / web app (Log In with Telegram)
@@ -28,15 +28,15 @@ Detailed references, if you need more: [send-api-ed25519.md](send-api-ed25519.md
    └──────────────────────────────────────────────────  Bot  (when the DCA wallet receives sats)
 ```
 
-1. **DCA's own wallet.** DCA BE sends sats from its whitelisted wallet, asks users to pay it (collect), checks balances and polls payment status. It signs with the **send key** (§3–§4).
-2. **User wallets.** Mini App and web app users send sats, pay invoices and approve collect requests from **their own** bot wallets. DCA BE relays these calls, signed with the **P2P key**. The Telegram login is checked once, at login (`/api/v1/init`); after that DCA BE's own session names the user with `X-BDB-User` (§5–§6).
+1. **DCA's own wallet.** DCA BE sends sats from its whitelisted wallet, charges users (collect), checks balances and polls payment status. It signs with the **send key** (§3–§4).
+2. **User wallets.** Mini App and web app users send sats and pay invoices from **their own** bot wallets. DCA BE relays these calls, signed with the **P2P key**. The Telegram login is checked once, at login (`/api/v1/init`); after that DCA BE's own session names the user with `X-BDB-User` (§5–§6).
 3. **Callback.** When the DCA wallet receives a deposit, the bot calls DCA BE so it can retry failed buys (§7).
 
 ### 1.1 The two keys
 
 | Key | Signs | Bot config | If it leaks |
 |---|---|---|---|
-| **Send key** | (1) DCA's wallet: payouts and collect requests | `api.send.whitelisted_wallets.<id>.ed25519_public_key` | Someone can send sats **from the DCA wallet**, up to its limits, and create collect requests (users still have to approve them) |
+| **Send key** | (1) DCA's wallet: payouts and collect requests | `api.send.whitelisted_wallets.<id>.ed25519_public_key` | Someone can send sats **from the DCA wallet**, and **charge any logged-in user** (collect), up to its limits |
 | **P2P key** | (2) user-wallet relay | `api.p2p.service_public_key` | Can act as, and pay from, any **linked** user (anyone who logged in through `/api/v1/init`), up to `daily_limit`, until passkeys exist. Guard it like the send key. |
 
 Keep the keys **separate**, so either can be rotated without touching the other. A signature made with one key is useless on the other API: each signs a different first line (`BDB-SEND-…` vs `BDB-P2P-…`).
@@ -259,9 +259,9 @@ Default limits: `min_amount` 1, `max_amount` 1,000,000, `admin_approval_threshol
 
 The query string is signed: sign `code=PROMO2024` exactly as sent.
 
-### 4.7 Collect — ask a user to pay DCA (sell orders)
+### 4.7 Collect — charge a user (sell orders)
 
-Needs `can_collect: true` on the wallet. DCA BE creates the request. **Nothing moves until the user approves it in the Mini App or web app** (§6.6). The bot sends no chat message about it.
+Needs `can_collect: true` on the wallet. **The sats move at once, with no approval step**: the signed call is enough. The bot sends no chat message about it. Only call it after the user agreed in the app.
 
 **`POST /api/v1/collect`**
 
@@ -271,12 +271,12 @@ Needs `can_collect: true` on the wallet. DCA BE creates the request. **Nothing m
 
 | Field | Notes |
 |---|---|
-| `to` | Numeric Telegram ID (preferred) or `@username`. The user must have a wallet (§6.1) |
+| `to` | The user to charge: numeric Telegram ID (preferred) or `@username`. They must have logged in through `/api/v1/init` (§6.1), otherwise `403 payer_not_linked` |
 | `amount` | Sats, at most the wallet's `max_amount` |
-| `memo` | Optional. Shown to the user |
-| `external_id` | 8–128 chars, unique per request: **use your order ID**. A retry with it returns the same request (`200` instead of `201`). The same ID with a different user, amount or memo → `409 idempotency_conflict` |
+| `memo` | Optional. Shown in the user's history |
+| `external_id` | 8–128 chars, unique per charge: **use your order ID**. A retry with it returns the same request (`200` instead of `201`) and never charges twice. The same ID with a different user, amount or memo → `409 idempotency_conflict` |
 
-Returns `201` with a request. It expires after **15 minutes**. At most 10 requests per wallet per user per hour.
+Returns `201` with the request, already charged. At most 10 charges per wallet per user per hour.
 
 **`GET /api/v1/collect/{id}`**, to poll it:
 
@@ -293,24 +293,20 @@ Returns `201` with a request. It expires after **15 minutes**. At most 10 reques
 
 | `status` | Meaning |
 |---|---|
-| `pending` | Waiting for the user, until `expires_at` |
-| `approved` | The user approved. `transfer` shows the payment; **`paid: true` once it completed**. A `failed` transfer (for example, low balance) is final: create a new request |
-| `declined` | The user declined |
-| `cancelled` | You cancelled it |
-| `expired` | Not answered within 15 minutes |
+| `approved` | Charged. `transfer` shows the payment; **`paid: true` once it completed**. A `failed` transfer (for example, low balance) is final: use a new `external_id` to try again |
+| `pending` | Rare: the bot stopped before paying. Retry with the same `external_id` |
+| `expired` | A `pending` request not retried within 15 minutes. Nothing was paid |
 
-Only one of these outcomes ever counts, and a request can never pay twice.
-
-**`POST /api/v1/collect/{id}/cancel`** withdraws a `pending` request.
+A request can never pay twice.
 
 Errors use the P2P shape `{ "code", "message" }`:
 
 | HTTP | `code` |
 |---|---|
 | 400 | `invalid_amount`, `amount_too_large`, `memo_too_long`, `invalid_external_id`, `invalid_recipient`, `self_collect` |
-| 403 | `collect_not_allowed` (no `can_collect`), `collector_not_allowed` |
+| 403 | `collect_not_allowed` (no `can_collect`), `collector_not_allowed`, `payer_not_linked` |
 | 404 | `recipient_not_found`, `not_found` |
-| 409 | `idempotency_conflict`, `in_progress`, `request_closed` |
+| 409 | `idempotency_conflict`, `in_progress` |
 | 429 | `rate_limited` |
 
 ---
@@ -470,21 +466,17 @@ The **login** call, and the only one that carries the Telegram credential (§5.1
 
 Low balance and daily-limit failures come back as a `failed` transfer. Only the user who sent a transfer can read it.
 
-### 6.6 Collect approval — the user pays DCA's request (§4.7)
-
-DCA BE created the request, so it knows the ID. Pass it to the Mini App (for example in the page URL).
+### 6.6 Collect — show a charge to the user (§4.7)
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/v1/p2p/collect/{id}` | Show the request: amount, who asks, memo, expiry. Only the payer can see it |
-| `POST /api/v1/p2p/collect/{id}/approve` | Pay it **now**. Returns a transfer (§6.5); repeats return the same one |
-| `POST /api/v1/p2p/collect/{id}/decline` | Decline it |
+| `GET /api/v1/p2p/collect/{id}` | Show a charge to the user it was taken from: amount, who charged, memo. Anyone else gets `404` |
 
-The bodies are empty (`{}`). The P2P daily limit doesn't apply to collect; the DCA wallet's `max_amount` does.
+There's nothing to approve: `POST /api/v1/collect` already took the sats.
 
 ### 6.7 Rules for DCA BE and the app UI
 
-- **No confirmation in the bot chat.** The signed call **is** the approval and pays straight away. Always show a review screen (amount, recipient, memo) before `send`, `invoice/pay` or a collect `approve`. Passkey approval is planned.
+- **No confirmation in the bot chat.** The signed call **is** the approval and pays straight away. Always show a review screen (amount, recipient, memo) before `send`, `invoice/pay` or a collect charge. Passkey approval is planned.
 - **`idempotency_key`:** a new UUID per payment, reused on every retry of **that** payment. The same key always returns the same transfer, so a retry can never pay twice. Reusing a key for a different payment → `409`.
 - **Logged-in users only:** every call names the user with `X-BDB-User`. A user who isn't linked gets `403 login_required`; log them in with `POST /api/v1/init`.
 - **Limits:** `max_amount` per transfer and `daily_limit` per user per UTC day. 10 sends or payments per minute, 30 resolves or decodes per minute, 30 status polls per minute.
@@ -562,15 +554,16 @@ See §6.8.
 ### 9.2 Sell order (collect)
 
 ```
-1. POST /collect { to: "<telegram_id>", amount, memo, external_id: "<orderId>" }
-     201 → show the request to the user in the Mini App / web app (pass the id)
-     timeout / 5xx → resend with the SAME external_id
-2. User reviews and taps Pay → DCA BE: POST /api/v1/p2p/collect/{id}/approve (as that user)
+1. User reviews the sell order in the app and taps Sell
+2. POST /collect { to: "<telegram_id>", amount, memo, external_id: "<orderId>" }
+     201 → charged
+     timeout / 5xx → resend with the SAME external_id (never charges twice)
 3. Poll GET /collect/{id} every 3–5 s:
-     approved, paid: true                       → sats received: pay the user LKR
-     approved, transfer processing / in_flight  → keep polling
-     approved, transfer failed                  → order failed
-     declined | cancelled | expired             → order closed
+     paid: true                         → sats received: pay the user LKR
+     transfer processing / in_flight    → keep polling
+     transfer failed                    → order failed (for example, low balance)
+     pending                            → resend step 2 with the SAME external_id
+     expired                            → order closed, nothing paid
 ```
 
 **Only pay the user out (LKR) after `paid: true`.**

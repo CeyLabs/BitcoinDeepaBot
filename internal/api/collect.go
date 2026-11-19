@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -10,8 +11,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// CollectResponse describes a collect request. Transfer is set once the
-// payer approved; its status says whether the sats arrived.
+// CollectResponse describes a collect request. Transfer is the payment; its
+// status says whether the sats arrived.
 type CollectResponse struct {
 	ID         string            `json:"id"`
 	Status     string            `json:"status"`
@@ -64,8 +65,10 @@ func collectWallet(w http.ResponseWriter, r *http.Request) (string, bool) {
 }
 
 // Collect: POST /api/v1/collect {"to", "amount", "memo", "external_id"}.
-// Asks the user in "to" to pay the calling wallet. Nothing moves until the
-// user approves.
+// Charges the user in "to" and pays the calling wallet at once, with no
+// approval. Only users who logged in through /api/v1/init can be charged. A
+// repeat of the same external_id returns the same request and never pays
+// twice.
 func (p *P2PService) Collect(w http.ResponseWriter, r *http.Request) {
 	walletID, ok := collectWallet(w, r)
 	if !ok {
@@ -91,8 +94,22 @@ func (p *P2PService) Collect(w http.ResponseWriter, r *http.Request) {
 		p2pWriteErr(w, err)
 		return
 	}
+	if !p.Bot.P2PLinked(payer.Telegram.ID) {
+		p2pFail(w, http.StatusForbidden, "payer_not_linked", "This user hasn't logged in to the app yet.")
+		return
+	}
 	c, created, err := p.Bot.CollectCreate(walletID, collector, payer, req.Amount, GetWalletMaxAmount(walletID), req.Memo, req.ExternalID, GetMaxMemoLength())
 	if err != nil {
+		p2pWriteErr(w, err)
+		return
+	}
+	if _, err := p.Bot.CollectCharge(c.ID, payer); err != nil {
+		var pe *telegram.P2PError
+		if !errors.As(err, &pe) || pe.Code != "request_closed" {
+			log.Warnf("[api/collect] Charge %s: %v", c.ID, err)
+		}
+	}
+	if c, err = p.Bot.CollectGet(c.ID); err != nil {
 		p2pWriteErr(w, err)
 		return
 	}
@@ -117,21 +134,6 @@ func (p *P2PService) CollectStatus(w http.ResponseWriter, r *http.Request) {
 	p2pWriteJSON(w, http.StatusOK, p.collectResponse(c, true))
 }
 
-// CollectCancel: POST /api/v1/collect/{id}/cancel. Withdraws a request that
-// was not answered yet.
-func (p *P2PService) CollectCancel(w http.ResponseWriter, r *http.Request) {
-	walletID, ok := collectWallet(w, r)
-	if !ok {
-		return
-	}
-	c, err := p.Bot.CollectCancel(mux.Vars(r)["id"], walletID)
-	if err != nil {
-		p2pWriteErr(w, err)
-		return
-	}
-	p2pWriteJSON(w, http.StatusOK, p.collectResponse(c, true))
-}
-
 // MiniAppCollect: GET /api/v1/p2p/collect/{id}. Only the payer can read it.
 func (p *P2PService) MiniAppCollect(w http.ResponseWriter, r *http.Request) {
 	payer := p2pSender(r)
@@ -141,39 +143,6 @@ func (p *P2PService) MiniAppCollect(w http.ResponseWriter, r *http.Request) {
 	c, err := p.Bot.CollectGet(mux.Vars(r)["id"])
 	if err != nil || c.PayerTelegramID != payer.Telegram.ID {
 		p2pFail(w, http.StatusNotFound, "not_found", "Request not found.")
-		return
-	}
-	p2pWriteJSON(w, http.StatusOK, p.collectResponse(c, false))
-}
-
-// MiniAppCollectApprove: POST /api/v1/p2p/collect/{id}/approve. Pays the
-// request from the logged-in user. Repeats return the same transfer.
-func (p *P2PService) MiniAppCollectApprove(w http.ResponseWriter, r *http.Request) {
-	payer := p2pSender(r)
-	if p.limited(w, p.payRate, payer) {
-		return
-	}
-	t, err := p.Bot.CollectApprove(mux.Vars(r)["id"], payer)
-	if err != nil && t == nil {
-		p2pWriteErr(w, err)
-		return
-	}
-	if t, err = p.reload(t); err != nil {
-		p2pWriteErr(w, err)
-		return
-	}
-	p2pWriteJSON(w, statusCode(t), toTransferResponse(t))
-}
-
-// MiniAppCollectDecline: POST /api/v1/p2p/collect/{id}/decline.
-func (p *P2PService) MiniAppCollectDecline(w http.ResponseWriter, r *http.Request) {
-	payer := p2pSender(r)
-	if p.limited(w, p.readRate, payer) {
-		return
-	}
-	c, err := p.Bot.CollectDecline(mux.Vars(r)["id"], payer.Telegram.ID)
-	if err != nil {
-		p2pWriteErr(w, err)
 		return
 	}
 	p2pWriteJSON(w, http.StatusOK, p.collectResponse(c, false))

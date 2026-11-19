@@ -158,10 +158,9 @@ func startApiServer(bot *telegram.TipBot) {
 		s.AppendRoute(`/api/v1/send/payment/{payment_hash}`, api.NetworkAllowlistMiddleware(api.WalletAuthMiddleware(apiService.SendPaymentStatus)), http.MethodGet)
 		log.Infof("API SendPaymentStatus endpoint registered at /api/v1/send/payment/{payment_hash} with wallet Ed25519 signatures")
 
-		// Collect: ask a user to pay a wallet with can_collect. The user approves each request.
+		// Collect: charge a user for a wallet with can_collect. No approval step.
 		s.AppendRoute(`/api/v1/collect`, api.NetworkAllowlistMiddleware(api.WalletAuthMiddleware(p2p.Collect)), http.MethodPost)
 		s.AppendRoute(`/api/v1/collect/{id}`, api.NetworkAllowlistMiddleware(api.WalletAuthMiddleware(p2p.CollectStatus)), http.MethodGet)
-		s.AppendRoute(`/api/v1/collect/{id}/cancel`, api.NetworkAllowlistMiddleware(api.WalletAuthMiddleware(p2p.CollectCancel)), http.MethodPost)
 		log.Infof("API Collect endpoints registered at /api/v1/collect with wallet Ed25519 signatures")
 	} else {
 		log.Infof("API Send endpoint disabled in configuration")
@@ -177,8 +176,6 @@ func startApiServer(bot *telegram.TipBot) {
 		s.AppendRoute(`/api/v1/p2p/invoice/pay`, p2p.Auth(p2p.PayInvoice), http.MethodPost)
 		s.AppendRoute(`/api/v1/p2p/transfers/{id}`, p2p.Auth(p2p.Transfer), http.MethodGet)
 		s.AppendRoute(`/api/v1/p2p/collect/{id}`, p2p.Auth(p2p.MiniAppCollect), http.MethodGet)
-		s.AppendRoute(`/api/v1/p2p/collect/{id}/approve`, p2p.Auth(p2p.MiniAppCollectApprove), http.MethodPost)
-		s.AppendRoute(`/api/v1/p2p/collect/{id}/decline`, p2p.Auth(p2p.MiniAppCollectDecline), http.MethodPost)
 		log.Infof("P2P API endpoints registered at /api/v1/p2p/*")
 	}
 	// Start serving only after every middleware and route is added.

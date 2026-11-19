@@ -155,8 +155,7 @@ function p2pHeaders(method, path, query, who, body) {
 - Sends go to the recipient's **numeric Telegram ID**, never a username.
 - **No bot-chat confirmation.** The signed request (DCA backend signature plus
   the user's fresh Telegram credential) is the approval, so the Mini App must
-  show its own review screen before calling `/send`, `/invoice/pay` or a
-  collect `approve`. `max_amount` and `daily_limit` still apply. Passkey
+  show its own review screen before calling `/send` or `/invoice/pay`. `max_amount` and `daily_limit` still apply. Passkey
   (WebAuthn) approval through the DCA backend is planned.
 - **`idempotency_key`**: generate a new UUID per payment and **reuse it when
   retrying the same request** (e.g. after a timeout or a dropped connection).
@@ -247,9 +246,8 @@ for a long time, and the bot checks it with lnbits at most once every 20
 seconds anyway. Polls are limited to 30 per minute per sender.
 
 ### Collect requests
-`GET /collect/{id}`, `POST /collect/{id}/approve` and `POST /collect/{id}/decline`
-let the user answer a request from a wallet to pay it. See
-[collect-api.md](collect-api.md).
+`GET /collect/{id}` shows the user a charge a wallet took from them. There is
+no approval step. See [collect-api.md](collect-api.md).
 
 ## Transfer
 
