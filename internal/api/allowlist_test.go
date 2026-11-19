@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/LightningTipBot/LightningTipBot/internal"
 	"github.com/LightningTipBot/LightningTipBot/internal/netutil"
@@ -67,19 +66,3 @@ func TestNetworkAllowlistMiddleware(t *testing.T) {
 	}
 }
 
-func TestWalletHMACMiddlewareIgnoresWeakSecrets(t *testing.T) {
-	saved := internal.Configuration.API.Send
-	t.Cleanup(func() { internal.Configuration.API.Send = saved })
-	internal.Configuration.API.Send.TimestampTolerance = 300
-	internal.Configuration.API.Send.WhitelistedWallets = map[string]internal.WhitelistedWallet{
-		"empty": {Username: "mallory", HMACSecret: ""},
-	}
-
-	// A signature made with an empty key is trivial to compute. It must not
-	// authenticate, even if a weak secret reached the configuration somehow.
-	r := signedRequest(http.MethodPost, "/api/v1/send", `{"amount":1}`, time.Now().Unix(), "")
-	rec, wallet := serveHMAC(r)
-	if rec.Code != http.StatusUnauthorized || wallet != "" {
-		t.Fatalf("got %d with wallet %q, want 401 and no wallet", rec.Code, wallet)
-	}
-}

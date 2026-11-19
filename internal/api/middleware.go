@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httputil"
 	"strconv"
@@ -149,7 +148,7 @@ func RequestStart(ctx context.Context) (time.Time, bool) {
 	return start, ok
 }
 
-// signatureSet remembers HMAC signatures that were already accepted, so each
+// signatureSet remembers signatures and nonces that were already accepted, so each
 // signed request can be used only once.
 //
 // The set lives in process memory, so this assumes the bot runs as a single
@@ -184,121 +183,11 @@ func (s *signatureSet) claim(sig string, ttl time.Duration) bool {
 	return true
 }
 
-// WalletHMACMiddleware validates HMAC signatures for wallet-based API endpoints
-// It identifies the sending wallet by validating the signature against each whitelisted wallet's secret
-func WalletHMACMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		requestStart := time.Now()
-
-		// Get timestamp from header for replay attack prevention
-		timestampStr := r.Header.Get("X-Timestamp")
-		if timestampStr == "" {
-			log.Warn("Missing timestamp in wallet API request")
-			http.Error(w, "Missing timestamp", http.StatusUnauthorized)
-			return
-		}
-
-		// Parse timestamp
-		timestamp, err := strconv.ParseInt(timestampStr, 10, 64)
-		if err != nil {
-			log.Warn("Invalid timestamp format in wallet API request")
-			http.Error(w, "Invalid timestamp", http.StatusBadRequest)
-			return
-		}
-
-		// Check if request is not too old (prevent replay attacks)
-		now := time.Now().Unix()
-		tolerance := internal.Configuration.API.Send.TimestampTolerance
-		if tolerance == 0 {
-			tolerance = 300 // Default 5 minutes
-		}
-
-		// Reject timestamps too far in either direction: a future timestamp
-		// would keep a captured request replayable until it came due.
-		if age := now - timestamp; age > tolerance || age < -tolerance {
-			log.Warnf("Request timestamp outside tolerance (age: %d seconds, tolerance: %d)", age, tolerance)
-			http.Error(w, "Request expired", http.StatusUnauthorized)
-			return
-		}
-
-		// Get signature from header
-		signature := r.Header.Get("X-HMAC-Signature")
-		if signature == "" {
-			log.Warn("Missing HMAC signature in wallet API request")
-			http.Error(w, "Missing signature", http.StatusUnauthorized)
-			return
-		}
-
-		// Read request body
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			log.Error("Failed to read request body for HMAC verification: ", err)
-			http.Error(w, "Failed to read request", http.StatusBadRequest)
-			return
-		}
-
-		// Restore body for next handler
-		r.Body = io.NopCloser(strings.NewReader(string(body)))
-
-		// Create message to sign: METHOD + PATH + TIMESTAMP + BODY
-		message := fmt.Sprintf("%s%s%s%s", r.Method, r.URL.Path, timestampStr, string(body))
-
-		// Try to validate signature against each whitelisted wallet
-		var authenticatedWallet string
-		for walletID, wallet := range internal.Configuration.API.Send.WhitelistedWallets {
-			// Startup validation disables the API for weak secrets. This guards
-			// against a weak secret getting in some other way: an empty secret
-			// in particular would let anyone compute a matching signature.
-			if internal.WeakHMACSecret(wallet.HMACSecret) {
-				continue
-			}
-			expectedSignature := calculateHMAC(message, wallet.HMACSecret)
-			if hmac.Equal([]byte(signature), []byte(expectedSignature)) {
-				authenticatedWallet = walletID
-				log.Debugf("HMAC signature verified for wallet: %s", walletID)
-				break
-			}
-		}
-
-		if authenticatedWallet == "" {
-			log.Warn("HMAC signature verification failed - no matching wallet found")
-			http.Error(w, "Invalid signature", http.StatusUnauthorized)
-			return
-		}
-
-		// A valid signature is single use. Without this, a captured /send
-		// request could be replayed inside the tolerance window to move the
-		// same sats again.
-		if !usedSignatures.claim(signature, time.Duration(2*tolerance)*time.Second) {
-			log.Warnf("Replayed HMAC signature rejected for wallet: %s", authenticatedWallet)
-			http.Error(w, "Request already processed", http.StatusUnauthorized)
-			return
-		}
-
-		// Add authenticated wallet info to request context, along with the time
-		// the request entered the handler chain. Handlers that wait on
-		// something slow budget against the server's WriteTimeout, which is
-		// already ticking by the time they run (see sendToInvoice).
-		ctx := context.WithValue(r.Context(), "authenticated_wallet", authenticatedWallet)
-		ctx = context.WithValue(ctx, requestStartKey, requestStart)
-		r = r.WithContext(ctx)
-
-		log.Debugf("Wallet API request authenticated for wallet: %s", authenticatedWallet)
-		next.ServeHTTP(w, r)
-	}
-}
-
 // calculateHMAC calculates HMAC-SHA256 signature
 func calculateHMAC(message, secret string) string {
 	h := hmac.New(sha256.New, []byte(secret))
 	h.Write([]byte(message))
 	return hex.EncodeToString(h.Sum(nil))
-}
-
-// GenerateHMACSignature helper function for clients
-func GenerateHMACSignature(method, path, timestamp, body, secret string) string {
-	message := fmt.Sprintf("%s%s%s%s", method, path, timestamp, body)
-	return calculateHMAC(message, secret)
 }
 
 // AnalyticsHMACMiddleware validates HMAC signatures for analytics API endpoints

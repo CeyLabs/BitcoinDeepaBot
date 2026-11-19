@@ -17,52 +17,17 @@
 
 ## Authentication
 
-All Send and Referral endpoints use **wallet-based HMAC-SHA256** signing. Each whitelisted wallet has its own secret configured in `config.yaml`.
+All Send and Referral endpoints require an **Ed25519 request signature**. Each whitelisted wallet registers its public key in `config.yaml`; the caller keeps the private key.
 
-### Signing a request
+Every request carries `X-Wallet-ID`, `X-Timestamp`, `X-Nonce` and `X-Signature`. The signing format, key setup and Node.js/Python/bash signers are in [send-api-ed25519.md](send-api-ed25519.md).
 
-Build the message string:
-```
-METHOD + PATH + TIMESTAMP + BODY
-```
-
-For `GET` requests with no body, use the raw query string in place of `BODY`.
-
-| Part        | Example value                      |
-|-------------|-------------------------------------|
-| `METHOD`    | `POST`                              |
-| `PATH`      | `/api/v1/send`                      |
-| `TIMESTAMP` | `1748563200` (Unix seconds)         |
-| `BODY`      | Raw JSON string (or query string)   |
-
-**Example (POST):**
-```
-POST/api/v1/send1748563200{"to":"johndoe","amount":1000,"memo":"reward"}
-```
-
-**Example (GET):**
-```
-GET/api/v1/referral/lookup1748563200code=PROMO2024
-```
-
-Sign with HMAC-SHA256 using your wallet's `hmac_secret`:
+The bash examples below use its `bdb_request` helper:
 
 ```bash
-TIMESTAMP=$(date +%s)
-BODY='{"to":"johndoe","amount":1000,"memo":"reward"}'
-MESSAGE="POST/api/v1/send${TIMESTAMP}${BODY}"
-SIGNATURE=$(echo -n "$MESSAGE" | openssl dgst -sha256 -hmac "your-hmac-secret" | awk '{print $2}')
+bdb_request METHOD PATH[?QUERY] [JSON_BODY]
 ```
 
-### Required headers
-
-| Header             | Value                        |
-|--------------------|------------------------------|
-| `Content-Type`     | `application/json`           |
-| `X-Timestamp`      | Unix timestamp (seconds)     |
-| `X-HMAC-Signature` | Hex-encoded HMAC-SHA256      |
-
-> Requests older than `timestamp_tolerance` seconds (default: 300) are rejected to prevent replay attacks.
+> Requests with a timestamp more than `timestamp_tolerance` seconds (default: 300) away from server time are rejected, and each nonce works only once.
 
 ---
 
@@ -171,16 +136,7 @@ When `to` is a bolt11 invoice, `payment_hash` and `fee` (sats) are included:
 #### Example request
 
 ```bash
-TIMESTAMP=$(date +%s)
-BODY='{"to":"johndoe","amount":1000,"memo":"promo-reward-001"}'
-MESSAGE="POST/api/v1/send${TIMESTAMP}${BODY}"
-SIGNATURE=$(echo -n "$MESSAGE" | openssl dgst -sha256 -hmac "your-hmac-secret" | awk '{print $2}')
-
-curl -X POST "https://bitcoindeepa.com/api/v1/send" \
-  -H "Content-Type: application/json" \
-  -H "X-Timestamp: ${TIMESTAMP}" \
-  -H "X-HMAC-Signature: ${SIGNATURE}" \
-  -d "${BODY}"
+bdb_request POST /api/v1/send '{"to":"johndoe","amount":1000,"memo":"promo-reward-001"}'
 ```
 
 ---
@@ -251,18 +207,10 @@ When approved or rejected, additional fields appear:
 #### Example request
 
 ```bash
-TIMESTAMP=$(date +%s)
 TX_ID="pending-myservice-johndoe-150000-1748563200"
-MESSAGE="GET/api/v1/send/status/${TX_ID}${TIMESTAMP}"
-SIGNATURE=$(echo -n "$MESSAGE" | openssl dgst -sha256 -hmac "your-hmac-secret" | awk '{print $2}')
-
-curl -X GET "https://bitcoindeepa.com/api/v1/send/status/${TX_ID}" \
-  -H "X-Timestamp: ${TIMESTAMP}" \
-  -H "X-HMAC-Signature: ${SIGNATURE}"
+bdb_request GET "/api/v1/send/status/${TX_ID}"
 ```
 
-> The HMAC message for this endpoint uses an empty query string (no body, no query params):
-> `GET` + `/api/v1/send/status/{id}` + `{timestamp}` + `` (empty)
 
 ---
 
@@ -301,16 +249,7 @@ Returns the wallet balance of any bot user by Telegram ID.
 #### Example request
 
 ```bash
-TIMESTAMP=$(date +%s)
-BODY='{"telegram_id":123456789}'
-MESSAGE="POST/api/v1/userbalance${TIMESTAMP}${BODY}"
-SIGNATURE=$(echo -n "$MESSAGE" | openssl dgst -sha256 -hmac "your-hmac-secret" | awk '{print $2}')
-
-curl -X POST "https://bitcoindeepa.com/api/v1/userbalance" \
-  -H "Content-Type: application/json" \
-  -H "X-Timestamp: ${TIMESTAMP}" \
-  -H "X-HMAC-Signature: ${SIGNATURE}" \
-  -d "${BODY}"
+bdb_request POST /api/v1/userbalance '{"telegram_id":123456789}'
 ```
 
 ---
@@ -378,15 +317,7 @@ If no users are found for the code, `count` is `0` and `users` is an empty array
 #### Example request
 
 ```bash
-TIMESTAMP=$(date +%s)
-CODE="PROMO2024"
-QUERY="code=${CODE}"
-MESSAGE="GET/api/v1/referral/lookup${TIMESTAMP}${QUERY}"
-SIGNATURE=$(echo -n "$MESSAGE" | openssl dgst -sha256 -hmac "your-hmac-secret" | awk '{print $2}')
-
-curl -X GET "https://bitcoindeepa.com/api/v1/referral/lookup?${QUERY}" \
-  -H "X-Timestamp: ${TIMESTAMP}" \
-  -H "X-HMAC-Signature: ${SIGNATURE}"
+bdb_request GET "/api/v1/referral/lookup?code=PROMO2024"
 ```
 
 #### Sending rewards to referral users
@@ -395,12 +326,11 @@ The `username` from the lookup response can be passed directly into `/api/v1/sen
 
 ```bash
 # 1. Look up who used the referral code
-USERS=$(curl ... /api/v1/referral/lookup?code=PROMO2024)
+USERS=$(bdb_request GET "/api/v1/referral/lookup?code=PROMO2024")
 
 # 2. Send a reward to each user
-for USERNAME in $(echo $USERS | jq -r '.users[].username'); do
-  curl -X POST .../api/v1/send \
-    -d "{\"to\":\"$USERNAME\",\"amount\":500,\"memo\":\"PROMO2024-reward\"}"
+for USERNAME in $(echo "$USERS" | jq -r '.users[].username'); do
+  bdb_request POST /api/v1/send "{\"to\":\"$USERNAME\",\"amount\":500,\"memo\":\"PROMO2024-reward-$USERNAME\"}"
 done
 ```
 
@@ -414,7 +344,7 @@ api:
     enabled: true
 
     # Optional: only these IPs/CIDRs can reach the send endpoints.
-    # Empty means no network restriction (HMAC still applies).
+    # Empty means no network restriction (signatures still apply).
     # (internal_network was never enforced and is now ignored.)
     allowed_networks: ["127.0.0.1"]
 
@@ -433,15 +363,16 @@ api:
     whitelisted_wallets:
       my-service:
         username: "the_bot_telegram_username"   # sender wallet
-        hmac_secret: "generate with: openssl rand -hex 32"
+        ed25519_public_key: "<base64 public key from the caller>"
 
 database:
   referrals_path: "data/referrals.db"
 ```
 
-**Generate a secret:**
+**Generate a key pair** (caller side; send only the public key to the operator):
 ```bash
-openssl rand -hex 32
+openssl genpkey -algorithm ed25519 -out send-ed25519.pem
+openssl pkey -in send-ed25519.pem -pubout -outform DER | tail -c 32 | base64
 ```
 
 ---
@@ -466,6 +397,8 @@ All errors return `400 Bad Request` (or `401`/`403` for auth failures) with the 
 | `Recipient '@...' not found or has no wallet` | `to` user not found in bot database |
 | `Sender '@...' not found or has no wallet` | Wallet username in config has no bot account |
 | `missing 'code' query parameter` | `code` not provided in referral lookup |
-| `Missing timestamp` | `X-Timestamp` header absent |
+| `Invalid timestamp` | `X-Timestamp` header absent or not a number |
+| `Invalid nonce` | `X-Nonce` absent or not 16–128 chars of `[A-Za-z0-9_-]` |
+| `Request already processed` | Nonce already used |
 | `Request expired` | Timestamp older than `timestamp_tolerance` |
-| `Invalid signature` | HMAC mismatch — wrong secret or message format |
+| `Invalid signature` | Missing signature, unknown wallet, or wrong key / signing string |
