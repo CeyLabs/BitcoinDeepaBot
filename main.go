@@ -158,6 +158,7 @@ func startApiServer(bot *telegram.TipBot) {
 	} else {
 		log.Infof("API Send endpoint disabled in configuration")
 	}
+	s.ListenAndServe()
 
 	// start internal admin server
 	adminHost, adminToken := internal.Configuration.Bot.AdminAPIHost, internal.Configuration.Bot.AdminAPIToken
@@ -178,6 +179,7 @@ func startApiServer(bot *telegram.TipBot) {
 		internalAdminServer.PathPrefix("/debug/pprof/", http.DefaultServeMux)
 		log.Warnf("[admin] pprof enabled at %s/debug/pprof/", adminHost)
 	}
+	internalAdminServer.ListenAndServe()
 	if adminToken == "" {
 		log.Warnf("[admin] Admin API on %s has no token; set bot.admin_api_token", adminHost)
 	}

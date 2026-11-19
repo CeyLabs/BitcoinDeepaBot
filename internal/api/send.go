@@ -84,7 +84,7 @@ func PathAllowlistMiddleware(prefix string, allowed func() []*net.IPNet) mux.Mid
 			}
 			ip := netutil.ClientIP(r, internal.Configuration.Bot.TrustedProxyNets)
 			if !netutil.Contains(nets, ip) {
-				log.Warnf("[api] Access to %s denied for IP %v (not in api.allowed_networks)", r.URL.Path, ip)
+				log.Warnf("[api] Access to %q denied for IP %v (not in api.allowed_networks)", r.URL.Path, ip)
 				http.Error(w, "Access denied", http.StatusForbidden)
 				return
 			}

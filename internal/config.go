@@ -282,16 +282,22 @@ func init() {
 		panic(fmt.Errorf("bot.trusted_proxies: %w", err))
 	}
 	checkLnbitsConfiguration()
-	setAPISendDefaults()
-	setAPIAnalyticsDefaults()
 	// An unreadable allowlist must stop the bot rather than leave the API open.
+	// Parsed before setAPISendDefaults, which logs it.
 	Configuration.API.AllowedNets, err = netutil.ParseNetworks(Configuration.API.AllowedNetworks)
 	if err != nil {
 		panic(fmt.Errorf("api.allowed_networks: %w", err))
 	}
+	// Entries that are all blank (e.g. an unset env var) parse to nothing,
+	// which would mean "no restriction". Treat that as a config error.
+	if len(Configuration.API.AllowedNetworks) > 0 && len(Configuration.API.AllowedNets) == 0 {
+		panic(fmt.Errorf("api.allowed_networks: all %d entries are blank", len(Configuration.API.AllowedNetworks)))
+	}
 	if len(Configuration.API.AllowedNets) > 0 {
 		log.Infof("/api/v1/ restricted to: %s", strings.Join(Configuration.API.AllowedNetworks, ", "))
 	}
+	setAPISendDefaults()
+	setAPIAnalyticsDefaults()
 }
 
 // WebhookSecretParam is the query parameter that carries the webhook secret.
@@ -442,9 +448,18 @@ func setAPISendDefaults() {
 
 	// Log API Send configuration status
 	if Configuration.API.Send.Enabled {
-		network := "any (HMAC only)"
+		// Both lists apply: a caller must be in api.allowed_networks and in
+		// api.send.allowed_networks.
+		var limits []string
+		if len(Configuration.API.AllowedNetworks) > 0 {
+			limits = append(limits, "api: "+strings.Join(Configuration.API.AllowedNetworks, ", "))
+		}
 		if len(Configuration.API.Send.AllowedNetworks) > 0 {
-			network = strings.Join(Configuration.API.Send.AllowedNetworks, ", ")
+			limits = append(limits, "send: "+strings.Join(Configuration.API.Send.AllowedNetworks, ", "))
+		}
+		network := "any (HMAC only)"
+		if len(limits) > 0 {
+			network = strings.Join(limits, " AND ")
 		}
 		log.Infof("API Send module enabled with %d whitelisted wallets, networks: %s",
 			len(Configuration.API.Send.WhitelistedWallets), network)

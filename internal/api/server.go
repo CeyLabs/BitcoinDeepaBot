@@ -44,13 +44,14 @@ func NewServer(address string) *Server {
 	}
 	apiServer.router = mux.NewRouter()
 	apiServer.httpServer.Handler = apiServer.router
-	go apiServer.httpServer.ListenAndServe()
-	log.Infof("[api] Server started at %s", address)
 	return apiServer
 }
 
+// ListenAndServe starts serving in the background. Call it after all
+// middleware and routes are added: the router must not change while it serves.
 func (w *Server) ListenAndServe() {
 	go w.httpServer.ListenAndServe()
+	log.Infof("[api] Server started at %s", w.httpServer.Addr)
 }
 func (w *Server) PathPrefix(path string, handler http.Handler) {
 	w.router.PathPrefix(path).Handler(handler)
@@ -62,9 +63,11 @@ func (w *Server) AppendAuthorizedRoute(path string, authType AuthType, accessTyp
 	}
 }
 
-// Use adds middleware that runs on every route of this server.
+// Use adds middleware that runs on every request to this server, before
+// routing. Unlike mux's router.Use it also runs on 404 and 405 answers, so a
+// blocked caller cannot map routes. Call it before ListenAndServe.
 func (w *Server) Use(mw mux.MiddlewareFunc) {
-	w.router.Use(mw)
+	w.httpServer.Handler = mw(w.httpServer.Handler)
 }
 
 // BearerTokenMiddleware requires "Authorization: Bearer <token>" on every

@@ -63,3 +63,37 @@ func TestPathAllowlistMiddleware(t *testing.T) {
 		})
 	}
 }
+
+// Server.Use runs before routing, so blocked callers get 403 on unknown
+// paths and wrong methods too, instead of 404/405 that reveal the routes.
+func TestServerUseRunsBeforeRouting(t *testing.T) {
+	saved := internal.Configuration.Bot
+	t.Cleanup(func() { internal.Configuration.Bot = saved })
+	internal.Configuration.Bot.TrustedProxyNets = nil
+
+	allowed, _ := netutil.ParseNetworks([]string{"208.77.246.15"})
+	s := NewServer("")
+	s.Use(PathAllowlistMiddleware("/api/v1/", func() []*net.IPNet { return allowed }))
+	s.AppendRoute("/api/v1/send", func(w http.ResponseWriter, r *http.Request) {}, http.MethodPost)
+
+	tests := []struct {
+		name, method, path, remote string
+		want                       int
+	}{
+		{"blocked, wrong method", http.MethodGet, "/api/v1/send", "198.51.100.4:1", http.StatusForbidden},
+		{"blocked, unknown path", http.MethodGet, "/api/v1/nope", "198.51.100.4:1", http.StatusForbidden},
+		{"allowed, wrong method", http.MethodGet, "/api/v1/send", "208.77.246.15:1", http.StatusMethodNotAllowed},
+		{"allowed, unknown path", http.MethodGet, "/api/v1/nope", "208.77.246.15:1", http.StatusNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := httptest.NewRequest(tt.method, tt.path, nil)
+			r.RemoteAddr = tt.remote
+			rec := httptest.NewRecorder()
+			s.httpServer.Handler.ServeHTTP(rec, r)
+			if rec.Code != tt.want {
+				t.Fatalf("got %d, want %d", rec.Code, tt.want)
+			}
+		})
+	}
+}
