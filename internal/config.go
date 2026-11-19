@@ -623,11 +623,10 @@ type APIP2PConfiguration struct {
 	MaxAmount          int64 `yaml:"max_amount"`            // per transfer
 	DailyLimit         int64 `yaml:"daily_limit"`           // per sender, per UTC day
 	RateLimitPerMinute int   `yaml:"rate_limit_per_minute"` // sends and invoice payments per sender
-	InitDataMaxAge     int64 `yaml:"init_data_max_age"`     // seconds
-	// SpendInitDataMaxAge is a shorter init data age for /send and
-	// /invoice/pay, so leaked init data can't move sats for long.
-	SpendInitDataMaxAge int64 `yaml:"spend_init_data_max_age"` // seconds
-	MaxMemoLength       int   `yaml:"max_memo_length"`
+	// InitDataMaxAge is how old the Telegram login sent to POST /api/v1/init
+	// may be. Other calls carry no Telegram login.
+	InitDataMaxAge int64 `yaml:"init_data_max_age"` // seconds
+	MaxMemoLength  int   `yaml:"max_memo_length"`
 	// ServicePublicKey is the base64 Ed25519 public key of the Mini App
 	// server. Every P2P call must be signed with its private key. Required.
 	ServicePublicKey string            `yaml:"service_public_key"`
@@ -645,12 +644,6 @@ type APIP2PConfiguration struct {
 	// OIDCClientID is the ID token audience: the bot ID the web app logs in
 	// with. Empty means this bot's ID (the number before ":" in its token).
 	OIDCClientID string `yaml:"oidc_client_id"`
-	// ServiceUserAuth lets the DCA backend name the user with X-BDB-User
-	// (P2P signature V2) instead of sending a Telegram credential on every
-	// call. Only users linked by a Telegram-verified call (POST /api/v1/init)
-	// can be named. Until passkeys exist, this trusts the DCA backend to
-	// move sats for linked users.
-	ServiceUserAuth bool `yaml:"service_user_auth"`
 }
 
 // DecodeKeyBase64 decodes standard or URL-safe base64, padded or not.
@@ -681,12 +674,6 @@ func setAPIP2PDefaults(c *APIP2PConfiguration) {
 	}
 	if c.MaxMemoLength <= 0 {
 		c.MaxMemoLength = 280
-	}
-	if c.SpendInitDataMaxAge <= 0 {
-		c.SpendInitDataMaxAge = 600
-	}
-	if c.SpendInitDataMaxAge > c.InitDataMaxAge {
-		c.SpendInitDataMaxAge = c.InitDataMaxAge
 	}
 	if c.Enabled {
 		key, err := DecodeKeyBase64(c.ServicePublicKey)
@@ -731,8 +718,6 @@ func setAPIP2PDefaults(c *APIP2PConfiguration) {
 	}
 	if c.Enabled {
 		log.Infof("P2P API enabled: max %d sat per transfer, %d sat per day", c.MaxAmount, c.DailyLimit)
-		if c.ServiceUserAuth {
-			log.Warnf("P2P API: service_user_auth is on: the DCA backend can act for linked users (X-BDB-User) without a Telegram credential")
-		}
+		log.Infof("P2P API: the Telegram login is checked on /api/v1/init; other calls name the user with X-BDB-User")
 	}
 }

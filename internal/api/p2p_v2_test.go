@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LightningTipBot/LightningTipBot/internal"
 	"github.com/LightningTipBot/LightningTipBot/internal/storage"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
 	"github.com/LightningTipBot/LightningTipBot/internal/tma"
@@ -45,11 +44,11 @@ func errCode(rec *httptest.ResponseRecorder) string {
 
 func TestP2PServiceUserAuth(t *testing.T) {
 	withP2PConfig(t)
-	internal.Configuration.API.P2P.ServiceUserAuth = true
 	p := v2Service(t)
-	call := func(r *http.Request, allowV2 bool) (int64, *httptest.ResponseRecorder) {
+	// call runs r as a normal P2P call (login=false) or as /api/v1/init (login=true).
+	call := func(r *http.Request, normal bool) (int64, *httptest.ResponseRecorder) {
 		rec := httptest.NewRecorder()
-		u, ok := p.p2pVerifyCaller(rec, r, true, allowV2)
+		u, ok := p.p2pVerifyCaller(rec, r, !normal)
 		if !ok {
 			return 0, rec
 		}
@@ -101,9 +100,13 @@ func TestP2PServiceUserAuth(t *testing.T) {
 		t.Fatal("both identities accepted")
 	}
 
-	// Switched off: refused.
-	internal.Configuration.API.P2P.ServiceUserAuth = false
-	if id, rec := call(p2pRequestV2(http.MethodGet, "/api/v1/p2p/me", "", "42", testServiceKey), true); id != 0 || rec.Code != http.StatusUnauthorized {
-		t.Fatalf("disabled V2 accepted: %d", rec.Code)
+	// A Telegram credential on a normal call (instead of X-BDB-User): refused.
+	if id, rec := call(p2pRequest(http.MethodPost, "/api/v1/p2p/send", "{}", initData, time.Now(), p2pNonce(), testServiceKey), true); id != 0 || rec.Code != http.StatusUnauthorized {
+		t.Fatalf("credential on a normal call accepted: %d", rec.Code)
+	}
+
+	// No identity at all: refused.
+	if id, rec := call(p2pRequest(http.MethodGet, "/api/v1/p2p/me", "", "", time.Now(), p2pNonce(), testServiceKey), true); id != 0 || rec.Code != http.StatusUnauthorized {
+		t.Fatalf("no identity accepted: %d", rec.Code)
 	}
 }

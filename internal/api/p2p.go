@@ -146,22 +146,13 @@ func NewP2PService(bot *telegram.TipBot) *P2PService {
 	}
 }
 
-// Auth checks the Mini App server's signature, then the Mini App init data,
-// and loads the sender. Nothing else in the request can name or change the
-// sender. Use it for read endpoints.
+// Auth is for every /api/v1/p2p/* endpoint. The DCA backend names the user
+// with X-BDB-User, and its service signature covers that header. Only users
+// linked by POST /api/v1/init (a Telegram-verified login) can be named. No
+// Telegram credential is sent or checked here.
 func (p *P2PService) Auth(next http.HandlerFunc) http.HandlerFunc {
-	return p.auth(next, false)
-}
-
-// AuthSpend is Auth for endpoints that move sats. It accepts only fresh init
-// data (spend_init_data_max_age), so leaked init data can't spend for long.
-func (p *P2PService) AuthSpend(next http.HandlerFunc) http.HandlerFunc {
-	return p.auth(next, true)
-}
-
-func (p *P2PService) auth(next http.HandlerFunc, spend bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tg, ok := p.p2pVerifyCaller(w, r, spend, true)
+		tg, ok := p.p2pVerifyCaller(w, r, false)
 		if !ok {
 			return
 		}
@@ -176,13 +167,12 @@ func (p *P2PService) auth(next http.HandlerFunc, spend bool) http.HandlerFunc {
 
 type p2pTelegramCtxKey struct{}
 
-// AuthNewUser is Auth for /api/v1/init: it checks the caller and the credential the
-// same way, but does not need the user to have a wallet yet. It always needs
-// a Telegram credential (V1): this is where a user is verified with Telegram
-// and linked for V2 calls.
+// AuthNewUser is for POST /api/v1/init, the only call that carries a Telegram
+// credential (init data or ID token). The bot checks it with Telegram, links
+// the user for X-BDB-User calls, and the user does not need a wallet yet.
 func (p *P2PService) AuthNewUser(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tg, ok := p.p2pVerifyCaller(w, r, false, false)
+		tg, ok := p.p2pVerifyCaller(w, r, true)
 		if !ok {
 			return
 		}
@@ -191,12 +181,9 @@ func (p *P2PService) AuthNewUser(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // p2pVerifyCaller checks the IP allowlist and the DCA backend's service
-// signature, then identifies the user:
-//   - V1: from the Telegram credential (init data or ID token), which also
-//     links the user for V2;
-//   - V2 (allowV2, api.p2p.service_user_auth): from UserHeader, trusting the
-//     DCA backend's signature, for users linked by an earlier V1 call.
-func (p *P2PService) p2pVerifyCaller(w http.ResponseWriter, r *http.Request, spend, allowV2 bool) (*tb.User, bool) {
+// signature, then identifies the user: from the Telegram credential on
+// /api/v1/init (login), or from X-BDB-User everywhere else.
+func (p *P2PService) p2pVerifyCaller(w http.ResponseWriter, r *http.Request, login bool) (*tb.User, bool) {
 	cfg := internal.Configuration.API.P2P
 	now := time.Now()
 	if len(cfg.AllowedNets) > 0 {
@@ -219,43 +206,40 @@ func (p *P2PService) p2pVerifyCaller(w http.ResponseWriter, r *http.Request, spe
 		}
 		return nil, false
 	}
+	if !login {
+		return p.p2pServiceUser(w, r)
+	}
 	if len(r.Header.Values(UserHeader)) > 0 {
-		return p.p2pServiceUser(w, r, cfg, allowV2)
+		p2pFail(w, http.StatusUnauthorized, "login_required", "Log in needs the Telegram login, not X-BDB-User.")
+		return nil, false
 	}
-	maxAge := cfg.InitDataMaxAge
-	if spend {
-		maxAge = cfg.SpendInitDataMaxAge
-	}
-	tg, ok := p2pIdentifyUser(w, r, cfg, time.Duration(maxAge)*time.Second, now)
+	tg, ok := p2pIdentifyUser(w, r, cfg, time.Duration(cfg.InitDataMaxAge)*time.Second, now)
 	if ok && p.Bot != nil && p.Bot.Bunt != nil {
 		p.Bot.P2PLink(tg.ID)
 	}
 	return tg, ok
 }
 
-// p2pServiceUser identifies a V2 call's user from UserHeader. The service
-// signature (already checked) covers the header, so only the DCA backend can
-// name a user; the user must have been linked by a Telegram-verified call.
-func (p *P2PService) p2pServiceUser(w http.ResponseWriter, r *http.Request, cfg internal.APIP2PConfiguration, allowV2 bool) (*tb.User, bool) {
-	if !allowV2 {
-		p2pFail(w, http.StatusUnauthorized, "login_required", "This call needs a Telegram login.")
-		return nil, false
-	}
-	if !cfg.ServiceUserAuth {
-		p2pFail(w, http.StatusUnauthorized, "unauthorized", "X-BDB-User is not enabled on this bot.")
-		return nil, false
-	}
+// p2pServiceUser identifies the user from X-BDB-User. The service signature
+// (already checked) covers the header, so only the DCA backend can name a
+// user, and only one linked by a Telegram-verified login.
+func (p *P2PService) p2pServiceUser(w http.ResponseWriter, r *http.Request) (*tb.User, bool) {
 	if r.Header.Get(InitDataHeader) != "" || r.Header.Get(IDTokenHeader) != "" {
-		p2pFail(w, http.StatusUnauthorized, "unauthorized", "Send either X-BDB-User or a Telegram credential, not both.")
+		p2pFail(w, http.StatusUnauthorized, "unauthorized", "Send the Telegram login only to /api/v1/init; use X-BDB-User here.")
 		return nil, false
 	}
-	id, err := strconv.ParseInt(r.Header.Get(UserHeader), 10, 64)
+	raw := r.Header.Get(UserHeader)
+	if raw == "" {
+		p2pFail(w, http.StatusUnauthorized, "unauthorized", "X-BDB-User is required.")
+		return nil, false
+	}
+	id, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil || id <= 0 {
 		p2pFail(w, http.StatusUnauthorized, "unauthorized", "X-BDB-User must be a numeric Telegram user ID.")
 		return nil, false
 	}
 	if p.Bot == nil || p.Bot.Bunt == nil || !p.Bot.P2PLinked(id) {
-		log.Warnf("[api/p2p] V2 call for unlinked user %d from %s", id, getClientIP(r))
+		log.Warnf("[api/p2p] Call for unlinked user %d from %s", id, getClientIP(r))
 		p2pFail(w, http.StatusForbidden, "login_required", "Open the app and log in with Telegram first.")
 		return nil, false
 	}
@@ -445,7 +429,7 @@ func (p *P2PService) DecodeInvoice(w http.ResponseWriter, r *http.Request) {
 	p2pWriteJSON(w, http.StatusOK, map[string]interface{}{
 		"amount": dec.Amount, "amount_lkr": thirdparty.FormatSatsWithLKR(dec.Amount),
 		"description": dec.Description, "payment_hash": dec.PaymentHash, "expires_at": dec.ExpiresAt,
-		"over_limit":         dec.Amount > cfg.MaxAmount,
+		"over_limit": dec.Amount > cfg.MaxAmount,
 	})
 }
 

@@ -69,7 +69,7 @@ request is for can see or answer it; anyone else gets `404`.
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/v1/p2p/collect/{id}` | Show the request (amount, who asks, memo, expiry) |
-| `POST /api/v1/p2p/collect/{id}/approve` | Pay it. Needs a fresh login, like `/p2p/send`. Returns the [transfer](p2p-api.md#transfer). Repeats return the same transfer. |
+| `POST /api/v1/p2p/collect/{id}/approve` | Pay it. Returns the [transfer](p2p-api.md#transfer). Repeats return the same transfer. |
 | `POST /api/v1/p2p/collect/{id}/decline` | Decline it |
 
 Both bodies are empty (`{}` is fine). The request ID reaches the Mini App
