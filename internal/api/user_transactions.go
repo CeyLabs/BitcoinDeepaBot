@@ -24,24 +24,24 @@ type UserTransactionsRequest struct {
 
 // UserTransactionData is one entry in a user's history: an internal transfer
 // (tips, sends, P2P, ...) or a Lightning payment from LNbits (type
-// "lightning": /pay, /invoice, Lightning-address receipts).
+// "lightning": /pay, /invoice, Lightning-address receipts). Every entry has
+// every field (no omitempty), with "" or 0 when a value is unknown.
 type UserTransactionData struct {
-	ID        uint   `json:"id"` // internal transfers only; 0 for Lightning payments
-	Time      string `json:"time"`
-	Direction string `json:"direction"` // "incoming" or "outgoing" relative to the queried user
-	FromID    int64  `json:"from_id"`
-	ToID      int64  `json:"to_id"`
-	FromUser  string `json:"from_user"`
-	ToUser    string `json:"to_user"`
-	Type      string `json:"type"`
-	Amount    int64  `json:"amount"` // Amount in satoshis
-	AmountLKR string `json:"amount_lkr,omitempty"`
-	Memo      string `json:"memo,omitempty"`
-	Success   bool   `json:"success"`
-	// Lightning payments only.
-	Fee         int64  `json:"fee,omitempty"`    // sats
-	Status      string `json:"status,omitempty"` // "success", "pending" or "failed"
-	PaymentHash string `json:"payment_hash,omitempty"`
+	ID          uint   `json:"id"` // internal row ID; 0 for Lightning payments
+	Time        string `json:"time"`
+	Direction   string `json:"direction"` // "incoming" or "outgoing" relative to the queried user
+	FromID      int64  `json:"from_id"`
+	ToID        int64  `json:"to_id"`
+	FromUser    string `json:"from_user"`
+	ToUser      string `json:"to_user"`
+	Type        string `json:"type"`
+	Amount      int64  `json:"amount"` // sats
+	AmountLKR   string `json:"amount_lkr"`
+	Memo        string `json:"memo"`
+	Success     bool   `json:"success"`
+	Fee         int64  `json:"fee"`    // sats; 0 for internal transfers
+	Status      string `json:"status"` // "success", "pending" or "failed"
+	PaymentHash string `json:"payment_hash"`
 }
 
 // UserTransactionsResponse represents the JSON response for the user transactions API
@@ -136,28 +136,11 @@ func (s Service) UserTransactions(w http.ResponseWriter, r *http.Request) {
 	}
 	entries := make([]entry, 0, len(internalTxs))
 	for _, tx := range internalTxs {
-		direction := "incoming"
-		if tx.FromId == req.TelegramID {
-			direction = "outgoing"
-		}
-		entries = append(entries, entry{tx.Time, UserTransactionData{
-			ID:        tx.ID,
-			Time:      tx.Time.Format(time.RFC3339),
-			Direction: direction,
-			FromID:    tx.FromId,
-			ToID:      tx.ToId,
-			FromUser:  tx.FromUser,
-			ToUser:    tx.ToUser,
-			Type:      tx.Type,
-			Amount:    tx.Amount,
-			AmountLKR: getLKRValue(tx.Amount),
-			Memo:      tx.Memo,
-			Success:   tx.Success,
-		}})
+		entries = append(entries, entry{tx.Time, internalEntry(req.TelegramID, tx)})
 	}
 
 	for _, p := range s.lightningPayments(user, window) {
-		entries = append(entries, entry{time.Unix(int64(p.Time), 0).UTC(), lightningEntry(req.TelegramID, p)})
+		entries = append(entries, entry{time.Unix(int64(p.Time), 0).UTC(), lightningEntry(req.TelegramID, p, s.lnurlComment(p))})
 	}
 
 	sort.SliceStable(entries, func(i, j int) bool { return entries[i].at.After(entries[j].at) })
@@ -222,9 +205,53 @@ func (s Service) lightningPayments(user *lnbits.User, n int) lnbits.Payments {
 	return out
 }
 
+// internalEntry turns an internal transfer into a history entry.
+func internalEntry(telegramID int64, tx telegram.Transaction) UserTransactionData {
+	direction := "incoming"
+	if tx.FromId == telegramID {
+		direction = "outgoing"
+	}
+	status := "failed"
+	if tx.Success {
+		status = "success"
+	}
+	return UserTransactionData{
+		ID:          tx.ID,
+		Time:        tx.Time.Format(time.RFC3339),
+		Direction:   direction,
+		FromID:      tx.FromId,
+		ToID:        tx.ToId,
+		FromUser:    tx.FromUser,
+		ToUser:      tx.ToUser,
+		Type:        tx.Type,
+		Amount:      tx.Amount,
+		AmountLKR:   getLKRValue(tx.Amount),
+		Memo:        tx.Memo,
+		Success:     tx.Success,
+		Status:      status,
+		PaymentHash: tx.Invoice.PaymentHash,
+	}
+}
+
+// lnurlComment returns the payer's comment the bot stored for a
+// Lightning-address receipt ("lnurl-p:<payment_hash>"), or "". It is only
+// looked up when LNbits has no memo.
+func (s Service) lnurlComment(p lnbits.Payment) string {
+	if p.Memo != "" || p.PaymentHash == "" || s.Bot == nil || s.Bot.Bunt == nil {
+		return ""
+	}
+	rec := &telegram.LNURLInvoice{Invoice: &telegram.Invoice{PaymentHash: p.PaymentHash}}
+	if err := s.Bot.Bunt.Get(rec); err != nil {
+		return ""
+	}
+	return rec.Comment
+}
+
 // lightningEntry turns an LNbits payment (amounts in msat, negative when
-// outgoing) into a history entry.
-func lightningEntry(telegramID int64, p lnbits.Payment) UserTransactionData {
+// outgoing) into a history entry. comment is used as the memo when LNbits
+// has none. Only the fields below are copied: never the webhook (it holds
+// the webhook secret), wallet_id, checking_id or any wallet key.
+func lightningEntry(telegramID int64, p lnbits.Payment, comment string) UserTransactionData {
 	amount, fee := p.Amount/1000, p.Fee/1000
 	direction, from, to := "incoming", int64(0), telegramID
 	if p.Amount < 0 {
@@ -240,6 +267,10 @@ func lightningEntry(telegramID int64, p lnbits.Payment) UserTransactionData {
 			status = "pending"
 		}
 	}
+	memo := p.Memo
+	if memo == "" {
+		memo = comment
+	}
 	return UserTransactionData{
 		Time:        time.Unix(int64(p.Time), 0).UTC().Format(time.RFC3339),
 		Direction:   direction,
@@ -248,7 +279,7 @@ func lightningEntry(telegramID int64, p lnbits.Payment) UserTransactionData {
 		Type:        "lightning",
 		Amount:      amount,
 		AmountLKR:   getLKRValue(amount),
-		Memo:        p.Memo,
+		Memo:        memo,
 		Success:     status == "success",
 		Fee:         fee,
 		Status:      status,

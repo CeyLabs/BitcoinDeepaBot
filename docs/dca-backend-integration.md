@@ -249,15 +249,23 @@ Default limits: `min_amount` 1, `max_amount` 1,000,000, `admin_approval_threshol
 ```json
 { "telegram_id": 123456789, "limit": 100, "offset": 0 }
 ```
-→ `{ "success": true, "count": 2, "transactions": [ … ] }`, newest first:
+→ `{ "success": true, "count": 2, "transactions": [ … ] }`, newest first. **Every entry has the same fields**, with `""` or `0` when a value is unknown:
 
 ```json
-{ "id": 1, "time": "…", "direction": "incoming", "from_user": "…", "to_user": "…", "type": "p2p_send", "amount": 1000, "memo": "…", "success": true }
-{ "id": 0, "time": "…", "direction": "outgoing", "from_id": 123456789, "to_id": 0, "type": "lightning", "amount": 500, "fee": 1, "status": "success", "payment_hash": "…", "memo": "…", "success": true }
+{ "id": 812, "time": "2026-11-20T03:30:00Z", "direction": "incoming", "from_id": 222, "to_id": 123456789, "from_user": "@bob", "to_user": "@alice", "type": "p2p_send", "amount": 1000, "amount_lkr": "…", "memo": "lunch", "success": true, "fee": 0, "status": "success", "payment_hash": "9c1f…" }
+{ "id": 0, "time": "2026-11-20T03:41:12Z", "direction": "incoming", "from_id": 0, "to_id": 123456789, "from_user": "", "to_user": "", "type": "lightning", "amount": 10, "amount_lkr": "…", "memo": "thanks!", "success": true, "fee": 0, "status": "success", "payment_hash": "a3f1…" }
 ```
 
-- **Internal transfers** (tips, sends, P2P, API sends, collect, …) come from the bot's table.
-- **Lightning payments** (`type: "lightning"`: `/pay`, `/invoice`, Lightning-address receipts) come from the user's LNbits wallet. `amount` and `fee` are in sats; `status` is `success`, `pending` or `failed`. Internal transfers that also show in LNbits are listed once.
+| Field | Internal transfer | Lightning payment (`type: "lightning"`) |
+|---|---|---|
+| `id` | Row ID | `0` |
+| `status` | `success` or `failed` | `success`, `pending` or `failed` (from LNbits) |
+| `fee` | `0` | LNbits fee, in sats |
+| `payment_hash` | The internal invoice's hash, or `""` | The LNbits payment hash |
+| `memo` | The transfer's memo | LNbits' memo; if empty, the payer's comment on a Lightning-address payment |
+| `from_user` / `to_user`, `from_id` / `to_id` | Both sides | The user's side; the other side is `""` / `0` |
+
+- **Internal transfers** (tips, sends, P2P, API sends, collect, …) come from the bot's table. **Lightning payments** (`/pay`, `/invoice`, Lightning-address receipts) come from the user's LNbits wallet. Internal transfers that also show in LNbits are listed once.
 - If LNbits can't be reached, only internal transfers are returned.
 
 `limit` defaults to 100 (maximum 250). Page with `offset`. Only the newest 1000 entries can be paged.
