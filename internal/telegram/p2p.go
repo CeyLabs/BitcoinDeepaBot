@@ -43,6 +43,8 @@ const (
 
 // Transfer states.
 const (
+	// P2PAwaitingConfirmation is no longer used. Transfers saved in it before
+	// bot-chat confirmations were removed still expire at ConfirmBy.
 	P2PAwaitingConfirmation = "awaiting_confirmation"
 	P2PProcessing           = "processing"
 	P2PInFlight             = "in_flight" // payment sent, not settled yet
@@ -53,7 +55,6 @@ const (
 )
 
 const (
-	p2pConfirmWindow  = 10 * time.Minute
 	p2pIdempotencyTTL = 24 * time.Hour
 	// p2pRecordTTL is how long transfer records, locks and claim keys live.
 	p2pRecordTTL  = 30 * 24 * time.Hour
@@ -96,11 +97,11 @@ type P2PTransfer struct {
 	Memo           string    `json:"memo,omitempty"`
 	Error          string    `json:"error,omitempty"`
 	IdempotencyKey string    `json:"idempotency_key"`
-	ConfirmBy      time.Time `json:"confirm_by,omitempty"`
+	ConfirmBy      time.Time `json:"confirm_by,omitempty"` // legacy: awaiting_confirmation deadline
 	DailyCounted   bool      `json:"daily_counted,omitempty"`
 	DailyKey       string    `json:"daily_key,omitempty"` // the day the amount was counted against
-	// UnconfirmedKey is set when the amount was counted against today's
-	// allowance for sends without confirmation.
+	// UnconfirmedKey is legacy: the daily no-confirmation allowance a
+	// transfer was counted against. It is still refunded for old records.
 	UnconfirmedKey string `json:"unconfirmed_key,omitempty"`
 	// InternalPaymentHash is the hash of the recipient's invoice for an
 	// internal send. It is saved before paying, so the outcome can be looked
@@ -186,7 +187,7 @@ func (bot *TipBot) P2PResolve(identifier string) (*lnbits.User, error) {
 	return u, nil
 }
 
-// DisplayName is a recipient's name for the confirm screen.
+// DisplayName is a recipient's name for the Mini App's review screen.
 func DisplayName(u *tb.User) string {
 	name := strings.TrimSpace(u.FirstName + " " + u.LastName)
 	if name == "" && u.Username != "" {
@@ -330,9 +331,6 @@ func (bot *TipBot) P2PStartInvoice(from *lnbits.User, invoice, memo, idemKey str
 		bot.p2pEnd(t, P2PFailed, "This invoice is already being paid.", nil)
 		return t, true, nil
 	}
-	if !dec.ExpiresAt.IsZero() {
-		t.ConfirmBy = dec.ExpiresAt
-	}
 	return t, true, bot.p2pBegin(from, t)
 }
 
@@ -370,59 +368,10 @@ func (bot *TipBot) p2pLockInvoice(t *P2PTransfer) bool {
 	return false
 }
 
-func p2pUnconfirmedKey(senderID int64, now time.Time) string {
-	return fmt.Sprintf("p2p-unconfirmed:%d:%s", senderID, now.UTC().Format("2006-01-02"))
-}
-
-// p2pNeedsConfirmation decides whether t must be confirmed in the bot chat.
-// Sends without confirmation share one daily allowance of confirm_threshold
-// sats, so splitting a payment into small parts does not skip the step. A
-// transfer that fits is counted against the allowance here.
-func (bot *TipBot) p2pNeedsConfirmation(t *P2PTransfer) bool {
-	limit := p2pConfig().ConfirmThreshold
-	if t.Amount > limit {
-		return true
-	}
-	key := p2pUnconfirmedKey(t.FromTelegramID, time.Now())
-	ok, _, err := bot.Bunt.AddWithinLimit(key, t.Amount, limit, 48*time.Hour)
-	if err != nil || !ok {
-		return true
-	}
-	t.UnconfirmedKey = key
-	return false
-}
-
-// P2PUnconfirmedRemaining is how many sats the sender can still send today
-// without confirming in the bot chat.
-func (bot *TipBot) P2PUnconfirmedRemaining(senderID int64) int64 {
-	used, _ := bot.Bunt.CounterValue(p2pUnconfirmedKey(senderID, time.Now()))
-	if left := p2pConfig().ConfirmThreshold - used; left > 0 {
-		return left
-	}
-	return 0
-}
-
-// p2pBegin either asks the sender to confirm in the bot chat, or executes.
+// p2pBegin runs a transfer. The signed Mini App or web app request is the
+// approval; there is no extra confirmation in the bot chat.
 func (bot *TipBot) p2pBegin(from *lnbits.User, t *P2PTransfer) error {
-	if bot.p2pNeedsConfirmation(t) {
-		deadline := time.Now().Add(p2pConfirmWindow)
-		if t.ConfirmBy.IsZero() || deadline.Before(t.ConfirmBy) {
-			t.ConfirmBy = deadline
-		}
-		t.Status = P2PAwaitingConfirmation
-		if err := bot.p2pSave(t); err != nil {
-			bot.p2pEnd(t, P2PFailed, "Could not start this payment. Nothing was sent; try again.", nil)
-			return nil
-		}
-		if err := bot.sendP2PConfirmation(from, t); err != nil {
-			log.Errorf("[p2p] Could not send confirmation for %s: %v", t.ID, err)
-			if bot.p2pClaim(t) {
-				bot.p2pEnd(t, P2PFailed, "Could not send the confirmation to your Telegram chat. Nothing was sent; try again.", nil)
-			}
-		}
-		return nil
-	}
-	if err := bot.p2pSave(t); err != nil { // records UnconfirmedKey
+	if err := bot.p2pSave(t); err != nil {
 		bot.p2pEnd(t, P2PFailed, "Could not start this payment. Nothing was sent; try again.", nil)
 		return nil
 	}
@@ -711,8 +660,8 @@ func (bot *TipBot) p2pMarkInFlight(from *lnbits.User, t *P2PTransfer) {
 	}
 }
 
-// P2PRefresh brings a transfer up to date: confirmations past their window
-// expire, and payments that are in flight, or were cut off while processing,
+// P2PRefresh brings a transfer up to date: legacy unconfirmed transfers past
+// their window expire, and payments that are in flight, or were cut off while processing,
 // are checked with lnbits. Lookups are throttled per transfer.
 func (bot *TipBot) P2PRefresh(t *P2PTransfer) {
 	if _, running := p2pDone.Load(t.ID); running {

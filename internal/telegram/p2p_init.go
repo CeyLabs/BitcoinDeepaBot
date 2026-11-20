@@ -49,6 +49,6 @@ func (bot *TipBot) P2PInit(tg *tb.User, referralCode string) (u *lnbits.User, cr
 		return nil, false, false, err
 	}
 	log.Infof("[⭐️ init] New user from the Mini App / web app: %s (%d)", GetUserStr(tg), tg.ID)
-	_, sendErr := bot.Telegram.Send(tg, "✅ Your Bitcoin Deepa wallet is ready. You'll get payment confirmations and receipts here.")
+	_, sendErr := bot.Telegram.Send(tg, "✅ Your Bitcoin Deepa wallet is ready. You'll get payment receipts here.")
 	return u, true, sendErr == nil, nil
 }

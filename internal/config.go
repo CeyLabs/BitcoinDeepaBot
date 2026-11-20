@@ -622,7 +622,6 @@ type APIP2PConfiguration struct {
 	Enabled            bool  `yaml:"enabled"`
 	MaxAmount          int64 `yaml:"max_amount"`            // per transfer
 	DailyLimit         int64 `yaml:"daily_limit"`           // per sender, per UTC day
-	ConfirmThreshold   int64 `yaml:"confirm_threshold"`     // above this, the sender confirms in the bot chat
 	RateLimitPerMinute int   `yaml:"rate_limit_per_minute"` // sends and invoice payments per sender
 	InitDataMaxAge     int64 `yaml:"init_data_max_age"`     // seconds
 	// SpendInitDataMaxAge is a shorter init data age for /send and
@@ -667,9 +666,6 @@ func setAPIP2PDefaults(c *APIP2PConfiguration) {
 	}
 	if c.DailyLimit <= 0 {
 		c.DailyLimit = 500000
-	}
-	if c.ConfirmThreshold <= 0 {
-		c.ConfirmThreshold = 50000
 	}
 	if c.RateLimitPerMinute <= 0 {
 		c.RateLimitPerMinute = 10
@@ -728,6 +724,6 @@ func setAPIP2PDefaults(c *APIP2PConfiguration) {
 		}
 	}
 	if c.Enabled {
-		log.Infof("P2P API enabled: max %d sat per transfer, %d sat per day, confirm above %d sat", c.MaxAmount, c.DailyLimit, c.ConfirmThreshold)
+		log.Infof("P2P API enabled: max %d sat per transfer, %d sat per day", c.MaxAmount, c.DailyLimit)
 	}
 }

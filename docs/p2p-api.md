@@ -138,7 +138,6 @@ function p2pHeaders(method, path, query, cred, body) {
 |---|---|
 | Max per transfer | 100,000 sats (`max_amount`) |
 | Max per sender per UTC day | 500,000 sats (`daily_limit`) |
-| Sends without confirmation per sender per UTC day | 50,000 sats in total (`confirm_threshold`) |
 | Sends + invoice payments per sender | 10 per minute (`rate_limit_per_minute`) |
 | Resolves + invoice decodes per sender | 30 per minute |
 | Transfer status polls per sender | 30 per minute |
@@ -148,22 +147,21 @@ function p2pHeaders(method, path, query, cred, body) {
   sats can't get stuck in an unclaimed wallet.
 - No sending to yourself. Banned users can neither send nor receive.
 - Sends go to the recipient's **numeric Telegram ID**, never a username.
-- **Confirmation:** each sender can send up to `confirm_threshold` sats per
-  UTC day **in total** without confirming. Any transfer that would go over
-  that total (including one transfer above it) needs confirmation: the bot
-  messages the sender in Telegram with **Confirm / Cancel** buttons, valid for
-  10 minutes. Nothing moves until they press Confirm. Splitting a payment into
-  small parts doesn't skip this. `GET /me` shows what is left as
-  `unconfirmed_remaining`; transfers that fail give it back.
+- **No bot-chat confirmation.** The signed request (DCA backend signature plus
+  the user's fresh Telegram credential) is the approval, so the Mini App must
+  show its own review screen before calling `/send`, `/invoice/pay` or a
+  collect `approve`. `max_amount` and `daily_limit` still apply. Passkey
+  (WebAuthn) approval through the DCA backend is planned.
 - **`idempotency_key`**: generate a new UUID per payment and **reuse it when
   retrying the same request** (e.g. after a timeout or a dropped connection).
   The same key always returns the same transfer, whatever its status, so a
   retried request can never pay twice. Reusing a key for a different payment
   returns `409`.
-- `failed`, `cancelled` and `expired` are **final for their key**. To try
+- `failed` is **final for its key** (as are `cancelled` and `expired` on older
+  transfers). To try
   again after one of these, start a new payment with a **new** key.
 - Don't start a new key while the previous transfer for the same payment is
-  still `processing`, `awaiting_confirmation` or `in_flight`. Keep polling it.
+  still `processing` or `in_flight`. Keep polling it.
 
 ## Endpoints
 
@@ -182,8 +180,8 @@ recorded like a `/start` payload, for new users only.
 
 Returns `201` for a new wallet and `200` if the user already had one, with the
 same fields as `/me` plus `created`. A new wallet also has `can_message`:
-`false` means the bot can't message the user yet, so they won't get Confirm
-buttons, collect prompts or receipts in the chat. Ask for it first with
+`false` means the bot can't message the user yet, so they won't get receipts
+in the chat. Ask for it first with
 `Telegram.WebApp.requestWriteAccess()` in the Mini App, or the "allow messages"
 option of Log In with Telegram, or send them to the bot with a Start link.
 
@@ -195,13 +193,12 @@ Limits: 30 new wallets per minute across all users; banned users get `403`.
   "telegram_id": 111, "username": "alice", "name": "Alice",
   "balance": 250000, "balance_lkr": "250,000 sats (~LKR 7,500)",
   "limits": { "max_amount": 100000, "daily_limit": 500000, "daily_used": 60000,
-              "daily_remaining": 440000, "confirm_threshold": 50000,
-              "unconfirmed_remaining": 30000 }
+              "daily_remaining": 440000 }
 }
 ```
 
 ### `POST /resolve`
-Find who you're sending to. Show `name` on the confirm screen. Users who
+Find who you're sending to. Show `name` on the review screen. Users who
 haven't started the bot, or can't receive, all get `404 recipient_not_found`.
 ```json
 { "to": "@bob" }            // or "bob" or "123456789"
@@ -223,10 +220,8 @@ Show the invoice before paying.
 ```
 ```json
 { "amount": 21000, "amount_lkr": "…", "description": "Coffee", "payment_hash": "…",
-  "expires_at": "2026-11-19T10:00:00Z", "needs_confirmation": false, "over_limit": false }
+  "expires_at": "2026-11-19T10:00:00Z", "over_limit": false }
 ```
-`needs_confirmation` is true when the amount is more than the sender's
-`unconfirmed_remaining`.
 
 ### `POST /invoice/pay`
 ```json
@@ -234,14 +229,13 @@ Show the invoice before paying.
 ```
 Waits up to 15 seconds for the payment to settle. If it hasn't settled by
 then, returns `202` with status `in_flight`: poll `GET /transfers/{id}`.
-While that transfer is `processing`, `awaiting_confirmation` or `in_flight`,
-don't start the same invoice with a new key: it is refused with
-"This invoice is already being paid." After it ends `failed`, `cancelled` or
-`expired`, a new key can pay the invoice. The bot never pays an invoice twice.
+While that transfer is `processing` or `in_flight`, don't start the same
+invoice with a new key: it is refused with "This invoice is already being
+paid." After it ends `failed`, a new key can pay the invoice. The bot never pays an invoice twice.
 
 ### `GET /transfers/{id}`
 Current state of one of **your** transfers (others get `404`). Poll it every
-2–3 seconds while the status is `processing` or `awaiting_confirmation`, and
+2–3 seconds while the status is `processing`, and
 every **15–30 seconds** while it is `in_flight`: a payment can stay in flight
 for a long time, and the bot checks it with lnbits at most once every 20
 seconds anyway. Polls are limited to 30 per minute per sender.
@@ -259,7 +253,7 @@ login, like `/send`. See [collect-api.md](collect-api.md).
   "amount": 1000, "amount_lkr": "…", "fee": 0, "memo": "lunch",
   "to": { "telegram_id": 222, "username": "bob", "name": "Bob Silva" },
   "payment_hash": "", "description": "", "preimage": "",
-  "error": "", "confirm_by": null, "created_at": "…"
+  "error": "", "created_at": "…"
 }
 ```
 `kind` is `internal` or `invoice`. Invoice transfers have no `to` but have
@@ -269,11 +263,9 @@ login, like `/send`. See [collect-api.md](collect-api.md).
 |---|---|---|---|
 | `completed` | 200 | Done | Success |
 | `failed` | 200 | Nothing was sent; reason in `error`. Final for this key. | `error` |
-| `awaiting_confirmation` | 202 | Waiting for Confirm in the bot chat, until `confirm_by` | "Approve this in your Telegram chat" + poll |
 | `processing` | 202 | Running | Spinner + poll |
 | `in_flight` | 202 | Payment sent, not settled yet. It may still complete or fail. | "Payment in progress" + slow poll |
-| `cancelled` | 200 | Cancelled in the bot chat | Cancelled |
-| `expired` | 200 | Not confirmed in time | Expired |
+| `cancelled`, `expired` | 200 | Only on transfers from before bot-chat confirmations were removed | Cancelled / Expired |
 
 ## Errors
 
@@ -305,7 +297,6 @@ api:
     allowed_networks: ["<DCA backend IP>"]   # only these IPs can call /api/v1/p2p/*; empty = any IP
     max_amount: 100000
     daily_limit: 500000
-    confirm_threshold: 50000      # daily total a sender can send without confirming
     rate_limit_per_minute: 10
     init_data_max_age: 3600
     spend_init_data_max_age: 600   # /send and /invoice/pay
