@@ -67,8 +67,8 @@ func collectWallet(w http.ResponseWriter, r *http.Request) (string, bool) {
 
 // Collect: POST /api/v1/collect {"amount", "memo", "external_id"}, with the
 // payer in X-BDB-User (signed). Charges the payer and pays the calling
-// wallet at once, with no approval. Any user with a bot wallet can be
-// charged. A repeat of the same external_id returns the same request and never pays
+// wallet at once, with no approval. Only users who logged in through /api/v1/init can be charged. A
+// repeat of the same external_id returns the same request and never pays
 // twice.
 func (p *P2PService) Collect(w http.ResponseWriter, r *http.Request) {
 	walletID, ok := collectWallet(w, r)
@@ -93,6 +93,10 @@ func (p *P2PService) Collect(w http.ResponseWriter, r *http.Request) {
 	payer, err := p.Bot.P2PResolve(strconv.FormatInt(payerID, 10))
 	if err != nil {
 		p2pWriteErr(w, err)
+		return
+	}
+	if !p.Bot.P2PLinked(payer.Telegram.ID) {
+		p2pFail(w, http.StatusForbidden, "payer_not_linked", "This user hasn't logged in to the app yet.")
 		return
 	}
 	c, created, err := p.Bot.CollectCreate(walletID, collector, payer, req.Amount, GetWalletMaxAmount(walletID), req.Memo, req.ExternalID, GetMaxMemoLength())
