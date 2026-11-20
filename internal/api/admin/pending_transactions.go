@@ -164,6 +164,9 @@ func (s Service) executePendingTransaction(pendingTx *api.PendingTransaction) er
 	if !success || err != nil {
 		return fmt.Errorf("transaction execution failed: %v", err)
 	}
+	// So /api/v1/send/status returns the transfer's hash (the same as its
+	// /usertransactions row) with executed
+	pendingTx.PaymentHash = t.Invoice.PaymentHash
 
 	// Mark as executed
 	err = pendingTx.Execute()
