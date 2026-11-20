@@ -4,12 +4,11 @@
 user's Telegram credential, and the bot checks it with Telegram. It:
 
 - creates a bot wallet for a user who never pressed **Start** in the bot, the
-  same way `/start` does;
-- **links** the user, so the DCA backend can name them with `X-BDB-User` on
-  every other call for a year (renewed by each login).
+  same way `/start` does.
 
-Until a user has logged in this way, every `/api/v1/p2p/*` call for them
-answers `403 login_required`.
+After that, the DCA backend names the user with `X-BDB-User` on every other
+call. Until the user has a wallet, `/api/v1/p2p/*` calls for them answer
+`403 sender_not_found`.
 
 The user is always the one in the Telegram-signed credential, so a caller
 can't create a wallet for anyone else.
@@ -19,7 +18,7 @@ Called by the **DCA backend**, which serves the Mini App and the web app.
 ## When to call it
 
 - When the user logs in (first open on a device), or
-- when any P2P call answers `403 login_required` or `403 sender_not_found`.
+- when any P2P call answers `403 sender_not_found`.
 
 It's safe to call on every open: for an existing user it creates nothing
 and returns `200`.

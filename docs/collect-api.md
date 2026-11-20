@@ -8,7 +8,7 @@ The bot sends no message about it. Paying creates a normal P2P transfer from
 the user to the wallet, so balance checks, settlement and status work the
 same as for `/p2p/send`.
 
-> **Security:** anyone with the wallet's key can charge any logged-in user,
+> **Security:** anyone with the wallet's key can charge any bot user,
 > up to `max_amount` per charge and 10 charges per user per hour. Keep the
 > key in a secret store, and only call this after the user agreed in the app.
 
@@ -25,8 +25,8 @@ whitelisted_wallets:
 ```
 
 The wallet's `max_amount` (or the global `api.send.max_amount`) caps each
-charge. The money goes to the wallet's bot user (`username`). Users must have
-logged in through `POST /api/v1/init`, so `api.p2p.enabled` is needed too.
+charge. The money goes to the wallet's bot user (`username`). The payer must
+have a bot wallet: they started the bot, or the app called `POST /api/v1/init`.
 
 ## Wallet endpoints (DCA backend)
 
@@ -57,9 +57,8 @@ A send signature (`BDB-SEND-ED25519-V1`) is refused here.
 { "amount": 50000, "memo": "Sell order #812", "external_id": "6b1f…uuid" }
 ```
 
-- `X-BDB-User`: the payer's numeric Telegram ID. They must have logged in
-  through `POST /api/v1/init`, otherwise `403 payer_not_linked`. Missing or
-  not a number → `401`. A `to` field in the body is refused (`400 invalid_json`).
+- `X-BDB-User`: the payer's numeric Telegram ID. They must have a bot wallet,
+  otherwise `404 recipient_not_found`. Missing or not a number → `401`. A `to` field in the body is refused (`400 invalid_json`).
 - `external_id`: 8–128 characters, unique per charge (use your order ID or a
   UUID). Retrying with the same `external_id` returns the same request (`200`
   instead of `201`) and **never charges twice**. The same `external_id` with
@@ -114,7 +113,7 @@ Same shape as the P2P API: `{ "code": "…", "message": "…" }`.
 | HTTP | `code` |
 |---|---|
 | 400 | `invalid_json`, `invalid_amount`, `amount_too_large`, `memo_too_long`, `invalid_external_id`, `invalid_recipient`, `self_collect` |
-| 403 | `collect_not_allowed`, `collector_not_allowed` (the wallet's bot user is missing or banned), `payer_not_linked` |
+| 403 | `collect_not_allowed`, `collector_not_allowed` (the wallet's bot user is missing or banned) |
 | 404 | `recipient_not_found`, `not_found` |
 | 409 | `idempotency_conflict`, `in_progress` |
 | 429 | `rate_limited` |
