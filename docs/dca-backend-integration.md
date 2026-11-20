@@ -244,14 +244,23 @@ Default limits: `min_amount` 1, `max_amount` 1,000,000, `admin_approval_threshol
 ```
 → `{ "success": true, "balance": 5000, "balance_lkr": "…", "username": "…", ... }`
 
-### 4.5 `POST /api/v1/usertransactions` — a user's internal transactions
+### 4.5 `POST /api/v1/usertransactions` — a user's history
 
 ```json
 { "telegram_id": 123456789, "limit": 100, "offset": 0 }
 ```
-→ `{ "success": true, "count": 2, "transactions": [ { "id": 1, "time": "…", "direction": "incoming", "from_user": "…", "to_user": "…", "amount": 1000, "memo": "…", "success": true } ] }`
+→ `{ "success": true, "count": 2, "transactions": [ … ] }`, newest first:
 
-`limit` defaults to 100 (maximum 250). Page with `offset`.
+```json
+{ "id": 1, "time": "…", "direction": "incoming", "from_user": "…", "to_user": "…", "type": "p2p_send", "amount": 1000, "memo": "…", "success": true }
+{ "id": 0, "time": "…", "direction": "outgoing", "from_id": 123456789, "to_id": 0, "type": "lightning", "amount": 500, "fee": 1, "status": "success", "payment_hash": "…", "memo": "…", "success": true }
+```
+
+- **Internal transfers** (tips, sends, P2P, API sends, collect, …) come from the bot's table.
+- **Lightning payments** (`type: "lightning"`: `/pay`, `/invoice`, Lightning-address receipts) come from the user's LNbits wallet. `amount` and `fee` are in sats; `status` is `success`, `pending` or `failed`. Internal transfers that also show in LNbits are listed once.
+- If LNbits can't be reached, only internal transfers are returned.
+
+`limit` defaults to 100 (maximum 250). Page with `offset`. Only the newest 1000 entries can be paged.
 
 ### 4.6 `GET /api/v1/referral/lookup?code=…` — users who joined with a code
 
