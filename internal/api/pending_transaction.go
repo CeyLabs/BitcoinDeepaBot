@@ -24,7 +24,7 @@ type PendingTransaction struct {
 	Memo             string       `json:"memo"`
 	PaymentType      string       `json:"payment_type,omitempty"` // "" / "internal" for user transfers, "invoice" for bolt11 payments
 	Invoice          string       `json:"invoice,omitempty"`      // bolt11 payment request when PaymentType == "invoice"
-	PaymentHash      string       `json:"payment_hash,omitempty"` // bolt11 payment hash when PaymentType == "invoice"
+	PaymentHash      string       `json:"payment_hash,omitempty"` // bolt11 payment hash when PaymentType == "invoice"; for an executed internal send, its invoice's hash
 	RequestTimestamp time.Time    `json:"request_timestamp"`
 	Status           string       `json:"status"` // "pending", "approved", "rejected", "expired"
 	ApprovedBy       string       `json:"approved_by,omitempty"`
@@ -273,6 +273,22 @@ func LoadPendingTransaction(id string, bot *telegram.TipBot) (*PendingTransactio
 // RegisterUpdatePendingTxHook sets the storage-level hook so the telegram
 // package can update PendingTransaction status without an import cycle.
 func RegisterUpdatePendingTxHook(bot *telegram.TipBot) {
+	storage.SetPendingTxPaymentHashFn = func(id, paymentHash string) {
+		if paymentHash == "" {
+			return
+		}
+		pt := &PendingTransaction{Base: storage.New(storage.ID(id))}
+		sn, err := pt.Get(pt, bot.Bunt)
+		if err != nil {
+			log.Warnf("[pending tx hook] could not load %s: %v", id, err)
+			return
+		}
+		ptx := sn.(*PendingTransaction)
+		ptx.PaymentHash = paymentHash
+		if err := ptx.Set(ptx, bot.Bunt); err != nil {
+			log.Errorf("[pending tx hook] could not save payment hash for %s: %v", id, err)
+		}
+	}
 	storage.UpdatePendingTxStatusFn = func(id, status, actor string) {
 		pt := &PendingTransaction{Base: storage.New(storage.ID(id))}
 		sn, err := pt.Get(pt, bot.Bunt)

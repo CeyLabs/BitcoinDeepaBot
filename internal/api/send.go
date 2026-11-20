@@ -45,7 +45,7 @@ type SendResponse struct {
 	Amount          int64  `json:"amount,omitempty"`
 	AmountLKR       string `json:"amount_lkr,omitempty"` // LKR conversion
 	Memo            string `json:"memo,omitempty"`
-	PaymentHash     string `json:"payment_hash,omitempty"` // set for bolt11 invoice payments
+	PaymentHash     string `json:"payment_hash,omitempty"` // bolt11 invoice payments; internal sends: the hash of the recipient's invoice, as in /usertransactions
 	Preimage        string `json:"preimage,omitempty"`     // proof of payment, set once settled
 	Fee             int64  `json:"fee,omitempty"`          // routing fee in sats for invoice payments
 }
@@ -388,6 +388,10 @@ func (s Service) Send(w http.ResponseWriter, r *http.Request) {
 		AmountLKR: getLKRValue(req.Amount),
 		Memo:      req.Memo,
 	}
+	// The hash of the recipient's invoice the send paid: the same payment_hash
+	// as the transfer's row in /api/v1/usertransactions, so the caller can find
+	// that row exactly.
+	response.PaymentHash = t.Invoice.PaymentHash
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -438,6 +442,8 @@ func (s Service) SendStatus(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	// PaymentHash is set for invoice transactions, so a caller that sees
 	// in_flight can resolve the outcome via /api/v1/send/payment/{payment_hash}.
+	// For an executed internal send it is the hash of the transfer's invoice,
+	// the same payment_hash as its row in /api/v1/usertransactions.
 	json.NewEncoder(w).Encode(StatusResponse{
 		ID:               pt.ID,
 		Status:           status,
