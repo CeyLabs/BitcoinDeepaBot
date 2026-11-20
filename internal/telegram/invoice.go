@@ -215,25 +215,26 @@ func (bot *TipBot) createInvoiceWithEvent(ctx context.Context, user *lnbits.User
 
 func (bot *TipBot) notifyInvoiceReceivedEvent(event Event) {
 	invoiceEvent := event.(*InvoiceEvent)
-	// do balance check for keyboard update
-	_, err := bot.GetUserBalance(invoiceEvent.User)
-	if err != nil {
-		errmsg := fmt.Sprintf("could not get balance of user %s", GetUserStr(invoiceEvent.User.Telegram))
-		log.Errorln(errmsg)
-	}
+	bot.trySendMessage(invoiceEvent.User.Telegram, bot.invoiceReceivedText(invoiceEvent))
+}
 
+// invoiceReceivedText refreshes the user's balance (for the keyboard) and
+// returns the "You received ..." text, in the user's currency if set.
+func (bot *TipBot) invoiceReceivedText(invoiceEvent *InvoiceEvent) string {
+	if _, err := bot.GetUserBalance(invoiceEvent.User); err != nil {
+		log.Errorf("could not get balance of user %s", GetUserStr(invoiceEvent.User.Telegram))
+	}
+	lang := invoiceEvent.User.Telegram.LanguageCode
+	sats := thirdparty.FormatSatsWithLKR(invoiceEvent.Amount)
 	if invoiceEvent.UserCurrency == "" || strings.ToLower(invoiceEvent.UserCurrency) == "btc" {
-		bot.trySendMessage(invoiceEvent.User.Telegram, fmt.Sprintf(i18n.Translate(invoiceEvent.User.Telegram.LanguageCode, "invoiceReceivedMessage"), thirdparty.FormatSatsWithLKR(invoiceEvent.Amount)))
-	} else {
-               fiatAmount, err := SatoshisToFiat(invoiceEvent.Amount, strings.ToUpper(invoiceEvent.UserCurrency))
-               if err != nil {
-                        log.Errorln(err)
-                        // fallback to satoshis
-                        bot.trySendMessage(invoiceEvent.User.Telegram, fmt.Sprintf(i18n.Translate(invoiceEvent.User.Telegram.LanguageCode, "invoiceReceivedMessage"), thirdparty.FormatSatsWithLKR(invoiceEvent.Amount)))
-                        return
-               }
-               bot.trySendMessage(invoiceEvent.User.Telegram, fmt.Sprintf(i18n.Translate(invoiceEvent.User.Telegram.LanguageCode, "invoiceReceivedCurrencyMessage"), thirdparty.FormatSatsWithLKR(invoiceEvent.Amount), utils.FormatFloatWithCommas(fiatAmount), strings.ToUpper(invoiceEvent.UserCurrency)))
-       }
+		return fmt.Sprintf(i18n.Translate(lang, "invoiceReceivedMessage"), sats)
+	}
+	fiatAmount, err := SatoshisToFiat(invoiceEvent.Amount, strings.ToUpper(invoiceEvent.UserCurrency))
+	if err != nil {
+		log.Errorln(err)
+		return fmt.Sprintf(i18n.Translate(lang, "invoiceReceivedMessage"), sats) // fall back to sats
+	}
+	return fmt.Sprintf(i18n.Translate(lang, "invoiceReceivedCurrencyMessage"), sats, utils.FormatFloatWithCommas(fiatAmount), strings.ToUpper(invoiceEvent.UserCurrency))
 }
 
 type LNURLInvoice struct {
@@ -252,42 +253,40 @@ func (lnurlInvoice LNURLInvoice) Key() string {
 	return fmt.Sprintf("lnurl-p:%s", lnurlInvoice.PaymentHash)
 }
 
+// lnurlReceiveEvent tells the user about a payment to their Lightning
+// address in one message: the amount, then the sender's name and note. Spam
+// filter: the note is dropped under 21 sat, or under 100 sat if it has a link.
 func (bot *TipBot) lnurlReceiveEvent(event Event) {
 	invoiceEvent := event.(*InvoiceEvent)
-	bot.notifyInvoiceReceivedEvent(invoiceEvent)
+	msg := bot.invoiceReceivedText(invoiceEvent)
 
 	tx := &LNURLInvoice{Invoice: &Invoice{PaymentHash: invoiceEvent.PaymentHash}}
-	err := bot.Bunt.Get(tx)
+	if err := bot.Bunt.Get(tx); err != nil {
+		bot.trySendMessage(invoiceEvent.User.Telegram, msg)
+		return
+	}
 	log.Debugf("[lnurl-p] Received invoice for %s of %d sat.", GetUserStr(invoiceEvent.User.Telegram), tx.Amount)
-	if err == nil {
-		// filter: if tx.Comment includes a URL, return if tx.Amount is less than 100 sat(s)
-		if len(tx.Comment) > 0 && tx.Amount < 100 {
-			if strings.Contains(tx.Comment, "http") {
-				log.Debugf("[lnurl-p] Filtered LNURL comment for %s of %d sat.", GetUserStr(invoiceEvent.User.Telegram), tx.Amount)
-				return
-			}
-		}
 
-		if tx.Amount < 21 {
-			log.Debugf("[lnurl-p] Filtered LNURL comment for %s of %d sat.", GetUserStr(invoiceEvent.User.Telegram), tx.Amount)
-			return
-		}
+	comment := tx.Comment
+	if comment != "" && (tx.Amount < 21 || (tx.Amount < 100 && strings.Contains(comment, "http"))) {
+		log.Debugf("[lnurl-p] Filtered LNURL comment for %s of %d sat.", GetUserStr(invoiceEvent.User.Telegram), tx.Amount)
+		comment = ""
+	}
+	switch {
+	case comment != "" && tx.From != "":
+		msg += fmt.Sprintf("\n✉️ From `%s`: %s", tx.From, str.MarkdownEscape(comment))
+	case comment != "":
+		msg += "\n✉️ " + str.MarkdownEscape(comment)
+	case tx.From != "" && tx.Amount >= 21:
+		msg += fmt.Sprintf("\nFrom `%s`", tx.From)
+	}
+	if len(tx.Nip57Receipt.Sig) > 0 {
+		msg += "\n💜 This was a zap on nostr."
+	}
+	bot.trySendMessage(invoiceEvent.User.Telegram, msg, tb.NoPreview)
 
-		// notify user with LNURL comment and sender Information
-		if len(tx.Comment) > 0 {
-			if len(tx.From) == 0 {
-				bot.trySendMessage(tx.User.Telegram, fmt.Sprintf("✉️ %s", str.MarkdownEscape(tx.Comment)), tb.NoPreview)
-			} else {
-				bot.trySendMessage(tx.User.Telegram, fmt.Sprintf("✉️ From `%s`: %s", tx.From, str.MarkdownEscape(tx.Comment)), tb.NoPreview)
-			}
-		} else if len(tx.From) > 0 {
-			bot.trySendMessage(tx.User.Telegram, fmt.Sprintf("From `%s`", str.MarkdownEscape(tx.From)), tb.NoPreview)
-		}
-		// send out NIP57 zap receipt
-		if len(tx.Nip57Receipt.Sig) > 0 {
-			// zapEventSerialized, _ := json.Marshal(tx.Nip57Receipt)
-			bot.trySendMessage(tx.User.Telegram, "💜 This was a zap on nostr.")
-			go bot.publishNostrEvent(tx.Nip57Receipt, tx.Nip57ReceiptRelays)
-		}
+	// Send out the NIP-57 zap receipt.
+	if len(tx.Nip57Receipt.Sig) > 0 {
+		go bot.publishNostrEvent(tx.Nip57Receipt, tx.Nip57ReceiptRelays)
 	}
 }
