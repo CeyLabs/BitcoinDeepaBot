@@ -1,7 +1,13 @@
 # Spec: DCA-issued sessions + bot-verified passkeys
 
-**Status:** draft for review. Nothing here is built yet.
-**Replaces:** the 10-minute / 1-hour Telegram login limits, and the bot-chat confirmations removed in #101.
+**Status:** part 1 built, part 2 planned.
+
+| Part | What | State |
+|---|---|---|
+| 1 | The Telegram login is checked only at login (`POST /api/v1/init`); every other call names the user with `X-BDB-User` (§4) | **Built** (#104, #107). DCA BE sessions (§3) are DCA BE's job |
+| 2 | Passkeys: enrollment (§5) and approval of every payment (§6) | **Planned.** Until then, the P2P key alone can pay from linked users' wallets, up to `daily_limit` |
+
+**Replaces:** the 10-minute / 1-hour Telegram login limits (removed in #107), and the bot-chat confirmations (removed in #101).
 
 ## 1. Goal
 
@@ -36,7 +42,7 @@ The bot doesn't store or check these sessions. DCA BE's requirements:
 
 ## 4. Calling the bot: P2P signature v2
 
-Same headers and key as today (`X-Timestamp`, `X-Nonce`, `X-Signature`, DCA BE's P2P key), with a new version line. The **user ID** replaces the credential hash:
+Same URLs, headers and key as for login (`X-Timestamp`, `X-Nonce`, `X-Signature`, DCA BE's P2P key). Only the signed text differs: its first line is `…-V2`, and the **user ID** replaces the credential hash:
 
 ```
 BDB-P2P-ED25519-V2
@@ -50,9 +56,9 @@ BDB-P2P-ED25519-V2
 ```
 
 - **Header:** `X-BDB-User: <numeric telegram_id>`.
-- **Built now (interim, behind `api.p2p.service_user_auth`):** V2 works on every P2P endpoint, payments included, but only for users linked by a Telegram-verified `POST /api/v1/init`. `/api/v1/init` itself always needs V1. Until passkeys land, a leaked P2P key can pay from linked users' wallets up to `daily_limit`.
-- **Target, with passkeys:** V2 is allowed for all reads (`/me`, resolve, decode, transfer and collect status), and for **starting** a payment. It never moves sats by itself: every spend also needs a passkey (§6).
-- **V1** (Telegram credential) stays, and is **required** for `/api/v1/init` and for adding a passkey (§5).
+- **Built:** every `/api/v1/p2p/*` call must use V2, payments included. Only users linked by a Telegram-verified `POST /api/v1/init` can be named; others get `403 login_required`. A Telegram credential on these calls gets `401`.
+- **`/api/v1/init`** is the only call that takes the Telegram credential (signed text `…-V1`). Adding a passkey (§5) will need it too.
+- **With passkeys (part 2):** V2 alone will still allow reads and **starting** a payment, but it won't move sats by itself: every spend will also need a passkey (§6).
 
 ## 5. Adding a passkey (enrollment)
 
@@ -140,8 +146,9 @@ Library: `github.com/go-webauthn/webauthn`. Storage: buntdb, keyed by `telegram_
 
 ## 10. Rollout
 
-1. **Bot:** add V2 signing, passkey enrollment, `awaiting_passkey` and authorize, with `required_for_spends: false`.
-2. **DCA BE:** sessions, V2 calls, enrollment screen, passkey step before each payment.
-3. Test on dev with real iOS, Android and desktop devices, inside and outside Telegram.
-4. Set `required_for_spends: true`. Spends without a passkey stop.
-5. Later: drop the 10-minute spend login rule. V1 stays only for enrollment.
+1. ✅ **Bot:** V2 signing and login-only Telegram checks (#104, #107).
+2. **DCA BE:** login through `/api/v1/init`, its own sessions, and `X-BDB-User` on every other call. This is needed now, because the old calls get `401`.
+3. **Bot:** passkey enrollment, `awaiting_passkey` and authorize, with `required_for_spends: false`.
+4. **DCA BE:** enrollment screen and a passkey step before each payment.
+5. Test on dev with real iOS, Android and desktop devices, inside and outside Telegram.
+6. Set `required_for_spends: true`. Spends without a passkey stop.
