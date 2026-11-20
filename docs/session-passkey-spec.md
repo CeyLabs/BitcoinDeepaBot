@@ -5,7 +5,7 @@
 | Part | What | State |
 |---|---|---|
 | 1 | The Telegram login is checked only at login (`POST /api/v1/init`); every other call names the user with `X-BDB-User` (§4) | **Built** (#104, #107). DCA BE sessions (§3) are DCA BE's job |
-| 2 | Passkeys: enrollment (§5) and approval of every payment (§6) | **Planned.** Until then, the P2P key alone can pay from linked users' wallets, up to `daily_limit` |
+| 2 | Passkeys: enrollment (§5) and approval of every payment (§6) | **Planned.** Until then, the P2P key alone can pay from any user's wallet, up to `daily_limit` |
 
 **Replaces:** the 10-minute / 1-hour Telegram login limits (removed in #107), and the bot-chat confirmations (removed in #101).
 
@@ -56,7 +56,7 @@ BDB-P2P-ED25519-V2
 ```
 
 - **Header:** `X-BDB-User: <numeric telegram_id>`.
-- **Built:** every `/api/v1/p2p/*` call must use V2, payments included. Only users linked by a Telegram-verified `POST /api/v1/init` can be named; others get `403 login_required`. A Telegram credential on these calls gets `401`.
+- **Built:** every `/api/v1/p2p/*` call must use V2, payments included. Any user with a bot wallet can be named; there is no login check. A Telegram credential on these calls gets `401`.
 - **`/api/v1/init`** is the only call that takes the Telegram credential (signed text `…-V1`). Adding a passkey (§5) will need it too.
 - **With passkeys (part 2):** V2 alone will still allow reads and **starting** a payment, but it won't move sats by itself: every spend will also need a passkey (§6).
 
