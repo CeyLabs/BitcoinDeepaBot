@@ -37,7 +37,7 @@ Detailed references, if you need more: [send-api-ed25519.md](send-api-ed25519.md
 | Key | Signs | Bot config | If it leaks |
 |---|---|---|---|
 | **Send key** | (1) DCA's wallet: payouts and collect requests | `api.send.whitelisted_wallets.<id>.ed25519_public_key` | Someone can send sats **from the DCA wallet**, and **charge any logged-in user** (collect), up to its limits |
-| **P2P key** | (2) user-wallet relay | `api.p2p.service_public_key` | Can act as, and pay from, any **linked** user (anyone who logged in through `/api/v1/init`), up to `daily_limit`, until passkeys exist. Guard it like the send key. |
+| **P2P key** | (2) user-wallet relay | `api.p2p.service_public_key` | Can act as, and pay from, **any bot user**, up to `daily_limit`, until passkeys exist. Guard it like the send key. |
 
 Keep the keys **separate**, so either can be rotated without touching the other. A signature made with one key is useless on the other API: each signs a different first line (`BDB-SEND-…` vs `BDB-P2P-…`).
 
@@ -284,7 +284,7 @@ POST
 
 | Field | Notes |
 |---|---|
-| `X-BDB-User` (header) | The user to charge: numeric Telegram ID. They must have logged in through `/api/v1/init` (§6.1), otherwise `403 payer_not_linked` |
+| `X-BDB-User` (header) | The user to charge: numeric Telegram ID. They must have a bot wallet (started the bot, or `/api/v1/init`, §6.1), otherwise `404 recipient_not_found` |
 | `amount` | Sats, at most the wallet's `max_amount` |
 | `memo` | Optional. Shown in the user's history |
 | `external_id` | 8–128 chars, unique per charge: **use your order ID**. A retry with it returns the same request (`200` instead of `201`) and never charges twice. The same ID with a different user, amount or memo → `409 idempotency_conflict` |
@@ -317,7 +317,7 @@ Errors use the P2P shape `{ "code", "message" }`:
 | HTTP | `code` |
 |---|---|
 | 400 | `invalid_amount`, `amount_too_large`, `memo_too_long`, `invalid_external_id`, `invalid_recipient`, `self_collect` |
-| 403 | `collect_not_allowed` (no `can_collect`), `collector_not_allowed`, `payer_not_linked` |
+| 403 | `collect_not_allowed` (no `can_collect`), `collector_not_allowed` |
 | 404 | `recipient_not_found`, `not_found` |
 | 409 | `idempotency_conflict`, `in_progress` |
 | 429 | `rate_limited` |
@@ -346,7 +346,7 @@ These are the same URLs. `…-V1` and `…-V2` only name the format of the signe
 
 - Forward **exactly one** credential, **unchanged**.
 - The bot checks it with Telegram. It can be at most **1 hour** old (`init_data_max_age`).
-- On success, the user is **linked**: DCA BE can name them with `X-BDB-User` for a year. Each login renews the link.
+- On success, the user's wallet exists. After that, name them with `X-BDB-User`.
 
 Signing string:
 
@@ -378,13 +378,13 @@ BDB-P2P-ED25519-V2
 
 | What happens | Answer |
 |---|---|
-| A user who never logged in through `/api/v1/init` | `403 login_required`: log them in |
+| A user with no bot wallet | `403 sender_not_found`: call `/api/v1/init` first |
 | `X-BDB-User` missing, or a Telegram credential sent instead | `401 unauthorized` |
 | `X-BDB-User` sent to `/api/v1/init` | `401 login_required` |
 
 There's no login-age limit on these calls: DCA BE's session decides how long the user stays logged in. Use server-side sessions (`HttpOnly` cookies with refresh tokens). Never put the user ID in something the browser can change.
 
-> **Security:** the bot trusts DCA BE about who the user is, **payments included**. If the P2P key leaks, it can pay from any linked user's wallet, up to `daily_limit`. Passkeys will add per-payment approval ([session-passkey-spec.md](session-passkey-spec.md)). Keep the P2P key in a secret store.
+> **Security:** the bot trusts DCA BE about who the user is, **payments included**. If the P2P key leaks, it can pay from any user's wallet, up to `daily_limit`. Passkeys will add per-payment approval ([session-passkey-spec.md](session-passkey-spec.md)). Keep the P2P key in a secret store.
 
 ### 5.3 Reference client (Node.js)
 
@@ -491,7 +491,7 @@ There's nothing to approve: `POST /api/v1/collect` already took the sats.
 
 - **No confirmation in the bot chat.** The signed call **is** the approval and pays straight away. Always show a review screen (amount, recipient, memo) before `send`, `invoice/pay` or a collect charge. Passkey approval is planned.
 - **`idempotency_key`:** a new UUID per payment, reused on every retry of **that** payment. The same key always returns the same transfer, so a retry can never pay twice. Reusing a key for a different payment → `409`.
-- **Logged-in users only:** every call names the user with `X-BDB-User`. A user who isn't linked gets `403 login_required`; log them in with `POST /api/v1/init`.
+- **`X-BDB-User` on every call:** any user with a bot wallet can be named. A user with no wallet gets `403 sender_not_found`; create it with `POST /api/v1/init`.
 - **Limits:** `max_amount` per transfer and `daily_limit` per user per UTC day. 10 sends or payments per minute, 30 resolves or decodes per minute, 30 status polls per minute.
 - **Recipients** must have started the bot or gone through `init`. No sending to yourself.
 
@@ -504,7 +504,7 @@ Body: `{ "code": "…", "message": "…" }`. `message` is written for the user a
 | 400 | `invalid_json`, `invalid_amount`, `amount_too_large`, `memo_too_long`, `invalid_idempotency_key`, `invalid_recipient`, `self_send`, `invalid_invoice`, `amountless_invoice`, `invoice_expired`, `invalid_referral_code`, `invalid_request` |
 | 401 | `unauthorized`: on `init`, the Telegram login is missing, invalid, too old or sent twice. Elsewhere, `X-BDB-User` is missing or bad, or a Telegram credential was sent instead |
 | 401 | `bad_service_signature` (DCA BE's P2P signature is wrong, expired or replayed: a server bug) |
-| 401 / 403 | `login_required`: `X-BDB-User` sent to `init` (401), or the user isn't linked yet (403) |
+| 401 | `login_required`: `X-BDB-User` sent to `init` |
 | 403 | `forbidden` (IP), `sender_not_found` (no wallet: call `/api/v1/init`), `sender_not_allowed` (banned) |
 | 404 | `recipient_not_found`, `not_found` |
 | 409 | `idempotency_conflict`, `in_progress`, `request_closed` |
@@ -585,12 +585,12 @@ See §6.8.
 
 ```
 App open → get initData (Mini App) or id_token (web app)
-→ DCA BE: POST /api/v1/init with that credential       → wallet ready, user linked
+→ DCA BE: POST /api/v1/init with that credential       → wallet ready
 → DCA BE creates its own session (HttpOnly cookie, refresh tokens)
 → every later call: X-BDB-User (signed text …-V2)       → no Telegram re-login
 ```
 
-Log in again (a new `/api/v1/init`) on a new device, after DCA BE's session ends, or if a call returns `403 login_required`.
+Log in again (a new `/api/v1/init`) on a new device, or after DCA BE's session ends.
 
 ---
 
