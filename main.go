@@ -165,7 +165,6 @@ func startApiServer(bot *telegram.TipBot) {
 	} else {
 		log.Infof("API Send endpoint disabled in configuration")
 	}
-	s.ListenAndServe()
 
 	// Telegram Mini App sending. The sender is the user in the signed init data.
 	if internal.Configuration.API.P2P.Enabled {
