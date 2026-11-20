@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/LightningTipBot/LightningTipBot/internal"
@@ -107,14 +108,21 @@ func (w *Server) receive(writer http.ResponseWriter, request *http.Request) {
 	}
 	log.Debugln("[Webhook] Received request")
 	request.Body = http.MaxBytesReader(writer, request.Body, maxWebhookBody)
-	webhookEvent := Webhook{}
-	// need to delete the header otherwise the Decode will fail
-	request.Header.Del("content-length")
-	err := json.NewDecoder(request.Body).Decode(&webhookEvent)
+	body, err := io.ReadAll(request.Body)
 	if err != nil {
-		log.Errorf("[Webhook] Error decoding request: %s", err.Error())
+		log.Errorf("[Webhook] Error reading request: %v", err)
 		writer.WriteHeader(400)
 		return
+	}
+	webhookEvent := Webhook{}
+	if err := json.Unmarshal(body, &webhookEvent); err != nil {
+		// LNbits may post the payment as a JSON-encoded string: unwrap it once.
+		var inner string
+		if json.Unmarshal(body, &inner) != nil || json.Unmarshal([]byte(inner), &webhookEvent) != nil {
+			log.Errorf("[Webhook] Error decoding request: %v", err)
+			writer.WriteHeader(400)
+			return
+		}
 	}
 	if webhookEvent.WalletID == "" || !lnbits.ValidPaymentHash(webhookEvent.PaymentHash) {
 		log.Warnf("[Webhook] Rejected request with missing wallet id or malformed payment hash from %s", request.RemoteAddr)
