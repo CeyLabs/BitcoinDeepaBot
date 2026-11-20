@@ -36,7 +36,7 @@ Detailed references, if you need more: [send-api-ed25519.md](send-api-ed25519.md
 
 | Key | Signs | Bot config | If it leaks |
 |---|---|---|---|
-| **Send key** | (1) DCA's wallet: payouts and collect requests | `api.send.whitelisted_wallets.<id>.ed25519_public_key` | Someone can send sats **from the DCA wallet**, and **charge any logged-in user** (collect), up to its limits |
+| **Send key** | (1) DCA's wallet: payouts and collect requests | `api.send.whitelisted_wallets.<id>.ed25519_public_key` | Someone can send sats **from the DCA wallet**, and **charge any bot user** (collect), up to its limits |
 | **P2P key** | (2) user-wallet relay | `api.p2p.service_public_key` | Can act as, and pay from, any **linked** user (anyone who logged in through `/api/v1/init`), up to `daily_limit`, until passkeys exist. Guard it like the send key. |
 
 Keep the keys **separate**, so either can be rotated without touching the other. A signature made with one key is useless on the other API: each signs a different first line (`BDB-SEND-…` vs `BDB-P2P-…`).
@@ -284,7 +284,7 @@ POST
 
 | Field | Notes |
 |---|---|
-| `X-BDB-User` (header) | The user to charge: numeric Telegram ID. They must have logged in through `/api/v1/init` (§6.1), otherwise `403 payer_not_linked` |
+| `X-BDB-User` (header) | The user to charge: numeric Telegram ID. They must have a bot wallet (started the bot, or `/api/v1/init`, §6.1), otherwise `404 recipient_not_found` |
 | `amount` | Sats, at most the wallet's `max_amount` |
 | `memo` | Optional. Shown in the user's history |
 | `external_id` | 8–128 chars, unique per charge: **use your order ID**. A retry with it returns the same request (`200` instead of `201`) and never charges twice. The same ID with a different user, amount or memo → `409 idempotency_conflict` |
@@ -317,7 +317,7 @@ Errors use the P2P shape `{ "code", "message" }`:
 | HTTP | `code` |
 |---|---|
 | 400 | `invalid_amount`, `amount_too_large`, `memo_too_long`, `invalid_external_id`, `invalid_recipient`, `self_collect` |
-| 403 | `collect_not_allowed` (no `can_collect`), `collector_not_allowed`, `payer_not_linked` |
+| 403 | `collect_not_allowed` (no `can_collect`), `collector_not_allowed` |
 | 404 | `recipient_not_found`, `not_found` |
 | 409 | `idempotency_conflict`, `in_progress` |
 | 429 | `rate_limited` |
