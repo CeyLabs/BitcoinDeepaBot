@@ -3,11 +3,17 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
 	"time"
 
+	"github.com/LightningTipBot/LightningTipBot/internal/lnbits"
 	"github.com/LightningTipBot/LightningTipBot/internal/telegram"
 	log "github.com/sirupsen/logrus"
 )
+
+// maxHistoryWindow caps offset+limit for the merged history: both the
+// internal table and LNbits are read from the newest entry up to it.
+const maxHistoryWindow = 1000
 
 // UserTransactionsRequest represents the JSON request for the user transactions API
 type UserTransactionsRequest struct {
@@ -16,9 +22,11 @@ type UserTransactionsRequest struct {
 	Offset     int   `json:"offset"`      // Optional: number of transactions to skip for pagination
 }
 
-// UserTransactionData represents a single internal transaction in the response
+// UserTransactionData is one entry in a user's history: an internal transfer
+// (tips, sends, P2P, ...) or a Lightning payment from LNbits (type
+// "lightning": /pay, /invoice, Lightning-address receipts).
 type UserTransactionData struct {
-	ID        uint   `json:"id"`
+	ID        uint   `json:"id"` // internal transfers only; 0 for Lightning payments
 	Time      string `json:"time"`
 	Direction string `json:"direction"` // "incoming" or "outgoing" relative to the queried user
 	FromID    int64  `json:"from_id"`
@@ -30,6 +38,10 @@ type UserTransactionData struct {
 	AmountLKR string `json:"amount_lkr,omitempty"`
 	Memo      string `json:"memo,omitempty"`
 	Success   bool   `json:"success"`
+	// Lightning payments only.
+	Fee         int64  `json:"fee,omitempty"`    // sats
+	Status      string `json:"status,omitempty"` // "success", "pending" or "failed"
+	PaymentHash string `json:"payment_hash,omitempty"`
 }
 
 // UserTransactionsResponse represents the JSON response for the user transactions API
@@ -77,8 +89,17 @@ func (s Service) UserTransactions(w http.ResponseWriter, r *http.Request) {
 		offset = maxAnalyticsOffset
 	}
 
+	if offset+limit > maxHistoryWindow {
+		offset = maxHistoryWindow - limit
+		if offset < 0 {
+			offset = 0
+		}
+	}
+	window := offset + limit
+
 	// Confirm the user exists so we can distinguish "unknown user" from "no transactions"
-	if _, err := telegram.GetUserByTelegramID(req.TelegramID, *s.Bot); err != nil {
+	user, err := telegram.GetUserByTelegramID(req.TelegramID, *s.Bot)
+	if err != nil {
 		log.Warnf("[api/usertransactions] User not found for Telegram ID %d: %v", req.TelegramID, err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -94,12 +115,14 @@ func (s Service) UserTransactions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch internal transactions where the user is either sender or recipient
+	// Fetch internal transactions where the user is either sender or recipient.
+	// Both sources are read from the newest entry up to offset+limit, merged
+	// by time, and then the page is cut out.
 	var internalTxs []telegram.Transaction
 	dbTx := s.Bot.DB.Transactions.
 		Where("from_id = ? OR to_id = ?", req.TelegramID, req.TelegramID).
 		Order("time desc").
-		Limit(limit).Offset(offset).
+		Limit(window).
 		Find(&internalTxs)
 	if dbTx.Error != nil {
 		log.Errorf("[api/usertransactions] Database error fetching transactions for user %d: %v", req.TelegramID, dbTx.Error)
@@ -107,13 +130,17 @@ func (s Service) UserTransactions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	transactions := make([]UserTransactionData, 0, len(internalTxs))
+	type entry struct {
+		at   time.Time
+		data UserTransactionData
+	}
+	entries := make([]entry, 0, len(internalTxs))
 	for _, tx := range internalTxs {
 		direction := "incoming"
 		if tx.FromId == req.TelegramID {
 			direction = "outgoing"
 		}
-		transactions = append(transactions, UserTransactionData{
+		entries = append(entries, entry{tx.Time, UserTransactionData{
 			ID:        tx.ID,
 			Time:      tx.Time.Format(time.RFC3339),
 			Direction: direction,
@@ -126,7 +153,17 @@ func (s Service) UserTransactions(w http.ResponseWriter, r *http.Request) {
 			AmountLKR: getLKRValue(tx.Amount),
 			Memo:      tx.Memo,
 			Success:   tx.Success,
-		})
+		}})
+	}
+
+	for _, p := range s.lightningPayments(user, window) {
+		entries = append(entries, entry{time.Unix(int64(p.Time), 0).UTC(), lightningEntry(req.TelegramID, p)})
+	}
+
+	sort.SliceStable(entries, func(i, j int) bool { return entries[i].at.After(entries[j].at) })
+	transactions := make([]UserTransactionData, 0, limit)
+	for i := offset; i < len(entries) && i < window; i++ {
+		transactions = append(transactions, entries[i].data)
 	}
 
 	log.Infof("[api/usertransactions] Retrieved %d transaction(s) for user %d", len(transactions), req.TelegramID)
@@ -142,4 +179,79 @@ func (s Service) UserTransactions(w http.ResponseWriter, r *http.Request) {
 		Transactions: transactions,
 		Message:      "Transactions retrieved successfully",
 	})
+}
+
+// lightningPayments returns the user's newest LNbits payments, up to n,
+// leaving out those that are internal transfers (already in the internal
+// table, matched by payment hash). Errors are logged and give no payments, so
+// the internal history is still returned.
+func (s Service) lightningPayments(user *lnbits.User, n int) lnbits.Payments {
+	if user.Wallet == nil || s.Bot.Client == nil {
+		return nil
+	}
+	payments, err := s.Bot.Client.PaymentsWithOptions(*user.Wallet, n, 0)
+	if err != nil {
+		log.Warnf("[api/usertransactions] LNbits payments for user %d: %v", user.Telegram.ID, err)
+		return nil
+	}
+	hashes := make([]string, 0, len(payments))
+	for _, p := range payments {
+		if p.PaymentHash != "" {
+			hashes = append(hashes, p.PaymentHash)
+		}
+	}
+	internal := map[string]bool{}
+	if len(hashes) > 0 {
+		var found []string
+		if err := s.Bot.DB.Transactions.Model(&telegram.Transaction{}).
+			Where("invoice_payment_hash IN ?", hashes).
+			Pluck("invoice_payment_hash", &found).Error; err != nil {
+			log.Warnf("[api/usertransactions] Matching internal transfers for user %d: %v", user.Telegram.ID, err)
+			return nil
+		}
+		for _, h := range found {
+			internal[h] = true
+		}
+	}
+	out := payments[:0]
+	for _, p := range payments {
+		if !internal[p.PaymentHash] {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// lightningEntry turns an LNbits payment (amounts in msat, negative when
+// outgoing) into a history entry.
+func lightningEntry(telegramID int64, p lnbits.Payment) UserTransactionData {
+	amount, fee := p.Amount/1000, p.Fee/1000
+	direction, from, to := "incoming", int64(0), telegramID
+	if p.Amount < 0 {
+		amount, direction, from, to = -amount, "outgoing", telegramID, 0
+	}
+	if fee < 0 {
+		fee = -fee
+	}
+	status := p.Status
+	if status == "" {
+		status = "success"
+		if p.Pending {
+			status = "pending"
+		}
+	}
+	return UserTransactionData{
+		Time:        time.Unix(int64(p.Time), 0).UTC().Format(time.RFC3339),
+		Direction:   direction,
+		FromID:      from,
+		ToID:        to,
+		Type:        "lightning",
+		Amount:      amount,
+		AmountLKR:   getLKRValue(amount),
+		Memo:        p.Memo,
+		Success:     status == "success",
+		Fee:         fee,
+		Status:      status,
+		PaymentHash: p.PaymentHash,
+	}
 }
