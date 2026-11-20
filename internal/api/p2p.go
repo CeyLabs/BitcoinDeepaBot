@@ -354,6 +354,10 @@ func toTransferResponse(t *telegram.P2PTransfer) TransferResponse {
 	}
 	if t.Kind == telegram.P2PKindInternal {
 		resp.To = &RecipientResponse{TelegramID: t.ToTelegramID, Username: t.ToUsername, Name: t.ToName}
+		// The hash of the invoice the internal send paid: the same payment_hash
+		// its row has in /api/v1/usertransactions, so a caller (the DCA backend
+		// for a sale's collect) can find that row exactly.
+		resp.PaymentHash = t.InternalPaymentHash
 	}
 	if t.Status == telegram.P2PCompleted {
 		resp.Preimage = t.Preimage

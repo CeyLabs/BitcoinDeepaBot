@@ -260,7 +260,9 @@ no approval step. See [collect-api.md](collect-api.md).
 }
 ```
 `kind` is `internal` or `invoice`. Invoice transfers have no `to` but have
-`payment_hash`, `description` and, once paid, `fee` and `preimage`.
+`payment_hash`, `description` and, once paid, `fee` and `preimage`. Internal
+transfers have `payment_hash` too: the hash of the invoice the send paid, the
+same `payment_hash` as the transfer's row in `/api/v1/usertransactions`.
 
 | `status` | HTTP | Meaning | Mini App shows |
 |---|---|---|---|
