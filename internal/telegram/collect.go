@@ -15,30 +15,28 @@ import (
 	"github.com/tidwall/buntdb"
 )
 
-// A collect request asks a user (the payer) to pay sats to a whitelisted API
-// wallet (the collector). The API only creates the request; nothing moves
-// until the payer approves it from the Mini App or web app. Approving creates a P2P transfer from the payer
-// to the collector, so payment, settlement checks and refunds all reuse the
-// P2P code.
+// A collect request charges a user (the payer) sats for a whitelisted API
+// wallet (the collector). There is no approval step: the wallet's signed
+// call creates the request and pays it at once. Paying creates a P2P
+// transfer from the payer to the collector, so payment, settlement checks
+// and refunds all reuse the P2P code.
 //
-// Every request ends with one decision: approve, decline, cancel (by the
-// collector) or expire. The decision is taken with GetOrSet on one key, so
-// only the first one counts, and the stored value is the truth if the record
-// was not updated (for example after a crash).
+// Every request ends with one decision: charged ("approved") or expired (if
+// the bot stopped before paying and nobody retried in time). The decision is
+// taken with GetOrSet on one key, so only the first one counts, and the
+// stored value is the truth if the record was not updated (for example after
+// a crash).
 
 // Collect request states.
 const (
-	CollectPending   = "pending"
-	CollectApproved  = "approved" // a transfer exists; see its status
-	CollectDeclined  = "declined"
-	CollectCancelled = "cancelled"
-	CollectExpired   = "expired"
+	CollectPending  = "pending"
+	CollectApproved = "approved" // a transfer exists; see its status
+	CollectExpired  = "expired"
 )
 
 const (
 	CollectExpiry = 15 * time.Minute
-	// collectPerHour caps new requests per collector and payer, so a
-	// collector cannot flood a user with prompts.
+	// collectPerHour caps charges per collector and payer.
 	collectPerHour = 10
 )
 
@@ -73,7 +71,7 @@ func newCollectID() string {
 func collectDecideKey(id string) string { return "collect-decide:" + id }
 
 // CollectCreate creates a request from walletID's user to collect amount
-// sats from payer, who approves it in the Mini App or web app. A repeat of
+// sats from payer. CollectCharge pays it. A repeat of
 // the same externalID returns the original request; the same externalID with
 // different parameters is refused.
 func (bot *TipBot) CollectCreate(walletID string, collector, payer *lnbits.User, amount, maxAmount int64, memo, externalID string, maxMemo int) (*CollectRequest, bool, error) {
@@ -215,9 +213,10 @@ func (bot *TipBot) collectApprove(c *CollectRequest, payer *lnbits.User) (t *P2P
 	return t, true, nil
 }
 
-// CollectApprove approves and pays a request from the Mini App or web app.
-// A repeat returns the same transfer.
-func (bot *TipBot) CollectApprove(id string, payer *lnbits.User) (*P2PTransfer, error) {
+// CollectCharge pays a request from its payer, with no approval step. A
+// repeat returns the same transfer, and a request that was created but not
+// paid (the bot stopped) is paid by the retry.
+func (bot *TipBot) CollectCharge(id string, payer *lnbits.User) (*P2PTransfer, error) {
 	c, err := bot.CollectGet(id)
 	if err != nil || c.PayerTelegramID != payer.Telegram.ID {
 		return nil, p2pErr("not_found", "Request not found.")
@@ -227,29 +226,4 @@ func (bot *TipBot) CollectApprove(id string, payer *lnbits.User) (*P2PTransfer, 
 		return t, err
 	}
 	return t, bot.p2pBegin(payer, t)
-}
-
-// CollectDecline declines a request for its payer.
-func (bot *TipBot) CollectDecline(id string, payerID int64) (*CollectRequest, error) {
-	c, err := bot.CollectGet(id)
-	if err != nil || c.PayerTelegramID != payerID {
-		return nil, p2pErr("not_found", "Request not found.")
-	}
-	if !bot.collectDecide(c, CollectDeclined) {
-		return c, p2pErr("request_closed", "This request is %s.", c.Status)
-	}
-	log.Infof("[collect] %s declined by %d", c.ID, payerID)
-	return c, nil
-}
-
-// CollectCancel withdraws a request for the wallet that made it.
-func (bot *TipBot) CollectCancel(id, walletID string) (*CollectRequest, error) {
-	c, err := bot.CollectGet(id)
-	if err != nil || c.WalletID != walletID {
-		return nil, p2pErr("not_found", "Request not found.")
-	}
-	if !bot.collectDecide(c, CollectCancelled) {
-		return c, p2pErr("request_closed", "This request is %s.", c.Status)
-	}
-	return c, nil
 }
