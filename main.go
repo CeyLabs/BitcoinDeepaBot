@@ -169,6 +169,7 @@ func startApiServer(bot *telegram.TipBot) {
 
 	// Telegram Mini App sending. The sender is the user in the signed init data.
 	if internal.Configuration.API.P2P.Enabled {
+		s.AppendRoute(`/api/v1/init`, p2p.AuthNewUser(p2p.Init), http.MethodPost)
 		s.AppendRoute(`/api/v1/p2p/me`, p2p.Auth(p2p.Me), http.MethodGet)
 		s.AppendRoute(`/api/v1/p2p/resolve`, p2p.Auth(p2p.Resolve), http.MethodPost)
 		s.AppendRoute(`/api/v1/p2p/send`, p2p.AuthSpend(p2p.Send), http.MethodPost)
