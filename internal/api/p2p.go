@@ -161,7 +161,7 @@ func (p *P2PService) AuthSpend(next http.HandlerFunc) http.HandlerFunc {
 
 func (p *P2PService) auth(next http.HandlerFunc, spend bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tg, ok := p2pVerifyCaller(w, r, spend)
+		tg, ok := p.p2pVerifyCaller(w, r, spend, true)
 		if !ok {
 			return
 		}
@@ -177,10 +177,12 @@ func (p *P2PService) auth(next http.HandlerFunc, spend bool) http.HandlerFunc {
 type p2pTelegramCtxKey struct{}
 
 // AuthNewUser is Auth for /api/v1/init: it checks the caller and the credential the
-// same way, but does not need the user to have a wallet yet.
+// same way, but does not need the user to have a wallet yet. It always needs
+// a Telegram credential (V1): this is where a user is verified with Telegram
+// and linked for V2 calls.
 func (p *P2PService) AuthNewUser(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tg, ok := p2pVerifyCaller(w, r, false)
+		tg, ok := p.p2pVerifyCaller(w, r, false, false)
 		if !ok {
 			return
 		}
@@ -188,9 +190,13 @@ func (p *P2PService) AuthNewUser(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// p2pVerifyCaller checks the IP allowlist, the DCA backend's service
-// signature and the user's Telegram credential, and returns the user.
-func p2pVerifyCaller(w http.ResponseWriter, r *http.Request, spend bool) (*tb.User, bool) {
+// p2pVerifyCaller checks the IP allowlist and the DCA backend's service
+// signature, then identifies the user:
+//   - V1: from the Telegram credential (init data or ID token), which also
+//     links the user for V2;
+//   - V2 (allowV2, api.p2p.service_user_auth): from UserHeader, trusting the
+//     DCA backend's signature, for users linked by an earlier V1 call.
+func (p *P2PService) p2pVerifyCaller(w http.ResponseWriter, r *http.Request, spend, allowV2 bool) (*tb.User, bool) {
 	cfg := internal.Configuration.API.P2P
 	now := time.Now()
 	if len(cfg.AllowedNets) > 0 {
@@ -213,11 +219,47 @@ func p2pVerifyCaller(w http.ResponseWriter, r *http.Request, spend bool) (*tb.Us
 		}
 		return nil, false
 	}
+	if len(r.Header.Values(UserHeader)) > 0 {
+		return p.p2pServiceUser(w, r, cfg, allowV2)
+	}
 	maxAge := cfg.InitDataMaxAge
 	if spend {
 		maxAge = cfg.SpendInitDataMaxAge
 	}
-	return p2pIdentifyUser(w, r, cfg, time.Duration(maxAge)*time.Second, now)
+	tg, ok := p2pIdentifyUser(w, r, cfg, time.Duration(maxAge)*time.Second, now)
+	if ok && p.Bot != nil && p.Bot.Bunt != nil {
+		p.Bot.P2PLink(tg.ID)
+	}
+	return tg, ok
+}
+
+// p2pServiceUser identifies a V2 call's user from UserHeader. The service
+// signature (already checked) covers the header, so only the DCA backend can
+// name a user; the user must have been linked by a Telegram-verified call.
+func (p *P2PService) p2pServiceUser(w http.ResponseWriter, r *http.Request, cfg internal.APIP2PConfiguration, allowV2 bool) (*tb.User, bool) {
+	if !allowV2 {
+		p2pFail(w, http.StatusUnauthorized, "login_required", "This call needs a Telegram login.")
+		return nil, false
+	}
+	if !cfg.ServiceUserAuth {
+		p2pFail(w, http.StatusUnauthorized, "unauthorized", "X-BDB-User is not enabled on this bot.")
+		return nil, false
+	}
+	if r.Header.Get(InitDataHeader) != "" || r.Header.Get(IDTokenHeader) != "" {
+		p2pFail(w, http.StatusUnauthorized, "unauthorized", "Send either X-BDB-User or a Telegram credential, not both.")
+		return nil, false
+	}
+	id, err := strconv.ParseInt(r.Header.Get(UserHeader), 10, 64)
+	if err != nil || id <= 0 {
+		p2pFail(w, http.StatusUnauthorized, "unauthorized", "X-BDB-User must be a numeric Telegram user ID.")
+		return nil, false
+	}
+	if p.Bot == nil || p.Bot.Bunt == nil || !p.Bot.P2PLinked(id) {
+		log.Warnf("[api/p2p] V2 call for unlinked user %d from %s", id, getClientIP(r))
+		p2pFail(w, http.StatusForbidden, "login_required", "Open the app and log in with Telegram first.")
+		return nil, false
+	}
+	return &tb.User{ID: id}, true
 }
 
 // p2pIdentify returns the Telegram user a request is for, from exactly one
