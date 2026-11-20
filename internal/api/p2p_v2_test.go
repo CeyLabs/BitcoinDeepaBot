@@ -55,25 +55,15 @@ func TestP2PServiceUserAuth(t *testing.T) {
 		return u.ID, rec
 	}
 
-	// Not linked yet: refused.
-	if id, rec := call(p2pRequestV2(http.MethodPost, "/api/v1/p2p/send", "{}", "42", testServiceKey), true); id != 0 || rec.Code != http.StatusForbidden || errCode(rec) != "login_required" {
-		t.Fatalf("unlinked user: id %d, %d %s", id, rec.Code, errCode(rec))
+	// V2 works without a prior login, for spends too.
+	if id, rec := call(p2pRequestV2(http.MethodPost, "/api/v1/p2p/send", "{}", "42", testServiceKey), true); id != 42 {
+		t.Fatalf("V2 call: %d %s", rec.Code, errCode(rec))
 	}
 
-	// A Telegram-verified (V1) call links the user.
+	// /init still checks the Telegram login.
 	initData := tma.Sign(tma.User{ID: 42, FirstName: "Eve"}, "123:REAL", time.Now(), nil)
 	if id, rec := call(p2pRequest(http.MethodPost, "/api/v1/init", "{}", initData, time.Now(), p2pNonce(), testServiceKey), false); id != 42 {
 		t.Fatalf("V1 call failed: %d %s", rec.Code, errCode(rec))
-	}
-
-	// Now V2 works, for spends too.
-	if id, rec := call(p2pRequestV2(http.MethodPost, "/api/v1/p2p/send", "{}", "42", testServiceKey), true); id != 42 {
-		t.Fatalf("linked user: %d %s", rec.Code, errCode(rec))
-	}
-
-	// Another user, never verified with Telegram: refused.
-	if id, _ := call(p2pRequestV2(http.MethodGet, "/api/v1/p2p/me", "", "43", testServiceKey), true); id != 0 {
-		t.Fatal("unlinked user 43 accepted")
 	}
 
 	// /init never accepts V2.

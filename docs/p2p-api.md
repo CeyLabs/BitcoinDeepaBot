@@ -17,7 +17,7 @@ Two parts, on every call:
    - **Login, `POST /api/v1/init` only:** the user's Telegram login, which the
      bot checks with Telegram. This links the user.
    - **Every other call:** `X-BDB-User: <telegram_id>`. The bot trusts the DCA
-     backend's signature for it, but only for **linked** users.
+     backend's signature for it.
 
 ```
 Mini App ──(initData)──► DCA backend ──POST /api/v1/init + X-Telegram-Init-Data──► bot   (login, once)
@@ -58,11 +58,10 @@ Send **exactly one** credential signed by Telegram, **unchanged**:
 
 - Header `X-BDB-User: <numeric telegram_id>`, and **no** Telegram credential.
   A call that sends a credential instead gets `401`.
-- **Linked users only:** users who logged in through `POST /api/v1/init`.
-  Others get `403 login_required`, so call `/api/v1/init` with their Telegram
-  login. A link lasts a year and is renewed by each login.
+- **Any user with a bot wallet** can be named. A user with no wallet gets
+  `403 sender_not_found`: create it with `POST /api/v1/init`.
 - **Security:** the bot trusts the DCA backend about who the user is,
-  **payments included**. If the P2P key leaks, it can pay from any linked
+  **payments included**. If the P2P key leaks, it can pay from any
   user's wallet, up to `daily_limit`. Passkeys will add per-payment approval
   ([session-passkey-spec.md](session-passkey-spec.md)). Keep the P2P key in a
   secret store and the user sessions server-side.
@@ -282,7 +281,7 @@ no approval step. See [collect-api.md](collect-api.md).
 |---|---|
 | 400 | `invalid_json`, `invalid_amount`, `amount_too_large`, `memo_too_long`, `invalid_idempotency_key`, `invalid_recipient`, `self_send`, `invalid_invoice`, `amountless_invoice`, `invoice_expired` |
 | 401 | `unauthorized`: on `/api/v1/init`, the Telegram login is missing, invalid, too old or sent twice (Mini App: reopen it; web app: log in again). On other calls, `X-BDB-User` is missing or not a number, or a Telegram credential was sent instead. |
-| 401 / 403 | `login_required`: `X-BDB-User` sent to `/api/v1/init` (401), or the user isn't linked yet (403): log them in with `POST /api/v1/init`. |
+| 401 | `login_required`: `X-BDB-User` sent to `/api/v1/init`. |
 | 401 | `bad_service_signature`: the DCA backend's P2P signature is missing, wrong, expired or replayed. A server bug, not a user error. |
 | 403 | `forbidden` (caller's IP not in `api.p2p.allowed_networks`), `sender_not_found` (no wallet yet: call `POST /api/v1/init`), `sender_not_allowed` |
 | 503 | `wallet_unavailable` (wallet creation failed; retry) |
