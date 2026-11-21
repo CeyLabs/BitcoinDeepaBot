@@ -208,7 +208,7 @@ All of these are signed as in §3 and only work while `api.send.enabled` is true
 
 | HTTP | Body | Meaning | DCA BE should |
 |---|---|---|---|
-| `200` | `success: true` | Sent. Invoices also return `payment_hash`, `fee`, `preimage` | Mark the order paid |
+| `200` | `success: true` | Sent, with `payment_hash` (internal sends: the same as the transfer's `/usertransactions` row). Invoices also return `fee`, `preimage` | Mark the order paid; store `payment_hash` to find its history row |
 | `202` + `"status": "pending"` | `payment_hash` | Invoice payment still routing | Poll §4.3. **Don't** retry with a new invoice |
 | `202` + `"status": "awaiting_approval"` | `message` ends with `Transaction ID: <id>` | Above `admin_approval_threshold`: waiting for an operator in Telegram | Poll §4.2 with that ID |
 | `400` | `success: false`, `message` | Rejected, nothing sent (bad recipient, limits, duplicate memo, low balance, invoice rejected) | Fix or fail the order |
@@ -223,7 +223,7 @@ Default limits: `min_amount` 1, `max_amount` 1,000,000, `admin_approval_threshol
   "request_timestamp": "…", "expiry_time": "…" }
 ```
 
-`status` goes `pending` → `approved` → `executed`, or ends `rejected` / `expired` (after 24 h). An approved invoice payment can report `in_flight` with a `payment_hash`; continue with §4.3.
+`status` goes `pending` → `approved` → `executed`, or ends `rejected` / `expired` (after 24 h). An executed internal send has the transfer's `payment_hash` (the same as its `/usertransactions` row). An approved invoice payment can report `in_flight` with a `payment_hash`; continue with §4.3.
 
 ### 4.3 `GET /api/v1/send/payment/{payment_hash}` — invoice settlement
 

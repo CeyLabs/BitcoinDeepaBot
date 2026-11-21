@@ -12,6 +12,11 @@ const PendingTxExpiry = 24 * time.Hour
 // creating an import cycle (api imports telegram, telegram imports storage).
 var UpdatePendingTxStatusFn func(id, status, actor string)
 
+// SetPendingTxPaymentHashFn is set by the api package at startup, like
+// UpdatePendingTxStatusFn: it records the payment hash of an approved internal
+// send once it executed, so /api/v1/send/status returns it.
+var SetPendingTxPaymentHashFn func(id, paymentHash string)
+
 // PendingTransaction status values.
 //
 // These live here rather than in the api package because both api and telegram
