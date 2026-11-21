@@ -255,9 +255,12 @@ func TestTransferResponse(t *testing.T) {
 	tr := &telegram.P2PTransfer{
 		Base: storage.New(storage.ID("p2p-1")), Kind: telegram.P2PKindInternal, Status: telegram.P2PProcessing,
 		ToTelegramID: 7, ToUsername: "bob", ToName: "Bob", Amount: 60000, Preimage: "secret",
-		IdempotencyKey: "never-shown",
+		IdempotencyKey: "never-shown", InternalPaymentHash: "abc123",
 	}
 	resp := toTransferResponse(tr)
+	if resp.PaymentHash != "abc123" {
+		t.Fatalf("internal transfer should show its invoice hash, got %q", resp.PaymentHash)
+	}
 	if resp.Preimage != "" {
 		t.Fatal("preimage shown before completion")
 	}

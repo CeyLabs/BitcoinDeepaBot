@@ -177,6 +177,12 @@ func (bot *TipBot) approveAPITransactionHandler(ctx intercept.Context) (intercep
 
 	approvalData.Inactivate(approvalData, bot.Bunt)
 
+	// Record the transfer's hash first (the status update below reloads and
+	// saves the same record), so /api/v1/send/status returns it with executed.
+	if storage.SetPendingTxPaymentHashFn != nil {
+		storage.SetPendingTxPaymentHashFn(approvalData.TransactionID, t.Invoice.PaymentHash)
+	}
+
 	// Update the PendingTransaction status so /api/v1/send/status reflects the real outcome.
 	if storage.UpdatePendingTxStatusFn != nil {
 		storage.UpdatePendingTxStatusFn(approvalData.TransactionID, storage.TxStatusExecuted, ctx.Callback().Sender.Username)
